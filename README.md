@@ -4,7 +4,7 @@ A customer-support community built with Java, Spring Boot, PostgreSQL, and React
 
 ## Status
 
-Stage 1 is complete: repository setup and all prerequisite checks passed, including a real Linux container run. See [development setup](docs/development-setup.md). Stage 2 has not started: there is no backend application, database service, migration, or frontend application yet.
+Stage 1 is complete: repository setup and all prerequisite checks passed, including a real Linux container run. See [development setup](docs/development-setup.md). Stage 2 is complete: the Spring Boot backend, PostgreSQL service, first migration, and seven passing integration tests are implemented. See [backend setup](docs/backend-setup.md) for run commands. The frontend has not started.
 
 The first milestone delivers accounts, public boards, questions, replies, accepted solutions, server-enforced permissions, tests, and Docker Compose startup.
 
@@ -14,13 +14,13 @@ The first milestone delivers accounts, public boards, questions, replies, accept
 - Node.js: 24.13.1; npm: 11.8.0. Pinned in `.nvmrc`.
 - Git: verified with 2.53.0.windows.1.
 - Docker Desktop: 4.91.0 selected; use its bundled Docker Engine and Compose.
-- Spring Boot: 4.1.1, to be pinned in Stage 2 with Maven Wrapper.
-- PostgreSQL: major 18; exact container patch/digest will be selected and tested in Stage 2.
+- Spring Boot: 4.1.1; Maven Wrapper: 3.3.4; Maven: 3.9.16.
+- PostgreSQL: 18.6-alpine3.24, pinned by digest in Compose and integration tests.
 - React and React DOM: 19.3.0.
 - TypeScript: 7.0.2; Vite: 8.3.0; React plugin: 6.1.1.
 - React Router: 8.3.1; TanStack Query: 5.102.8.
 
-Frontend versions were checked against npm registry engine and peer metadata. They are selected, not installed or build-tested; Stage 3 will generate the manifest and lockfile and verify the complete frontend dependency graph. Spring Boot manages backend dependency versions in Stage 2. REST comes first; GraphQL follows the verified core workflow.
+Frontend versions were checked against npm registry engine and peer metadata. They are selected, not installed or build-tested; Stage 3 will generate the manifest and lockfile and verify the complete frontend dependency graph. Spring Boot manages backend dependency versions. REST comes first; GraphQL follows the verified core workflow.
 
 ## Local prerequisite check
 
@@ -38,7 +38,7 @@ Docker Desktop must be installed and running in Linux-container mode. Complete a
 
 ## Repository layout
 
-- `backend/`: reserved for the Stage 2 Spring Boot application.
+- `backend/`: Spring Boot application, Flyway migration, Maven Wrapper, and integration tests.
 - `frontend/`: reserved for the Stage 3 React application.
 - `scripts/`: local tool selection and prerequisite checks.
 - `docs/`: shared setup documentation.
