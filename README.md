@@ -4,7 +4,7 @@ A customer-support community built with Java, Spring Boot, PostgreSQL, and React
 
 ## Status
 
-Stage 1 is complete: repository setup and all prerequisite checks passed, including a real Linux container run. See [development setup](docs/development-setup.md). Stage 2 is complete: the Spring Boot backend, PostgreSQL service, first migration, and seven passing integration tests are implemented. See [backend setup](docs/backend-setup.md) for run commands. The frontend has not started.
+Stage 1 is complete: repository setup and all prerequisite checks passed, including a real Linux container run. See [development setup](docs/development-setup.md). Stage 2 is complete: the Spring Boot backend, PostgreSQL service, first migration, and seven passing integration tests are implemented. See [backend setup](docs/backend-setup.md) for run commands. Stage 3 is complete: a responsive React shell, live backend connection states, frontend tests, verification script, and initial CI jobs are implemented. See [frontend setup](docs/frontend-setup.md). Remote CI has not run for Stage 3 yet.
 
 The first milestone delivers accounts, public boards, questions, replies, accepted solutions, server-enforced permissions, tests, and Docker Compose startup.
 
@@ -17,10 +17,10 @@ The first milestone delivers accounts, public boards, questions, replies, accept
 - Spring Boot: 4.1.1; Maven Wrapper: 3.3.4; Maven: 3.9.16.
 - PostgreSQL: 18.6-alpine3.24, pinned by digest in Compose and integration tests.
 - React and React DOM: 19.3.0.
-- TypeScript: 7.0.2; Vite: 8.3.0; React plugin: 6.1.1.
+- TypeScript: 6.0.3; Vite: 8.3.0; React plugin: 6.1.1.
 - React Router: 8.3.1; TanStack Query: 5.102.8.
 
-Frontend versions were checked against npm registry engine and peer metadata. They are selected, not installed or build-tested; Stage 3 will generate the manifest and lockfile and verify the complete frontend dependency graph. Spring Boot manages backend dependency versions. REST comes first; GraphQL follows the verified core workflow.
+Frontend dependencies are pinned in package.json and package-lock.json and passed installation, lint, type checking, tests, and a production build. TypeScript 6.0.3 satisfies the lint tooling peer range. Spring Boot manages backend dependency versions. REST comes first; GraphQL follows the verified core workflow.
 
 ## Local prerequisite check
 
@@ -39,8 +39,8 @@ Docker Desktop must be installed and running in Linux-container mode. Complete a
 ## Repository layout
 
 - `backend/`: Spring Boot application, Flyway migration, Maven Wrapper, and integration tests.
-- `frontend/`: reserved for the Stage 3 React application.
-- `scripts/`: local tool selection and prerequisite checks.
+- `frontend/`: React/TypeScript shell, Vite proxy, component/client tests, and browser smoke checks.
+- `scripts/`: tool selection, database configuration, prerequisite checks, and combined verification.
 - `docs/`: shared setup documentation.
 
 Local planning documents are deliberately excluded from Git. Do not force-add them.

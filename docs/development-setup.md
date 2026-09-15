@@ -57,7 +57,7 @@ Final verification on 2026-09-15 passed:
 - The prerequisite script initially returned exit 1 while the engine was stopped, then exit 0 after Desktop started and the container ran.
 - Git diff whitespace check passed; local planning documents, credentials, Java build output, and frontend dependencies remain ignored.
 
-Stage 1 is complete. Stage 2 remains unstarted. No application build or database integration test is claimed at this stage.
+This record covers Stage 1 prerequisites. Stages 2 and 3 are now implemented; see backend-setup.md and frontend-setup.md for their separate verification.
 
 ## Sources
 
