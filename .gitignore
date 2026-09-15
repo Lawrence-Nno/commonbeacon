@@ -5,6 +5,10 @@
 *.pem
 *.key
 
+# Local planning documents
+/IMPLEMENTATION_GUIDE.md
+/MILESTONE_A_PLAN.md
+
 # Java builds
 target/
 *.class
