@@ -1026,3 +1026,10 @@ a.board-card:hover {
     font-size: 23px;
   }
 }
+
+.reply-section { margin-top: 3rem; border-top: 1px solid var(--border, #d8ded9); padding-top: 2rem; }
+.reply-list { display: grid; gap: 1rem; margin: 1.5rem 0; }
+.reply-card { padding: 1.5rem; border: 1px solid #d8ded9; border-radius: 1rem; background: #fff; min-width: 0; }
+.reply-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; margin-bottom: 1rem; }
+.reply-form { max-width: 100%; margin-top: 2rem; }
+.reply-form textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 9rem; padding: .9rem; border: 1px solid #aab8b0; border-radius: .6rem; font: inherit; }

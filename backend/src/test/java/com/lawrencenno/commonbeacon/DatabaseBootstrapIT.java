@@ -43,11 +43,11 @@ class DatabaseBootstrapIT {
 
     @Test
     void migrationIsAppliedOnceAndCanBeRunAgainWithoutChanges() {
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("3");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("4");
         assertThat(flyway.migrate().migrationsExecuted).isZero();
         assertThat(jdbc.queryForObject(
-                "SELECT count(*) FROM flyway_schema_history WHERE version IN ('1', '2', '3') AND success",
-                Integer.class)).isEqualTo(3);
+                "SELECT count(*) FROM flyway_schema_history WHERE version IN ('1', '2', '3', '4') AND success",
+                Integer.class)).isEqualTo(4);
     }
 
     @Test

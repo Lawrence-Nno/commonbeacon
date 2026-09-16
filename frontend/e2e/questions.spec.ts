@@ -142,6 +142,74 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
       fullPage: true,
     });
 
+    // A second member can reply, edit, and recover a stale draft.
+    await otherPage.goto(origin + questionPath);
+    await otherPage
+      .getByLabel("Your reply")
+      .fill("Try the setup guide. <b>Plain text answer.</b>");
+    await otherPage.getByRole("button", { name: "Post reply" }).click();
+    await expect(otherPage.locator(".reply-body")).toContainText(
+      "Try the setup guide.",
+    );
+    await otherPage.reload();
+    await expect(otherPage.locator(".reply-body")).toContainText(
+      "Plain text answer.",
+    );
+    await expect(otherPage.locator(".reply-body b")).toHaveCount(0);
+    const replies = await (
+      await otherPage.request.get(
+        origin + "/api/v1" + questionPath + "/replies",
+      )
+    ).json();
+    const reply = replies.items[0];
+    expect(
+      (
+        await mutation(
+          ownerPage,
+          "/api/v1/replies/" + reply.id,
+          { body: "Forged edit", expectedVersion: 0 },
+          "PATCH",
+        )
+      ).status(),
+    ).toBe(403);
+    await otherPage
+      .getByRole("button", { name: "Edit reply", exact: true })
+      .click();
+    const replyTab = await other.newPage();
+    await replyTab.goto(origin + questionPath);
+    await replyTab
+      .getByRole("button", { name: "Edit reply", exact: true })
+      .click();
+    await otherPage
+      .getByLabel("Edit reply", { exact: true })
+      .fill("Updated answer from the first tab.");
+    await otherPage.getByRole("button", { name: "Save reply" }).click();
+    await expect(otherPage.locator(".reply-body")).toHaveText(
+      "Updated answer from the first tab.",
+    );
+    await replyTab
+      .getByLabel("Edit reply", { exact: true })
+      .fill("Keep my competing draft.");
+    await replyTab.getByRole("button", { name: "Save reply" }).click();
+    await expect(replyTab.getByRole("alert")).toContainText("changed");
+    await expect(
+      replyTab.getByLabel("Edit reply", { exact: true }),
+    ).toHaveValue("Keep my competing draft.");
+    await replyTab
+      .getByRole("button", { name: "Reload latest and discard draft" })
+      .click();
+    await expect(
+      replyTab.getByLabel("Edit reply", { exact: true }),
+    ).toHaveValue("Updated answer from the first tab.");
+    await replyTab
+      .getByLabel("Edit reply", { exact: true })
+      .fill("Merged helpful answer.");
+    await replyTab.getByRole("button", { name: "Save reply" }).click();
+    await expect(replyTab.locator(".reply-body")).toHaveText(
+      "Merged helpful answer.",
+    );
+    await replyTab.close();
+
     const publicPage = await visitor.newPage();
     await publicPage.setViewportSize({ width: 390, height: 844 });
     await publicPage.goto(origin + "/boards/" + board.id);
@@ -162,6 +230,12 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
+    await expect(publicPage.locator(".reply-body")).toHaveText(
+      "Merged helpful answer.",
+    );
+    await expect(
+      publicPage.getByRole("button", { name: "Edit reply", exact: true }),
+    ).toHaveCount(0);
     await publicPage.screenshot({
       path: testInfo.outputPath("question-mobile.png"),
       fullPage: true,
@@ -174,6 +248,10 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
       "PATCH",
     );
     expect(archived.status()).toBe(200);
+    await otherPage.reload();
+    await expect(
+      otherPage.getByRole("button", { name: "Post reply" }),
+    ).toBeDisabled();
     await ownerPage.goto(origin + questionPath);
     await expect(
       ownerPage.getByText(

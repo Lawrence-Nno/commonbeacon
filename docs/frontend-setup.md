@@ -105,7 +105,7 @@ On 2026-09-15:
 - Isolated temporary command fixtures verified early exit on backend and frontend failures and success when a command emits stderr warnings but exits 0.
 - Combined scripts/verify.ps1 completed with exit 0: 7 backend integration tests, 15 frontend tests, lint, type checking, and build all passed.
 
-The evidence above records Stage 3. See [authentication](authentication.md) for Stage 4 behavior and verification. Discussions remain pending.
+The evidence above records Stage 3. See [authentication](authentication.md) for Stage 4 behavior and verification. See [questions](questions.md) and [replies](replies.md) for discussion features and current verification results.
 
 ## References
 

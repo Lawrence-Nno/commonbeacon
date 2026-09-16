@@ -112,12 +112,12 @@ npm run test:smoke. It uses separate owner, other-member, administrator, and
 anonymous contexts, including a two-tab stale edit and desktop/mobile screenshots.
 It leaves unique fictional boards/questions/accounts in the development database;
 it does not delete application data. Full isolated browser fixtures belong to
-Stage 10. Replies and acceptance remain future stages.
+Stage 10. Replies are implemented in [Stage 7](replies.md). Acceptance remains Stage 8.
 
 ## Verified results — 2026-09-16
 
 scripts/verify.ps1 passed: 5 backend unit tests and 34 integration tests, with no
 failures/errors/skips; 36 frontend tests; lint; TypeScript checking; production build.
 All 6 Chrome smoke tests passed. Desktop and mobile question screenshots were
-inspected, and the mobile overflow check passed. Changes are uncommitted and
-remote CI has not run for Stage 6.
+inspected, and the mobile overflow check passed. Stage 6 was committed and pushed as 19ce858;
+remote CI status is not recorded here.

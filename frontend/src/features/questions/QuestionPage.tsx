@@ -5,6 +5,7 @@ import { ApiError } from "../../lib/http";
 import { useAuth } from "../auth/AuthProvider";
 import { getQuestion, updateQuestion } from "./api";
 import type { Question, QuestionInput } from "./api";
+import { Replies } from "../replies/Replies";
 import { QuestionForm } from "./QuestionForm";
 
 export function QuestionPage({ editing = false }: { editing?: boolean }) {
@@ -111,9 +112,7 @@ export function QuestionPage({ editing = false }: { editing?: boolean }) {
           Edit question
         </Link>
       )}
-      <p className="availability-note">
-        Replies are coming next. This question is saved for the community.
-      </p>
+      <Replies question={question} />
     </article>
   );
 }

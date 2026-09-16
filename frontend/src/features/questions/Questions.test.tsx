@@ -79,6 +79,14 @@ function setup(path: string, options: Options = {}) {
       };
       return Response.json(current);
     }
+    if (url.includes("/replies?"))
+      return Response.json({
+        items: [],
+        page: 0,
+        size: 20,
+        totalElements: 0,
+        totalPages: 0,
+      });
     if (url.includes("/questions?")) {
       const page = Number(
         new URL(url, "http://localhost").searchParams.get("page"),
@@ -138,7 +146,9 @@ afterEach(() => vi.unstubAllGlobals());
 it("renders plain text and shows the edit action only to the owner", async () => {
   setup("/questions/q1");
   await screen.findByRole("heading", { name: original.title });
-  expect(document.querySelector(".question-body")?.textContent).toBe(original.body);
+  expect(document.querySelector(".question-body")?.textContent).toBe(
+    original.body,
+  );
   expect(document.querySelector(".question-body script")).toBeNull();
   expect(
     await screen.findByRole("link", { name: "Edit question" }),
