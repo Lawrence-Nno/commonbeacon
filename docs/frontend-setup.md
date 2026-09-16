@@ -2,7 +2,7 @@
 
 ## What exists
 
-React and TypeScript provide a responsive community home, an about route, and a not-found route. The home lists public boards; each board shows an empty question state until discussions are implemented. See [boards and demo setup](boards.md) for Stage 5 administration. Stage 4 adds registration and login routes; see [authentication](authentication.md).
+React and TypeScript provide a responsive community home, an about route, and a not-found route. The home lists public boards; each board shows paginated questions, with creation and owner editing available on open boards. See [question workflows](questions.md). See [boards and demo setup](boards.md) for Stage 5 administration. Stage 4 adds registration and login routes; see [authentication](authentication.md).
 
 The connection card calls the real backend through Vite. It supports loading, healthy, offline, timeout, and retry states. A failed refresh replaces previously cached success; automatic checks run every 30 seconds while the tab is active.
 

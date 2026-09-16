@@ -4,8 +4,8 @@
 
 Start the app with the commands in [frontend setup](frontend-setup.md). The home
 page lists every board, including archived boards. Open a card to visit
-/boards/{id}; direct links and refresh work. Boards have an honest empty state
-while question and reply features are being built.
+/boards/{id}; direct links and refresh work. Stage 6 adds paginated questions, creation, and owner editing; see [questions](questions.md).
+Empty boards show an invitation to ask the first question. Replies are still planned.
 
 Sign in as an administrator and choose **Manage boards** (/admin/boards).
 Create a board with its name, slug, and description. Choose **Edit board** to change
@@ -120,8 +120,8 @@ Java concepts to trace:
 - The demo seeder uses PostgreSQL ON CONFLICT DO NOTHING to preserve existing rows
   while avoiding changes to the public registration rule that always grants MEMBER.
 
-Questions, replies, and their archive restrictions will be implemented in their
-respective stages. Board listing is unpaginated for this initial community.
+Stage 6 enforces archive restrictions for question creation and owner editing.
+Reply restrictions arrive with replies. Board listing remains unpaginated.
 
 ## Verified results — 2026-09-16
 
@@ -130,4 +130,4 @@ scripts/verify.ps1 completed with exit 0: 5 backend unit tests, 24 integration t
 All 5 Chrome tests passed. Administrator desktop and archived-board mobile
 screenshots were inspected; the mobile overflow check passed.
 
-Stage 5 changes remain uncommitted and have not run in remote CI.
+Stage 5 was committed and pushed as 4fa6d34. These are its local verification results.

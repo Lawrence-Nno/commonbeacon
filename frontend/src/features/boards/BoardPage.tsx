@@ -1,3 +1,4 @@
+import { QuestionList } from "../questions/QuestionList";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import { ApiError } from "../../lib/http";
@@ -53,14 +54,7 @@ export function BoardPage() {
           questions and replies are closed.
         </p>
       )}
-      <div className="empty-state">
-        <h2>The first question is still ahead.</h2>
-        <p>
-          {board.archived
-            ? "There are no questions to read in this board yet."
-            : "This board is ready for the community. Questions and replies are coming soon."}
-        </p>
-      </div>
+      <QuestionList board={board} />
     </section>
   );
 }

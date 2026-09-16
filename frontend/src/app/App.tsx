@@ -1,3 +1,5 @@
+import { NewQuestionPage } from "../features/questions/NewQuestionPage";
+import { QuestionPage } from "../features/questions/QuestionPage";
 import { BoardList } from "../features/boards/BoardList";
 import { BoardPage } from "../features/boards/BoardPage";
 import { AdminBoards } from "../features/boards/AdminBoards";
@@ -12,7 +14,7 @@ function PageTitle() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    document.title = `${pathname.startsWith("/boards/") ? "Board" : pathname === "/admin/boards" ? "Manage boards" : pathname === "/about" ? "About" : pathname === "/login" ? "Sign in" : pathname === "/register" ? "Join" : pathname === "/" ? "Community" : "Page not found"} · CommonBeacon`;
+    document.title = `${pathname.startsWith("/questions/") ? "Question" : pathname.endsWith("/questions/new") ? "Ask a question" : pathname.startsWith("/boards/") ? "Board" : pathname === "/admin/boards" ? "Manage boards" : pathname === "/about" ? "About" : pathname === "/login" ? "Sign in" : pathname === "/register" ? "Join" : pathname === "/" ? "Community" : "Page not found"} · CommonBeacon`;
   }, [pathname]);
   return null;
 }
@@ -120,8 +122,8 @@ function About() {
         </article>
       </div>
       <p className="availability-note">
-        CommonBeacon is in its early stages. Member accounts are open.
-        Discussions and accepted solutions are coming next.
+        CommonBeacon is in its early stages. Member accounts are open. Questions
+        are open. Replies and accepted solutions are coming next.
       </p>
       <Link className="text-link" to="/">
         ← Back to the community
@@ -211,11 +213,15 @@ function Shell() {
                     ? "Sign in"
                     : pathname === "/register"
                       ? "Join"
-                      : pathname.startsWith("/boards/")
-                        ? "Board"
-                        : pathname === "/admin/boards"
-                          ? "Manage boards"
-                          : "Not found"}
+                      : pathname.startsWith("/questions/")
+                        ? "Question"
+                        : pathname.endsWith("/questions/new")
+                          ? "Ask a question"
+                          : pathname.startsWith("/boards/")
+                            ? "Board"
+                            : pathname === "/admin/boards"
+                              ? "Manage boards"
+                              : "Not found"}
             </strong>
           </span>
           <AuthControls />
@@ -231,6 +237,15 @@ function Shell() {
             <Route path="/about" element={<About />} />
             <Route path="/boards/:boardId" element={<BoardPage />} />
             <Route path="/admin/boards" element={<AdminBoards />} />
+            <Route
+              path="/boards/:boardId/questions/new"
+              element={<NewQuestionPage />}
+            />
+            <Route path="/questions/:questionId" element={<QuestionPage />} />
+            <Route
+              path="/questions/:questionId/edit"
+              element={<QuestionPage editing />}
+            />
             <Route
               path="/login"
               element={<AuthPage key="login" mode="login" />}

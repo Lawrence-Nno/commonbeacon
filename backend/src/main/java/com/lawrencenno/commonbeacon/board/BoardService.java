@@ -31,7 +31,8 @@ public class BoardService {
     @PreAuthorize("hasRole('ADMINISTRATOR')")
     @Transactional
     public BoardSummary update(UUID id, UpdateBoardRequest request) {
-        var board = find(id);
+        var board = boards.findForUpdate(id).orElseThrow(() ->
+                new ApiFailure(404, "BOARD_NOT_FOUND", "This board could not be found."));
         if (board.getVersion() != request.expectedVersion()) {
             throw new ApiFailure(409, "STALE_EDIT", "This board changed. Reload it before saving again.");
         }

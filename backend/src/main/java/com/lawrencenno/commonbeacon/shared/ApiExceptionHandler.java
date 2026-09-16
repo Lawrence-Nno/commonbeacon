@@ -35,7 +35,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(OptimisticLockingFailureException.class)
     ProblemDetail stale(OptimisticLockingFailureException exception) {
-        return ApiProblems.problem(409, "STALE_EDIT", "This board changed. Reload it before saving again.");
+        return ApiProblems.problem(409, "STALE_EDIT", "This item changed. Reload it before saving again.");
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

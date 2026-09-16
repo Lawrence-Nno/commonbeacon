@@ -33,6 +33,14 @@ function mount(
     if (url === "/api/health") return Response.json({ status: "UP" });
     if (init?.method === "PATCH" || init?.method === "POST")
       return mutation ? mutation(init) : Response.json(board);
+    if (url.includes("/questions?"))
+      return Response.json({
+        items: [],
+        page: 0,
+        size: 20,
+        totalElements: 0,
+        totalPages: 0,
+      });
     if (url === "/api/v1/boards") return Response.json([board]);
     if (url.endsWith("/board-1")) return Response.json(board);
     return Response.json(
@@ -66,7 +74,9 @@ it("lets an anonymous visitor open an archived board and see its empty state", a
   ).toBeInTheDocument();
   expect(screen.getByText("Archived board.")).toBeInTheDocument();
   expect(
-    screen.getByRole("heading", { name: "The first question is still ahead." }),
+    await screen.findByRole("heading", {
+      name: "The first question is still ahead.",
+    }),
   ).toBeInTheDocument();
   expect(
     screen.queryByRole("link", { name: "Manage boards" }),

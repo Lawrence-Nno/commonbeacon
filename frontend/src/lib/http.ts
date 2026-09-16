@@ -41,7 +41,8 @@ export async function getJson<T>(
       if (
         (isAuth ||
           path === "/api/v1/boards" ||
-          path.startsWith("/api/v1/boards/")) &&
+          path.startsWith("/api/v1/boards/") ||
+          path.startsWith("/api/v1/questions/")) &&
         response.headers
           .get("content-type")
           ?.includes("application/problem+json")
