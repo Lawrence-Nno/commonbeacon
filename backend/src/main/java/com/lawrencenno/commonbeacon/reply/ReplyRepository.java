@@ -9,6 +9,9 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface ReplyRepository extends JpaRepository<Reply, UUID> {
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Reply r where r.id = :id and r.question.id = :questionId and r.visibility = 'VISIBLE'")
+    Optional<Reply> findVisibleForUpdate(@Param("id") UUID id, @Param("questionId") UUID questionId);
     @EntityGraph(attributePaths = "author")
     Page<Reply> findByQuestionIdAndVisibilityAndQuestionVisibility(
             UUID questionId, ContentVisibility visibility, ContentVisibility questionVisibility, Pageable page);

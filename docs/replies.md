@@ -45,8 +45,8 @@ uses the same board lock, so a reply write waiting behind archival rechecks the
 archived state after obtaining the lock. Scalar parent lookup avoids loading an
 outdated managed question before acquiring that lock.
 
-Keep this order when Stage 8 adds accepted solutions and later moderation adds
-visibility writes. Accepted replies and moderation controls are not implemented here.
+Stage 8 accepted solutions follow this order; future moderation must do so too.
+See [accepted solutions](accepted-solutions.md). Moderation controls remain planned.
 
 ## Frontend behavior
 
@@ -80,5 +80,4 @@ scripts/use-dev-tools.ps1, scripts/use-local-database.ps1, then in frontend run
 npm run test:smoke. See boards.md for opt-in demo accounts. Smoke tests leave
 fictional development records; isolated browser fixtures belong to Stage 10.
 
-Stage 6 was committed and pushed as 19ce858. Stage 7 is locally verified and
-uncommitted; remote CI has not run for these changes.
+Stage 6 was committed and pushed as 19ce858. Stage 7 was committed and pushed as 4b08546. Remote CI status is not recorded here.

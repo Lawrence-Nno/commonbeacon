@@ -17,8 +17,9 @@ public class QuestionController {
 
     @GetMapping("/boards/{boardId}/questions")
     public PageResponse<QuestionSummary> list(@PathVariable UUID boardId,
-            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
-        return questions.list(boardId, page, size);
+            @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "all") String status) {
+        return questions.list(boardId, page, size, status);
     }
 
     @GetMapping("/questions/{id}")
@@ -35,5 +36,17 @@ public class QuestionController {
     public QuestionDetail update(@PathVariable UUID id,
             @Valid @RequestBody UpdateQuestionRequest request, Authentication authentication) {
         return questions.update(id, request, authentication);
+    }
+
+    @PutMapping("/questions/{id}/accepted-reply")
+    public QuestionDetail accept(@PathVariable UUID id, @Valid @RequestBody AcceptReplyRequest request,
+                                 Authentication authentication) {
+        return questions.accept(id, request.replyId(), request.expectedVersion(), authentication);
+    }
+
+    @DeleteMapping("/questions/{id}/accepted-reply")
+    public QuestionDetail clear(@PathVariable UUID id, @RequestParam long expectedVersion,
+                                Authentication authentication) {
+        return questions.accept(id, null, expectedVersion, authentication);
     }
 }

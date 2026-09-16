@@ -4,13 +4,15 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record QuestionDetail(UUID id, BoardInfo board, String title, String body,
-                             QuestionAuthor author, Instant createdAt, Instant updatedAt, long version) {
+                             QuestionAuthor author, Instant createdAt, Instant updatedAt, long version,
+                             boolean solved, com.lawrencenno.commonbeacon.reply.ReplySummary acceptedReply) {
     public record BoardInfo(UUID id, String name, boolean archived) {}
 
     static QuestionDetail from(Question question) {
         var board = question.getBoard();
         return new QuestionDetail(question.getId(), new BoardInfo(board.getId(), board.getName(), board.isArchived()),
                 question.getTitle(), question.getBody(), QuestionAuthor.from(question.getAuthor()),
-                question.getCreatedAt(), question.getUpdatedAt(), question.getVersion());
+                question.getCreatedAt(), question.getUpdatedAt(), question.getVersion(), question.isSolved(),
+                !question.isSolved() ? null : com.lawrencenno.commonbeacon.reply.ReplySummary.from(question.getAcceptedReply()));
     }
 }

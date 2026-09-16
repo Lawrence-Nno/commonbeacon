@@ -5,6 +5,7 @@ import { randomUUID } from "node:crypto";
 test("members publish and edit questions, recover stale drafts, and cannot edit another member's question", async ({
   browser,
 }, testInfo) => {
+  test.setTimeout(60_000);
   const password = process.env.DEMO_PASSWORD;
   expect(
     password,
@@ -210,6 +211,36 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
     );
     await replyTab.close();
 
+    // The question owner accepts, replaces with their own reply, and clears.
+    await ownerPage.goto(origin + questionPath);
+    await ownerPage.getByRole("button", { name: "Accept as solution" }).click();
+    await expect(ownerPage.getByRole("heading", { name: "Accepted answer" })).toBeVisible();
+    await ownerPage.reload();
+    await expect(ownerPage.locator(".accepted-answer .reply-body")).toHaveText("Merged helpful answer.");
+    await otherPage.reload();
+    await expect(otherPage.getByRole("button", { name: "Clear solution" })).toHaveCount(0);
+    const selected = await (await ownerPage.request.get(origin + "/api/v1" + questionPath)).json();
+    expect((await mutation(otherPage, "/api/v1" + questionPath + "/accepted-reply", {
+      replyId: reply.id, expectedVersion: selected.version,
+    }, "PUT")).status()).toBe(403);
+    await ownerPage.getByLabel("Your reply").fill("My own additional solution.");
+    await ownerPage.getByRole("button", { name: "Post reply" }).click();
+    await ownerPage.getByRole("button", { name: "Replace solution with this reply" }).click();
+    await expect(ownerPage.locator(".accepted-answer .reply-body")).toHaveText("My own additional solution.");
+    await ownerPage.getByRole("button", { name: "Clear solution" }).click();
+    await expect(ownerPage.getByRole("heading", { name: "Accepted answer" })).toHaveCount(0);
+    await ownerPage.goto(origin + "/boards/" + board.id);
+    await ownerPage.getByLabel("Show questions").selectOption("unanswered");
+    await expect(ownerPage.getByRole("link", { name: updatedTitle, exact: true })).toBeVisible();
+    await ownerPage.getByLabel("Show questions").selectOption("solved");
+    await expect(ownerPage.getByRole("heading", { name: "No questions match this filter." })).toBeVisible();
+    await ownerPage.goto(origin + questionPath);
+    await ownerPage.locator("#reply-" + reply.id).getByRole("button", { name: "Accept as solution" }).click();
+    await expect(ownerPage.getByRole("heading", { name: "Accepted answer" })).toBeVisible();
+    await ownerPage.goto(origin + "/boards/" + board.id + "?status=solved");
+    await expect(ownerPage.getByRole("link", { name: updatedTitle, exact: true })).toBeVisible();
+    await expect(ownerPage.locator(".question-card").getByText("Solved", { exact: true })).toBeVisible();
+
     const publicPage = await visitor.newPage();
     await publicPage.setViewportSize({ width: 390, height: 844 });
     await publicPage.goto(origin + "/boards/" + board.id);
@@ -230,7 +261,7 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
         () => document.documentElement.scrollWidth <= innerWidth,
       ),
     ).toBe(true);
-    await expect(publicPage.locator(".reply-body")).toHaveText(
+    await expect(publicPage.locator(".accepted-answer .reply-body")).toHaveText(
       "Merged helpful answer.",
     );
     await expect(
@@ -261,6 +292,7 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
     await expect(
       ownerPage.getByRole("link", { name: "Edit question" }),
     ).toHaveCount(0);
+    await expect(ownerPage.getByRole("button", { name: "Clear solution" })).toHaveCount(0);
     expect(
       (
         await mutation(ownerPage, "/api/v1/boards/" + board.id + "/questions", {

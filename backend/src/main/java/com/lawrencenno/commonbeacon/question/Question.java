@@ -22,6 +22,8 @@ public class Question {
     @Column(name = "created_at", nullable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
     @Version private long version;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "accepted_reply_id") private com.lawrencenno.commonbeacon.reply.Reply acceptedReply;
 
     protected Question() {}
 
@@ -45,6 +47,12 @@ public class Question {
     }
 
     public UUID getId() { return id; }
+    public com.lawrencenno.commonbeacon.reply.Reply getAcceptedReply() { return acceptedReply; }
+    public boolean isSolved() { return acceptedReply != null && acceptedReply.isVisible(); }
+    void accept(com.lawrencenno.commonbeacon.reply.Reply reply) {
+        acceptedReply = reply;
+        updatedAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+    }
     public Board getBoard() { return board; }
     public AppUser getAuthor() { return author; }
     public String getTitle() { return title; }

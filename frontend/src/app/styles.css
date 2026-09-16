@@ -1033,3 +1033,7 @@ a.board-card:hover {
 .reply-body { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.75; margin-bottom: 1rem; }
 .reply-form { max-width: 100%; margin-top: 2rem; }
 .reply-form textarea { width: 100%; box-sizing: border-box; resize: vertical; min-height: 9rem; padding: .9rem; border: 1px solid #aab8b0; border-radius: .6rem; font: inherit; }
+.accepted-answer { padding: 1.5rem; margin-bottom: 1.5rem; border: 2px solid var(--color-accent, #34745c); border-radius: 1rem; background: #f0f7f2; }
+.accepted-answer h2 { margin-top: 0; }
+.question-filter { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-block: 1rem; }
+.question-filter select { font: inherit; padding: .5rem .75rem; border-radius: .5rem; }

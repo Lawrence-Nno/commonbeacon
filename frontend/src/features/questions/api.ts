@@ -1,4 +1,6 @@
 import { ApiError, getJson, postJson } from "../../lib/http";
+import { readReply } from "../replies/api";
+import type { Reply } from "../replies/api";
 
 export type Author = { id: string; displayName: string };
 type QuestionFields = {
@@ -8,10 +10,12 @@ type QuestionFields = {
   createdAt: string;
   updatedAt: string;
   version: number;
+  solved: boolean;
 };
 export type QuestionSummary = QuestionFields & { boardId: string };
 export type Question = QuestionFields & {
   body: string;
+  acceptedReply: Reply | null;
   board: { id: string; name: string; archived: boolean };
 };
 export type QuestionInput = { title: string; body: string };
@@ -44,6 +48,7 @@ function integer(value: unknown): number {
 }
 function fields(value: Record<string, unknown>): QuestionFields {
   const author = record(value.author);
+  if (typeof value.solved !== "boolean") return invalid();
   return {
     id: string(value.id),
     title: string(value.title),
@@ -51,15 +56,19 @@ function fields(value: Record<string, unknown>): QuestionFields {
     createdAt: string(value.createdAt),
     updatedAt: string(value.updatedAt),
     version: integer(value.version),
+    solved: value.solved,
   };
 }
 export function readQuestion(value: unknown): Question {
   const item = record(value);
   const board = record(item.board);
   if (typeof board.archived !== "boolean") return invalid();
+  const acceptedReply = item.acceptedReply === null ? null : readReply(item.acceptedReply);
+  if (item.solved !== (acceptedReply !== null) || (acceptedReply && acceptedReply.questionId !== item.id)) return invalid();
   return {
     ...fields(item),
     body: string(item.body),
+    acceptedReply,
     board: {
       id: string(board.id),
       name: string(board.name),
@@ -87,13 +96,14 @@ export const listQuestions = (
   boardId: string,
   page: number,
   signal?: AbortSignal,
+  status = "all",
 ) =>
   getJson(
     "/api/v1/boards/" +
       encodeURIComponent(boardId) +
       "/questions?page=" +
       page +
-      "&size=20",
+      "&size=20" + (status === "all" ? "" : "&status=" + encodeURIComponent(status)),
     readQuestionPage,
     signal,
   );
@@ -111,4 +121,13 @@ export const updateQuestion = (question: Question, input: QuestionInput) =>
     { ...input, expectedVersion: question.version },
     readQuestion,
     "PATCH",
+  );
+
+export const selectSolution = (question: Question, replyId: string | null) =>
+  postJson(
+    "/api/v1/questions/" + encodeURIComponent(question.id) + "/accepted-reply" +
+      (replyId === null ? "?expectedVersion=" + question.version : ""),
+    replyId === null ? null : { replyId, expectedVersion: question.version },
+    readQuestion,
+    replyId === null ? "DELETE" : "PUT",
   );

@@ -6,15 +6,18 @@ import { listQuestions } from "./api";
 
 export function QuestionList({ board }: { board: Board }) {
   const { user } = useAuth();
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
+  const status = params.get("status") ?? "all";
+  const validStatus = ["all", "solved", "unanswered"].includes(status);
+  const pageLink = (next: number) => "?page=" + next + (status === "all" ? "" : "&status=" + status);
   const rawPage = params.get("page") ?? "0";
   const page = /^\d+$/.test(rawPage) ? Number(rawPage) : -1;
   const validPage =
     Number.isSafeInteger(page) && page >= 0 && page * 20 <= 2147483647;
   const query = useQuery({
-    queryKey: ["questions", "board", board.id, page],
-    queryFn: ({ signal }) => listQuestions(board.id, page, signal),
-    enabled: validPage,
+    queryKey: ["questions", "board", board.id, page, status],
+    queryFn: ({ signal }) => listQuestions(board.id, page, signal, status),
+    enabled: validPage && validStatus,
     retry: false,
   });
   return (
@@ -38,7 +41,19 @@ export function QuestionList({ board }: { board: Board }) {
             </Link>
           ) : null)}
       </div>
-      {!validPage ? (
+      <label className="question-filter">Show questions
+        <select value={validStatus ? status : "all"} onChange={(event) => {
+          const next = new URLSearchParams(params);
+          next.set("status", event.target.value);
+          next.set("page", "0");
+          setParams(next);
+        }}>
+          <option value="all">All questions</option>
+          <option value="solved">Solved</option>
+          <option value="unanswered">Unanswered</option>
+        </select>
+      </label>
+      {!validStatus ? <p role="alert">This question filter is invalid. Choose a filter above.</p> : !validPage ? (
         <div role="alert" className="form-error">
           This page number is invalid.{" "}
           <Link to={"/boards/" + board.id}>Go to the first page</Link>
@@ -66,7 +81,7 @@ export function QuestionList({ board }: { board: Board }) {
             <div className="empty-state">
               <h3>
                 {page === 0
-                  ? "The first question is still ahead."
+                  ? status === "all" ? "The first question is still ahead." : "No questions match this filter."
                   : "No questions on this page."}
               </h3>
               <p>
@@ -81,6 +96,7 @@ export function QuestionList({ board }: { board: Board }) {
             <div className="question-list">
               {query.data.items.map((question) => (
                 <article className="question-card" key={question.id}>
+                  {question.solved && <span className="subtle-badge">Solved</span>}
                   <h3>
                     <Link to={"/questions/" + question.id}>
                       {question.title}
@@ -102,7 +118,7 @@ export function QuestionList({ board }: { board: Board }) {
               {page > 0 && (
                 <Link
                   className="button button-secondary"
-                  to={"?page=" + (page - 1)}
+                  to={pageLink(page - 1)}
                 >
                   Previous page
                 </Link>
@@ -113,13 +129,13 @@ export function QuestionList({ board }: { board: Board }) {
               {page + 1 < query.data.totalPages && (
                 <Link
                   className="button button-secondary"
-                  to={"?page=" + (page + 1)}
+                  to={pageLink(page + 1)}
                 >
                   Next page
                 </Link>
               )}
               {page >= query.data.totalPages && (
-                <Link className="text-link" to="?page=0">
+                <Link className="text-link" to={pageLink(0)}>
                   First page
                 </Link>
               )}

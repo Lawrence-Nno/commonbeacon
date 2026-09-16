@@ -137,7 +137,7 @@ export async function postJson<T>(
   path: string,
   body: unknown,
   decode: (value: unknown) => T,
-  method: "POST" | "PATCH" = "POST",
+  method: "POST" | "PATCH" | "PUT" | "DELETE" = "POST",
 ): Promise<T> {
   // Obtain a fresh session token for every mutation, including after login/logout.
   // Do not retry a mutation automatically: it may already have taken effect.

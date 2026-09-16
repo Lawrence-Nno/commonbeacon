@@ -24,6 +24,8 @@ const original = {
   createdAt: board.createdAt,
   updatedAt: board.createdAt,
   version: 0,
+  solved: false,
+  acceptedReply: null,
 };
 type Options = {
   user?: string | null;
@@ -260,4 +262,15 @@ it("rejects malformed question payloads at the HTTP boundary", () => {
       totalPages: 0,
     }),
   ).toThrow("unexpected");
+});
+
+it("resets pagination when filtering and preserves the filter between pages", async () => {
+  const api = setup("/boards/b1?page=1", { pagination: true });
+  await screen.findByRole("link", { name: "Question on page 2" });
+  await userEvent.selectOptions(screen.getByLabelText("Show questions"), "solved");
+  await screen.findByRole("link", { name: "Question on page 1" });
+  expect(api.fetchMock.mock.calls.some((call) => call[0].endsWith("page=0&size=20&status=solved"))).toBe(true);
+  await userEvent.click(screen.getByRole("link", { name: "Next page" }));
+  await screen.findByRole("link", { name: "Question on page 2" });
+  expect(screen.getByRole("link", { name: "Previous page" })).toHaveAttribute("href", "/boards/b1?page=0&status=solved");
 });

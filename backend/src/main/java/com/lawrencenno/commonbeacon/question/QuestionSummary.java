@@ -4,10 +4,10 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record QuestionSummary(UUID id, UUID boardId, String title, QuestionAuthor author,
-                              Instant createdAt, Instant updatedAt, long version) {
+                              Instant createdAt, Instant updatedAt, long version, boolean solved) {
     static QuestionSummary from(Question question) {
         return new QuestionSummary(question.getId(), question.getBoard().getId(), question.getTitle(),
                 QuestionAuthor.from(question.getAuthor()), question.getCreatedAt(),
-                question.getUpdatedAt(), question.getVersion());
+                question.getUpdatedAt(), question.getVersion(), question.isSolved());
     }
 }

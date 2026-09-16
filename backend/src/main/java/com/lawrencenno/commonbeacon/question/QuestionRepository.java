@@ -9,10 +9,15 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface QuestionRepository extends JpaRepository<Question, UUID> {
-    @EntityGraph(attributePaths = "author")
+    @EntityGraph(attributePaths = {"author", "acceptedReply"})
     Page<Question> findByBoardIdAndVisibility(UUID boardId, ContentVisibility visibility, Pageable page);
 
-    @EntityGraph(attributePaths = {"author", "board"})
+    @EntityGraph(attributePaths = {"author", "acceptedReply"})
+    @org.springframework.data.jpa.repository.Query("select q from Question q left join q.acceptedReply a where q.board.id = :boardId and q.visibility = 'VISIBLE' and (:status = 'all' or (:status = 'solved' and a.visibility = 'VISIBLE') or (:status = 'unanswered' and (a.id is null or a.visibility <> 'VISIBLE')))")
+    Page<Question> findFiltered(@org.springframework.data.repository.query.Param("boardId") UUID boardId,
+            @org.springframework.data.repository.query.Param("status") String status, Pageable page);
+
+    @EntityGraph(attributePaths = {"author", "board", "acceptedReply.author"})
     Optional<Question> findDetailedByIdAndVisibility(UUID id, ContentVisibility visibility);
 
     Optional<Question> findByIdAndVisibility(UUID id, ContentVisibility visibility);

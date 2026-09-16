@@ -1,3 +1,5 @@
+import { useSolution } from "./useSolution";
+import { SolutionPanel, SolutionButton } from "./SolutionPanel";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
@@ -37,6 +39,9 @@ function ReplyThread({ question }: { question: Question }) {
   const [editing, setEditing] = useState<Reply | null>(null);
   const [message, setMessage] = useState("");
   const [closed, setClosed] = useState(false);
+  const solution = useSolution(question);
+  const canSelect =
+    user?.id === question.author.id && !question.board.archived && !closed;
   const unavailable =
     query.error instanceof ApiError && query.error.status === 404;
   const archived = question.board.archived || closed;
@@ -92,6 +97,11 @@ function ReplyThread({ question }: { question: Question }) {
   }
   return (
     <section className="reply-section" aria-labelledby="replies-heading">
+      <SolutionPanel
+        question={question}
+        canSelect={canSelect}
+        state={solution}
+      />
       <div className="section-heading">
         <h2 id="replies-heading">Replies</h2>
         {query.data && (
@@ -162,6 +172,12 @@ function ReplyThread({ question }: { question: Question }) {
                     {reply.version > 0 && " · Edited"}
                   </p>
                   <div className="reply-body">{reply.body}</div>
+                  <SolutionButton
+                    question={question}
+                    replyId={reply.id}
+                    canSelect={canSelect}
+                    state={solution}
+                  />
                   {user?.id === reply.author.id && !archived && (
                     <button
                       className="button button-secondary"
