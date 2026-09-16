@@ -15,7 +15,7 @@
     "test:run": "vitest run",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test:smoke": "playwright test"
+    "test:smoke": "node scripts/test-e2e.mjs"
   },
   "dependencies": {
     "@tanstack/react-query": "5.102.8",

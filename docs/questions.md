@@ -1,5 +1,8 @@
 # Stage 6: questions and owner editing
 
+> Stage 10 update: npm run test:smoke now creates and cleans up an isolated test stack. Earlier verification notes below describe the historical development-database runs. Follow [current browser testing instructions](browser-testing.md); no development credentials or running host backend are required.
+
+
 ## Use the feature
 
 Open a board and choose **Ask a question** after signing in. Enter a title and

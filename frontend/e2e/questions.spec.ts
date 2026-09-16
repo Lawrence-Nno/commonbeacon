@@ -25,6 +25,26 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
     await expect(page.getByRole("button", { name: "Sign out" })).toBeVisible();
     return page;
   }
+
+  const ownerEmail = "journey-owner-" + randomUUID() + "@example.test";
+  const otherEmail = "journey-other-" + randomUUID() + "@example.test";
+  async function register(
+    context: BrowserContext,
+    email: string,
+    name: string,
+  ) {
+    const page = await context.newPage();
+    await page.goto(origin + "/register");
+    await page.getByLabel("Email address").fill(email);
+    await page.getByLabel("Display name").fill(name);
+    await page.getByLabel("Password", { exact: true }).fill(password!);
+    await page.getByRole("button", { name: "Create account" }).click();
+    await expect(page.getByRole("status")).toContainText(
+      "Your account has been created.",
+    );
+    await page.close();
+  }
+
   async function mutation(
     page: Page,
     path: string,
@@ -41,8 +61,10 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
     });
   }
   try {
-    const ownerPage = await login(owner, "alex.member@example.test");
-    const otherPage = await login(other, "sam.member@example.test");
+    await register(owner, ownerEmail, "Journey Owner");
+    await register(other, otherEmail, "Journey Responder");
+    let ownerPage = await login(owner, ownerEmail);
+    const otherPage = await login(other, otherEmail);
     const adminPage = await login(admin, "avery.admin@example.test");
     const createdBoard = await mutation(adminPage, "/api/v1/boards", {
       name: "Question smoke " + randomUUID().slice(0, 8),
@@ -53,13 +75,34 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
     const board = await createdBoard.json();
     const title = "How can I set up my workspace? " + randomUUID().slice(0, 8);
     await ownerPage.goto(origin + "/boards/" + board.id);
+    await expect(
+      ownerPage.getByText("The first question is still ahead."),
+    ).toBeVisible();
     await ownerPage.getByRole("link", { name: "Ask a question" }).click();
     await ownerPage.getByLabel("Question title").fill(title);
     await ownerPage
       .getByLabel("Details", { exact: true })
       .fill(
-        "I followed the setup guide.\nWhat should I configure next? <b>This is plain text.</b>",
+        "I followed the setup guide.\nWhat should I configure next? <b>This is plain text.</b>" +
+          "x".repeat(2000),
       );
+
+    // A failed write must retain the draft and never claim success.
+    await ownerPage.route(
+      "**/api/v1/boards/" + board.id + "/questions",
+      (route) =>
+        route.request().method() === "POST"
+          ? route.abort("failed")
+          : route.continue(),
+    );
+    await ownerPage.getByRole("button", { name: "Publish question" }).click();
+    await expect(ownerPage.getByRole("alert")).toContainText("could not reach");
+    await expect(ownerPage.getByLabel("Question title")).toHaveValue(title);
+    await expect(
+      ownerPage.getByRole("button", { name: "Publish question" }),
+    ).toBeEnabled();
+    await ownerPage.unroute("**/api/v1/boards/" + board.id + "/questions");
+
     await ownerPage.getByRole("button", { name: "Publish question" }).click();
     await expect(
       ownerPage.getByRole("heading", { name: title, exact: true }),
@@ -70,6 +113,13 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
       ownerPage.getByRole("heading", { name: title, exact: true }),
     ).toBeVisible();
     await expect(ownerPage.locator(".question-body b")).toHaveCount(0);
+    await ownerPage.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await ownerPage.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await ownerPage.setViewportSize({ width: 1440, height: 1000 });
     await ownerPage.getByRole("link", { name: "Edit question" }).click();
     const updatedTitle = title + " updated";
     await ownerPage.getByLabel("Question title").fill(updatedTitle);
@@ -103,6 +153,13 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
       }),
     ).toBeVisible();
 
+    await ownerPage.setViewportSize({ width: 390, height: 844 });
+    expect(
+      await ownerPage.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth,
+      ),
+    ).toBe(true);
+    await ownerPage.setViewportSize({ width: 1440, height: 1000 });
     await ownerPage.getByRole("link", { name: "Edit question" }).click();
     const secondTab = await owner.newPage();
     await secondTab.goto(origin + questionPath + "/edit");
@@ -214,32 +271,73 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
     // The question owner accepts, replaces with their own reply, and clears.
     await ownerPage.goto(origin + questionPath);
     await ownerPage.getByRole("button", { name: "Accept as solution" }).click();
-    await expect(ownerPage.getByRole("heading", { name: "Accepted answer" })).toBeVisible();
+    await expect(
+      ownerPage.getByRole("heading", { name: "Accepted answer" }),
+    ).toBeVisible();
     await ownerPage.reload();
-    await expect(ownerPage.locator(".accepted-answer .reply-body")).toHaveText("Merged helpful answer.");
+    await expect(ownerPage.locator(".accepted-answer .reply-body")).toHaveText(
+      "Merged helpful answer.",
+    );
     await otherPage.reload();
-    await expect(otherPage.getByRole("button", { name: "Clear solution" })).toHaveCount(0);
-    const selected = await (await ownerPage.request.get(origin + "/api/v1" + questionPath)).json();
-    expect((await mutation(otherPage, "/api/v1" + questionPath + "/accepted-reply", {
-      replyId: reply.id, expectedVersion: selected.version,
-    }, "PUT")).status()).toBe(403);
-    await ownerPage.getByLabel("Your reply").fill("My own additional solution.");
+    await expect(
+      otherPage.getByRole("button", { name: "Clear solution" }),
+    ).toHaveCount(0);
+    const selected = await (
+      await ownerPage.request.get(origin + "/api/v1" + questionPath)
+    ).json();
+    expect(
+      (
+        await mutation(
+          otherPage,
+          "/api/v1" + questionPath + "/accepted-reply",
+          {
+            replyId: reply.id,
+            expectedVersion: selected.version,
+          },
+          "PUT",
+        )
+      ).status(),
+    ).toBe(403);
+    await ownerPage
+      .getByLabel("Your reply")
+      .fill("My own additional solution.");
     await ownerPage.getByRole("button", { name: "Post reply" }).click();
-    await ownerPage.getByRole("button", { name: "Replace solution with this reply" }).click();
-    await expect(ownerPage.locator(".accepted-answer .reply-body")).toHaveText("My own additional solution.");
+    await ownerPage
+      .getByRole("button", { name: "Replace solution with this reply" })
+      .click();
+    await expect(ownerPage.locator(".accepted-answer .reply-body")).toHaveText(
+      "My own additional solution.",
+    );
     await ownerPage.getByRole("button", { name: "Clear solution" }).click();
-    await expect(ownerPage.getByRole("heading", { name: "Accepted answer" })).toHaveCount(0);
+    await expect(
+      ownerPage.getByRole("heading", { name: "Accepted answer" }),
+    ).toHaveCount(0);
     await ownerPage.goto(origin + "/boards/" + board.id);
     await ownerPage.getByLabel("Show questions").selectOption("unanswered");
-    await expect(ownerPage.getByRole("link", { name: updatedTitle, exact: true })).toBeVisible();
+    await expect(
+      ownerPage.getByRole("link", { name: updatedTitle, exact: true }),
+    ).toBeVisible();
     await ownerPage.getByLabel("Show questions").selectOption("solved");
-    await expect(ownerPage.getByRole("heading", { name: "No questions match this filter." })).toBeVisible();
+    await expect(
+      ownerPage.getByRole("heading", {
+        name: "No questions match this filter.",
+      }),
+    ).toBeVisible();
     await ownerPage.goto(origin + questionPath);
-    await ownerPage.locator("#reply-" + reply.id).getByRole("button", { name: "Accept as solution" }).click();
-    await expect(ownerPage.getByRole("heading", { name: "Accepted answer" })).toBeVisible();
+    await ownerPage
+      .locator("#reply-" + reply.id)
+      .getByRole("button", { name: "Accept as solution" })
+      .click();
+    await expect(
+      ownerPage.getByRole("heading", { name: "Accepted answer" }),
+    ).toBeVisible();
     await ownerPage.goto(origin + "/boards/" + board.id + "?status=solved");
-    await expect(ownerPage.getByRole("link", { name: updatedTitle, exact: true })).toBeVisible();
-    await expect(ownerPage.locator(".question-card").getByText("Solved", { exact: true })).toBeVisible();
+    await expect(
+      ownerPage.getByRole("link", { name: updatedTitle, exact: true }),
+    ).toBeVisible();
+    await expect(
+      ownerPage.locator(".question-card").getByText("Solved", { exact: true }),
+    ).toBeVisible();
 
     const publicPage = await visitor.newPage();
     await publicPage.setViewportSize({ width: 390, height: 844 });
@@ -272,6 +370,33 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
       fullPage: true,
     });
 
+    // Switch identities in the same browser: old owner controls and drafts must disappear.
+    await ownerPage.goto(origin + questionPath);
+    await ownerPage
+      .getByLabel("Your reply")
+      .fill("Private unsent owner draft.");
+    await ownerPage.getByRole("button", { name: "Sign out" }).click();
+    await ownerPage.goto(origin + "/login");
+    await ownerPage.getByLabel("Email address").fill(otherEmail);
+    await ownerPage.getByLabel("Password", { exact: true }).fill(password!);
+    await ownerPage
+      .getByRole("button", { name: "Sign in", exact: true })
+      .click();
+    await expect(
+      ownerPage.getByRole("button", { name: "Sign out" }),
+    ).toBeVisible();
+    await ownerPage.goto(origin + questionPath);
+    await expect(
+      ownerPage.getByRole("link", { name: "Edit question" }),
+    ).toHaveCount(0);
+    await expect(
+      ownerPage.getByRole("button", { name: "Clear solution" }),
+    ).toHaveCount(0);
+    await expect(ownerPage.getByLabel("Your reply")).toHaveValue("");
+    await ownerPage.getByRole("button", { name: "Sign out" }).click();
+    await ownerPage.close();
+    ownerPage = await login(owner, ownerEmail);
+
     const archived = await mutation(
       adminPage,
       "/api/v1/boards/" + board.id,
@@ -292,7 +417,9 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
     await expect(
       ownerPage.getByRole("link", { name: "Edit question" }),
     ).toHaveCount(0);
-    await expect(ownerPage.getByRole("button", { name: "Clear solution" })).toHaveCount(0);
+    await expect(
+      ownerPage.getByRole("button", { name: "Clear solution" }),
+    ).toHaveCount(0);
     expect(
       (
         await mutation(ownerPage, "/api/v1/boards/" + board.id + "/questions", {

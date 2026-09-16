@@ -32,6 +32,9 @@ Flyway V5 adds nullable `question.accepted_reply_id`, a unique constraint on
 a reply belonging to another question. The single nullable reference permits at
 most one selected reply. There is no separate persisted solved flag.
 
+> Stage 10 update: npm run test:smoke now creates and cleans up an isolated test stack. Earlier verification notes below describe the historical development-database runs. Follow [current browser testing instructions](browser-testing.md); no development credentials or running host backend are required.
+
+
 Public solved status additionally requires the referenced reply to be visible. If a reply is hidden without clearing its reference (for example by a direct database write), question details suppress its body and author, and board badges, counts, and filters treat the question as unanswered. Reads do not mutate the stored reference. Future moderation must still clear an accepted reference atomically when hiding a reply. List queries fetch accepted replies alongside authors to avoid per-question visibility lookups.
 
 These protections solve different problems:

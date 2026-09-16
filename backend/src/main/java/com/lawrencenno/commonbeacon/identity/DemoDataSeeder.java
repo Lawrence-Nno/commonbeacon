@@ -40,6 +40,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         account("avery.admin@example.test", "Avery Stone", "ADMINISTRATOR", hash);
         board("getting-started", "Getting started", "Find your footing, share first steps, and learn the essentials.");
         board("product-help", "Product help", "A shared place for product questions and helpful experience.");
+        conversations();
     }
 
     private void account(String email, String name, String role, String hash) {
@@ -54,5 +55,35 @@ public class DemoDataSeeder implements ApplicationRunner {
                 INSERT INTO board (id, slug, name, description)
                 VALUES (?, ?, ?, ?) ON CONFLICT (slug) DO NOTHING
                 """, UUID.randomUUID(), slug, name, description);
+    }
+
+    private void conversations() {
+        UUID boardId = jdbc.queryForObject("SELECT id FROM board WHERE slug='getting-started'", UUID.class);
+        UUID alex = jdbc.queryForObject("SELECT id FROM app_user WHERE email='alex.member@example.test'", UUID.class);
+        UUID sam = jdbc.queryForObject("SELECT id FROM app_user WHERE email='sam.member@example.test'", UUID.class);
+        conversation("first-steps", boardId, alex, sam, "Where should I start in CommonBeacon?",
+                "I am new here. What is a useful first step?",
+                "Browse a board, ask a clear question, and share what you have already tried.", true);
+        conversation("helpful-question", boardId, sam, alex, "What makes a question easy to answer?",
+                "I would like to write a question that gives other members enough context.",
+                "Include your goal, the steps you tried, and the result you expected.", false);
+    }
+
+    private void conversation(String key, UUID boardId, UUID author, UUID responder,
+                              String title, String body, String answer, boolean solved) {
+        UUID questionId = UUID.nameUUIDFromBytes(("commonbeacon-demo-question-" + key).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        UUID replyId = UUID.nameUUIDFromBytes(("commonbeacon-demo-reply-" + key).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        int inserted = jdbc.update("""
+                INSERT INTO question (id,board_id,author_id,title,body,created_at,updated_at)
+                VALUES (?,?,?,?,?,TIMESTAMPTZ '2026-01-01 12:00:00+00',TIMESTAMPTZ '2026-01-01 12:00:00+00')
+                ON CONFLICT (id) DO NOTHING
+                """, questionId, boardId, author, title, body);
+        // Seed a conversation once; later edits, hiding and solution changes belong to the user.
+        if (inserted == 0) return;
+        jdbc.update("""
+                INSERT INTO reply (id,question_id,author_id,body,created_at,updated_at)
+                VALUES (?,?,?,?,TIMESTAMPTZ '2026-01-01 12:05:00+00',TIMESTAMPTZ '2026-01-01 12:05:00+00')
+                """, replyId, questionId, responder, answer);
+        if (solved) jdbc.update("UPDATE question SET accepted_reply_id=? WHERE id=?", replyId, questionId);
     }
 }

@@ -49,6 +49,14 @@ test("mobile shell fits and supports keyboard navigation", async ({
   await expect(
     page.getByRole("link", { name: "Skip to content" }),
   ).toBeFocused();
+  const focusStyle = await page
+    .getByRole("link", { name: "Skip to content" })
+    .evaluate((element) => ({
+      outline: getComputedStyle(element).outlineStyle,
+      width: getComputedStyle(element).outlineWidth,
+    }));
+  expect(focusStyle.outline).not.toBe("none");
+  expect(parseFloat(focusStyle.width)).toBeGreaterThan(0);
   await page.keyboard.press("Enter");
   await expect(page.locator("main")).toBeFocused();
   await page.screenshot({

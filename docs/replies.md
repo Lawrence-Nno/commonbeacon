@@ -1,5 +1,8 @@
 # Replies (Stage 7)
 
+> Stage 10 update: npm run test:smoke now creates and cleans up an isolated test stack. Earlier verification notes below describe the historical development-database runs. Follow [current browser testing instructions](browser-testing.md); no development credentials or running host backend are required.
+
+
 ## Behavior
 
 Question pages now display public replies oldest first, with reply ID breaking

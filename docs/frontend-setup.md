@@ -66,17 +66,9 @@ npm.cmd run build
 
 npm run test starts interactive test watching. The production output is frontend/dist. Vite preview serves those static files but does not provide the development API proxy; use npm run dev for the connected local application until the production reverse proxy is added.
 
-## Real-browser smoke checks
+## Real-browser checks
 
-Start the backend on port 8080 with local demo seeding enabled, and ensure Google Chrome is installed. Dot-source scripts/use-local-database.ps1 in the smoke-test terminal too, so Playwright receives DEMO_PASSWORD. From frontend:
-
-```powershell
-npm.cmd run test:smoke
-```
-
-Playwright starts two temporary Vite servers on ports 4173 and 4174. One targets the real backend; the other targets an unavailable local port to verify outage behavior without stopping the development backend. The test runner stops both Vite servers afterwards.
-
-Checks cover real health connectivity, deep-link refresh, not-found recovery, mobile overflow, keyboard skip navigation, and a retryable failure state. Screenshots and failure traces are written to ignored frontend/test-results. These are shell smoke checks; the full multi-user workflow suite belongs to a later stage.
+Run npm run test:smoke from frontend with Docker Desktop and Chrome available. Stage 10 starts a real backend with disposable PostgreSQL automatically; no development backend or .env is needed. See [isolated browser verification](browser-testing.md) for commands, isolation, coverage, and failure artifacts.
 
 ## Dependency decisions
 

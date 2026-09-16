@@ -1,5 +1,8 @@
 # Stage 5: public boards and administration
 
+> Stage 10 update: npm run test:smoke now creates and cleans up an isolated test stack. Earlier verification notes below describe the historical development-database runs. Follow [current browser testing instructions](browser-testing.md); no development credentials or running host backend are required.
+
+
 ## Use the feature
 
 Start the app with the commands in [frontend setup](frontend-setup.md). The home

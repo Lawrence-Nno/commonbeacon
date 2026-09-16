@@ -187,4 +187,19 @@ class BoardIT {
         assertThat(jdbc.queryForObject("SELECT name FROM board WHERE id=?", String.class, id)).isEqualTo("Edited demo");
         assertThat(jdbc.queryForObject("SELECT archived FROM board WHERE id=?", Boolean.class, id)).isTrue();
     }
+
+    @Test void demoConversationsAreDeterministicAndPreserveMemberChanges() {
+        UUID questionId = UUID.nameUUIDFromBytes("commonbeacon-demo-question-first-steps".getBytes(StandardCharsets.UTF_8));
+        UUID replyId = UUID.nameUUIDFromBytes("commonbeacon-demo-reply-first-steps".getBytes(StandardCharsets.UTF_8));
+        assertThat(jdbc.queryForObject("SELECT accepted_reply_id FROM question WHERE id=?", UUID.class, questionId)).isEqualTo(replyId);
+        jdbc.update("UPDATE question SET title='Edited fictional question', accepted_reply_id=null WHERE id=?", questionId);
+        jdbc.update("UPDATE reply SET body='Edited fictional answer', visibility='HIDDEN' WHERE id=?", replyId);
+        seeder.run(new DefaultApplicationArguments());
+        seeder.run(new DefaultApplicationArguments());
+        assertThat(jdbc.queryForObject("SELECT title FROM question WHERE id=?", String.class, questionId)).isEqualTo("Edited fictional question");
+        assertThat(jdbc.queryForObject("SELECT accepted_reply_id FROM question WHERE id=?", UUID.class, questionId)).isNull();
+        assertThat(jdbc.queryForObject("SELECT body FROM reply WHERE id=?", String.class, replyId)).isEqualTo("Edited fictional answer");
+        assertThat(jdbc.queryForObject("SELECT visibility FROM reply WHERE id=?", String.class, replyId)).isEqualTo("HIDDEN");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM reply WHERE question_id=?", Integer.class, questionId)).isEqualTo(1);
+    }
 }
