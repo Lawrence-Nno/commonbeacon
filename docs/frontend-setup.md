@@ -15,7 +15,7 @@ Terminal 1, from the repository root:
 ```powershell
 . .\scripts\use-dev-tools.ps1
 . .\scripts\use-local-database.ps1
-docker compose up -d --wait --wait-timeout 120 db
+docker compose -f compose.yaml -f compose.host.yaml up -d --wait --wait-timeout 120 db
 .\backend\mvnw.cmd -f backend/pom.xml spring-boot:run
 ```
 

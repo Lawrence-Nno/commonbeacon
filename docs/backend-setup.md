@@ -24,7 +24,7 @@ Then:
 ```powershell
 . .\scripts\use-local-database.ps1
 docker compose config --quiet
-docker compose up -d --wait --wait-timeout 120 db
+docker compose -f compose.yaml -f compose.host.yaml up -d --wait --wait-timeout 120 db
 .\backend\mvnw.cmd -f backend/pom.xml spring-boot:run
 ```
 
