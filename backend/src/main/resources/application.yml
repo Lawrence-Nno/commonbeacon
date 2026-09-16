@@ -45,3 +45,8 @@ management:
     health:
       show-details: never
       show-components: never
+
+commonbeacon:
+  demo:
+    enabled: ${DEMO_SEED_ENABLED:false}
+    password: ${DEMO_PASSWORD:}

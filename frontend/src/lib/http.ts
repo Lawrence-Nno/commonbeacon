@@ -39,7 +39,9 @@ export async function getJson<T>(
       let fields: Record<string, string> | undefined;
       const isAuth = path.startsWith("/api/v1/auth/");
       if (
-        isAuth &&
+        (isAuth ||
+          path === "/api/v1/boards" ||
+          path.startsWith("/api/v1/boards/")) &&
         response.headers
           .get("content-type")
           ?.includes("application/problem+json")
@@ -133,13 +135,14 @@ export async function postJson<T>(
   path: string,
   body: unknown,
   decode: (value: unknown) => T,
+  method: "POST" | "PATCH" = "POST",
 ): Promise<T> {
   // Obtain a fresh session token for every mutation, including after login/logout.
   // Do not retry a mutation automatically: it may already have taken effect.
   const csrf = await getJson("/api/v1/auth/csrf", readCsrf);
   const form = body instanceof URLSearchParams;
   return getJson(path, decode, undefined, 8_000, {
-    method: "POST",
+    method,
     headers: {
       "Content-Type": form
         ? "application/x-www-form-urlencoded"

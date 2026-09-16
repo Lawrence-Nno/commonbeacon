@@ -12,7 +12,9 @@ function renderApp(path = "/") {
   vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) =>
     input === "/api/v1/auth/me"
       ? Promise.resolve(new Response(null, { status: 401 }))
-      : healthFetch(input, init),
+      : input === "/api/v1/boards"
+        ? Promise.resolve(Response.json([]))
+        : healthFetch(input, init),
   );
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
@@ -29,9 +31,10 @@ function renderApp(path = "/") {
 it("shows an accessible loading state and disables the repeated request", () => {
   vi.stubGlobal("fetch", vi.fn().mockReturnValue(new Promise(() => {})));
   renderApp();
-  expect(screen.getByRole("status")).toHaveTextContent(
-    "Checking the connection",
-  );
+  expect(
+    screen.getByText("Making sure we can reach the community service.")
+      .parentElement,
+  ).toHaveTextContent("Checking the connection");
   expect(screen.getByRole("button", { name: "Checking…" })).toBeDisabled();
 });
 
@@ -46,7 +49,7 @@ it("renders the real empty state and a healthy connection", async () => {
   ).toBeInTheDocument();
   expect(
     screen.getByRole("heading", {
-      name: "The first conversation is still ahead.",
+      name: "No boards yet.",
     }),
   ).toBeInTheDocument();
   expect(

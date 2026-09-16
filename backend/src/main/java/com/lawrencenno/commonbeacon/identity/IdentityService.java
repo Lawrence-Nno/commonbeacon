@@ -15,8 +15,12 @@ public class IdentityService {
     }
     @Transactional
     public UserSummary register(RegistrationRequest request) {
-        return UserSummary.from(users.saveAndFlush(AppUser.member(
+        try {
+            return UserSummary.from(users.saveAndFlush(AppUser.member(
                 request.email(), request.displayName(), encoder.encode(request.password()))));
+        } catch (org.springframework.dao.DataIntegrityViolationException exception) {
+            throw new com.lawrencenno.commonbeacon.shared.ApiFailure(409, "ACCOUNT_CONFLICT", "An account with that email already exists.");
+        }
     }
     @Transactional(readOnly = true)
     public UserSummary current(Authentication authentication) {

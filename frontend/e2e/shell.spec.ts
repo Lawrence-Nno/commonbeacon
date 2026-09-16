@@ -12,7 +12,7 @@ test("real backend health is visible through the Vite proxy", async ({
   ).toBeVisible();
   await expect(
     page.getByRole("heading", {
-      name: "The first conversation is still ahead.",
+      name: "Explore the boards",
     }),
   ).toBeVisible();
   await page.screenshot({

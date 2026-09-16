@@ -6,8 +6,8 @@ Start PostgreSQL, the backend, and Vite using [frontend setup](frontend-setup.md
 Open http://127.0.0.1:5173/register, create a fictional member, then sign in.
 Reload to verify the session survives browser navigation; use **Sign out** to invalidate it.
 
-Registration does not sign the user in automatically. There are no seeded administrator
-accounts yet; board administration and development demo users belong to Stage 5.
+Registration does not sign the user in automatically. Stage 5 adds opt-in local administrator and other demo
+accounts; see [boards and demo setup](boards.md).
 
 ## API contract
 
@@ -115,4 +115,4 @@ when two requests arrive at once.
 - Frontend: 21 tests, ESLint, TypeScript checks, and production build passed.
 - Chrome: all 4 smoke tests passed against the rebuilt backend with the local profile.
 - Desktop registration and mobile login screenshots inspected; mobile width check passed.
-- Stage 4 changes remain uncommitted; remote CI has not run for this stage.
+- Stage 4 was committed and pushed as 13b7692. The results above are local verification.

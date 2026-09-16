@@ -11,6 +11,8 @@ $settings = @{
     POSTGRES_DB = 'commonbeacon'
     POSTGRES_USER = 'commonbeacon'
     POSTGRES_PORT = '5432'
+    DEMO_SEED_ENABLED = 'false'
+    DEMO_PASSWORD = ''
 }
 foreach ($line in Get-Content -LiteralPath $envPath) {
     $valueLine = $line.Trim()
@@ -18,7 +20,7 @@ foreach ($line in Get-Content -LiteralPath $envPath) {
     $parts = $valueLine -split '=', 2
     if ($parts.Count -ne 2) { throw 'Invalid .env entry; use KEY=value lines.' }
     $key = $parts[0].Trim()
-    if ($key -in @('POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_PORT')) {
+    if ($key -in @('POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PASSWORD', 'POSTGRES_PORT', 'DEMO_SEED_ENABLED', 'DEMO_PASSWORD')) {
         $value = $parts[1].Trim()
         if ($value.Contains('"') -or $value.Contains("'") -or $value.Contains('$') -or $value.Contains('#')) {
             throw "Use an unquoted literal value without interpolation or inline comments for $key."

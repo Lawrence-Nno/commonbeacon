@@ -2,7 +2,7 @@
 
 ## What exists
 
-React and TypeScript provide a responsive community home, an about route, and a not-found route. The home deliberately shows an empty community: boards and discussions arrive in later stages. Stage 4 adds registration and login routes; see [authentication](authentication.md).
+React and TypeScript provide a responsive community home, an about route, and a not-found route. The home lists public boards; each board shows an empty question state until discussions are implemented. See [boards and demo setup](boards.md) for Stage 5 administration. Stage 4 adds registration and login routes; see [authentication](authentication.md).
 
 The connection card calls the real backend through Vite. It supports loading, healthy, offline, timeout, and retry states. A failed refresh replaces previously cached success; automatic checks run every 30 seconds while the tab is active.
 
@@ -68,7 +68,7 @@ npm run test starts interactive test watching. The production output is frontend
 
 ## Real-browser smoke checks
 
-Start the backend on port 8080 and ensure Google Chrome is installed. From frontend:
+Start the backend on port 8080 with local demo seeding enabled, and ensure Google Chrome is installed. Dot-source scripts/use-local-database.ps1 in the smoke-test terminal too, so Playwright receives DEMO_PASSWORD. From frontend:
 
 ```powershell
 npm.cmd run test:smoke

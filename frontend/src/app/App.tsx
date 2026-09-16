@@ -1,3 +1,6 @@
+import { BoardList } from "../features/boards/BoardList";
+import { BoardPage } from "../features/boards/BoardPage";
+import { AdminBoards } from "../features/boards/AdminBoards";
 import { AuthProvider, useAuth } from "../features/auth/AuthProvider";
 import { AuthPage } from "../features/auth/AuthPage";
 import { AuthControls } from "../features/auth/AuthControls";
@@ -9,7 +12,7 @@ function PageTitle() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    document.title = `${pathname === "/about" ? "About" : pathname === "/login" ? "Sign in" : pathname === "/register" ? "Join" : pathname === "/" ? "Community" : "Page not found"} · CommonBeacon`;
+    document.title = `${pathname.startsWith("/boards/") ? "Board" : pathname === "/admin/boards" ? "Manage boards" : pathname === "/about" ? "About" : pathname === "/login" ? "Sign in" : pathname === "/register" ? "Join" : pathname === "/" ? "Community" : "Page not found"} · CommonBeacon`;
   }, [pathname]);
   return null;
 }
@@ -47,24 +50,11 @@ function Home() {
           <div className="section-heading">
             <div>
               <p className="eyebrow">THE COMMUNITY</p>
-              <h2 id="conversations-heading">Room for your next question</h2>
+              <h2 id="conversations-heading">Explore the boards</h2>
             </div>
             <span className="subtle-badge">Getting started</span>
           </div>
-          <div className="empty-state">
-            <div className="conversation-symbol" aria-hidden="true">
-              “
-            </div>
-            <h3>The first conversation is still ahead.</h3>
-            <p>
-              We're preparing a place for thoughtful questions and helpful
-              answers. Member accounts are open. Discussion boards are coming
-              next.
-            </p>
-            <Link to="/about" className="text-link">
-              See what this space is about <span aria-hidden="true">→</span>
-            </Link>
-          </div>
+          <BoardList />
           <div className="community-principle">
             <span aria-hidden="true">✧</span>
             <p>
@@ -160,7 +150,7 @@ function NotFound() {
 }
 
 function Shell() {
-  const { expired } = useAuth();
+  const { expired, user } = useAuth();
   const { pathname } = useLocation();
 
   return (
@@ -184,6 +174,9 @@ function Shell() {
           <NavLink to="/about">
             <span aria-hidden="true">◎</span> About this space
           </NavLink>
+          {user?.role === "ADMINISTRATOR" && (
+            <NavLink to="/admin/boards">Manage boards</NavLink>
+          )}
         </nav>
         <div className="sidebar-note">
           <span className="small-beacon" aria-hidden="true">
@@ -218,7 +211,11 @@ function Shell() {
                     ? "Sign in"
                     : pathname === "/register"
                       ? "Join"
-                      : "Not found"}
+                      : pathname.startsWith("/boards/")
+                        ? "Board"
+                        : pathname === "/admin/boards"
+                          ? "Manage boards"
+                          : "Not found"}
             </strong>
           </span>
           <AuthControls />
@@ -232,6 +229,8 @@ function Shell() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
+            <Route path="/boards/:boardId" element={<BoardPage />} />
+            <Route path="/admin/boards" element={<AdminBoards />} />
             <Route
               path="/login"
               element={<AuthPage key="login" mode="login" />}
