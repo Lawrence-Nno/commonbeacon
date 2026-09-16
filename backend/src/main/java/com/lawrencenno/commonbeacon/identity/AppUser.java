@@ -11,8 +11,8 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Persistence mapping for schema validation. Registration and credential
- * management are introduced with the identity feature, not exposed here.
+ * Persistent account identity. Public registration uses the member factory;
+ * API responses use UserSummary to keep credentials private.
  */
 @Entity
 @Table(name = "app_user")
@@ -39,6 +39,19 @@ public class AppUser {
     protected AppUser() {
         // Required by JPA.
     }
+
+    static AppUser member(String email, String displayName, String passwordHash) {
+        var user = new AppUser();
+        user.id = UUID.randomUUID();
+        user.email = email;
+        user.displayName = displayName;
+        user.passwordHash = passwordHash;
+        user.role = UserRole.MEMBER;
+        user.createdAt = Instant.now();
+        return user;
+    }
+
+    String passwordHash() { return passwordHash; }
 
     public UUID getId() {
         return id;

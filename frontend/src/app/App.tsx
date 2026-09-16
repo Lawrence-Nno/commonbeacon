@@ -1,11 +1,15 @@
+import { AuthProvider, useAuth } from "../features/auth/AuthProvider";
+import { AuthPage } from "../features/auth/AuthPage";
+import { AuthControls } from "../features/auth/AuthControls";
 import { Link, NavLink, Route, Routes, useLocation } from "react-router";
 import { useEffect } from "react";
 import { ConnectionCard } from "../features/connection/ConnectionCard";
 
 function PageTitle() {
   const { pathname } = useLocation();
+
   useEffect(() => {
-    document.title = `${pathname === "/about" ? "About" : pathname === "/" ? "Community" : "Page not found"} · CommonBeacon`;
+    document.title = `${pathname === "/about" ? "About" : pathname === "/login" ? "Sign in" : pathname === "/register" ? "Join" : pathname === "/" ? "Community" : "Page not found"} · CommonBeacon`;
   }, [pathname]);
   return null;
 }
@@ -54,7 +58,8 @@ function Home() {
             <h3>The first conversation is still ahead.</h3>
             <p>
               We're preparing a place for thoughtful questions and helpful
-              answers. Member accounts and discussion boards are coming next.
+              answers. Member accounts are open. Discussion boards are coming
+              next.
             </p>
             <Link to="/about" className="text-link">
               See what this space is about <span aria-hidden="true">→</span>
@@ -125,8 +130,8 @@ function About() {
         </article>
       </div>
       <p className="availability-note">
-        CommonBeacon is in its early stages. Accounts, discussions, and accepted
-        solutions are being built; they are not available yet.
+        CommonBeacon is in its early stages. Member accounts are open.
+        Discussions and accepted solutions are coming next.
       </p>
       <Link className="text-link" to="/">
         ← Back to the community
@@ -154,8 +159,10 @@ function NotFound() {
   );
 }
 
-export function App() {
+function Shell() {
+  const { expired } = useAuth();
   const { pathname } = useLocation();
+
   return (
     <div className="app-shell">
       <PageTitle />
@@ -207,15 +214,32 @@ export function App() {
                 ? "About"
                 : pathname === "/"
                   ? "Overview"
-                  : "Not found"}
+                  : pathname === "/login"
+                    ? "Sign in"
+                    : pathname === "/register"
+                      ? "Join"
+                      : "Not found"}
             </strong>
           </span>
-          <span className="preview-label">EARLY COMMUNITY PREVIEW</span>
+          <AuthControls />
         </header>
         <main id="main-content" tabIndex={-1}>
+          {expired && (
+            <p className="form-error" role="alert">
+              Your session expired. Please sign in again.
+            </p>
+          )}
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
+            <Route
+              path="/login"
+              element={<AuthPage key="login" mode="login" />}
+            />
+            <Route
+              path="/register"
+              element={<AuthPage key="register" mode="register" />}
+            />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </main>
@@ -225,5 +249,13 @@ export function App() {
         </footer>
       </div>
     </div>
+  );
+}
+
+export function App() {
+  return (
+    <AuthProvider>
+      <Shell />
+    </AuthProvider>
   );
 }

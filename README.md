@@ -4,7 +4,7 @@ A customer-support community built with Java, Spring Boot, PostgreSQL, and React
 
 ## Status
 
-Stage 1 is complete: repository setup and all prerequisite checks passed, including a real Linux container run. See [development setup](docs/development-setup.md). Stage 2 is complete: the Spring Boot backend, PostgreSQL service, first migration, and seven passing integration tests are implemented. See [backend setup](docs/backend-setup.md) for run commands. Stage 3 is complete: a responsive React shell, live backend connection states, frontend tests, verification script, and initial CI jobs are implemented. See [frontend setup](docs/frontend-setup.md). Remote CI has not run for Stage 3 yet.
+Stage 1 is complete: repository setup and all prerequisite checks passed, including a real Linux container run. See [development setup](docs/development-setup.md). Stage 2 is complete: the Spring Boot backend, PostgreSQL service, first migration, and seven passing integration tests are implemented. See [backend setup](docs/backend-setup.md) for run commands. Stage 3 is complete: a responsive React shell, live backend connection states, frontend tests, verification script, and initial CI jobs are implemented. See [frontend setup](docs/frontend-setup.md). Stage 3 [remote CI passed](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35004794571). Stage 4 adds registration, session login/logout, CSRF protection, and role/ownership support. See [authentication](docs/authentication.md). Stage 4 verification results are recorded there; its changes have not run in remote CI.
 
 The first milestone delivers accounts, public boards, questions, replies, accepted solutions, server-enforced permissions, tests, and Docker Compose startup.
 

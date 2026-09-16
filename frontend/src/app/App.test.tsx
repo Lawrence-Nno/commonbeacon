@@ -8,6 +8,12 @@ import { App } from "./App";
 afterEach(() => vi.unstubAllGlobals());
 
 function renderApp(path = "/") {
+  const healthFetch = globalThis.fetch;
+  vi.stubGlobal("fetch", (input: RequestInfo | URL, init?: RequestInit) =>
+    input === "/api/v1/auth/me"
+      ? Promise.resolve(new Response(null, { status: 401 }))
+      : healthFetch(input, init),
+  );
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0 } },
   });

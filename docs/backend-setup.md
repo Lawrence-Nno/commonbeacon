@@ -69,7 +69,7 @@ Reports are under `backend/target/failsafe-reports/`. Successful verification al
 
 ## Java learning notes
 
-Spring creates and connects configured components through dependency injection. Configuration supplies environment-specific connection details. Flyway runs before JPA initialization, so schema validation checks the migrated schema. Transactions and application identity behavior will be added with their feature stages.
+Spring creates and connects configured components through dependency injection. Configuration supplies environment-specific connection details. Flyway runs before JPA initialization, so schema validation checks the migrated schema. Stage 4 adds transactional registration and session identity; see [authentication](authentication.md).
 
 ## Verification status
 

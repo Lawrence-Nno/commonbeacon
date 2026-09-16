@@ -45,4 +45,5 @@ foreach ($key in $settings.Keys) {
 $env:SPRING_DATASOURCE_URL = "jdbc:postgresql://127.0.0.1:$portNumber/$($settings.POSTGRES_DB)"
 $env:SPRING_DATASOURCE_USERNAME = $settings.POSTGRES_USER
 $env:SPRING_DATASOURCE_PASSWORD = $settings.POSTGRES_PASSWORD
-Write-Host 'Configured the host backend database connection from .env (password not displayed).'
+$env:SPRING_PROFILES_ACTIVE = 'local'
+Write-Host 'Selected local profile. Configured the host backend database connection from .env (password not displayed).'
