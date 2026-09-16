@@ -85,7 +85,7 @@ All direct package versions are exact. package-lock.json records the full resolv
 - Backend: Temurin 21, Docker availability check, Maven verify with Testcontainers.
 - Frontend: pinned Node and npm, npm ci, lint, type checking, component/client tests, and production build.
 
-The jobs use read-only repository permissions. Browser smoke checks are currently local because they require a running backend. Stage 3 [remote CI passed](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35004794571). Stage 4 changes have not run remotely.
+The jobs use read-only repository permissions. Stage 11 adds an isolated container/browser job with report uploads and always-run cleanup. See [milestone evidence](evidence/milestone-a.md) for the exact remote-versus-local status.
 
 ## Verification evidence
 

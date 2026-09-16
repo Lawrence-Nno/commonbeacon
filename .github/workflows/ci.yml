@@ -23,6 +23,13 @@ jobs:
       - name: Build and run integration tests
         run: ./mvnw --batch-mode --no-transfer-progress verify
         working-directory: backend
+      - name: Upload backend reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-reports
+          path: backend/target/*-reports/
+          retention-days: 7
   frontend:
     name: Frontend quality checks
     runs-on: ubuntu-latest
@@ -43,3 +50,44 @@ jobs:
       - run: npm run typecheck
       - run: npm run test:run
       - run: npm run build
+
+  containers-and-browser:
+    name: Container images and real browser journey
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      COMMONBEACON_E2E_PROJECT: commonbeacon-e2e-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm install --global npm@11.8.0
+      - run: npm ci
+        working-directory: frontend
+      - name: Install Chrome and OS dependencies
+        run: npx playwright install --with-deps chrome
+        working-directory: frontend
+      - name: Build isolated images and run browser tests
+        run: npm run test:smoke
+        working-directory: frontend
+      - name: Collect remaining container logs
+        if: always()
+        run: |
+          mkdir -p frontend/test-results
+          docker compose --project-name "$COMMONBEACON_E2E_PROJECT" --env-file .env.example -f compose.e2e.yaml logs --no-color > frontend/test-results/ci-compose.log 2>&1
+      - name: Cleanup isolated stack even after test failure
+        if: always()
+        run: docker compose --project-name "$COMMONBEACON_E2E_PROJECT" --env-file .env.example -f compose.e2e.yaml down --remove-orphans
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-evidence
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          if-no-files-found: warn
+          retention-days: 7

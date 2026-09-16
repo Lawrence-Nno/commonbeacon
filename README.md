@@ -1,56 +1,99 @@
 # CommonBeacon
 
-A customer-support community built with Java, Spring Boot, PostgreSQL, and React.
+An independent customer-support community built to learn Java: Spring Boot,
+PostgreSQL, React/TypeScript, and Docker Compose.
 
-## Status
+Milestone A implements accounts, boards, questions, replies, accepted solutions,
+owner/role permissions, conflict handling, and repeatable tests. Stage 10 was
+pushed as `97bab88`. Stage 11 adds container/browser CI and the handoff below;
+its new workflow has not yet run remotely.
 
-Stage 1 is complete: repository setup and all prerequisite checks passed, including a real Linux container run. See [development setup](docs/development-setup.md). Stage 2 is complete: the Spring Boot backend, PostgreSQL service, first migration, and seven passing integration tests are implemented. See [backend setup](docs/backend-setup.md) for run commands. Stage 3 is complete: a responsive React shell, live backend connection states, frontend tests, verification script, and initial CI jobs are implemented. See [frontend setup](docs/frontend-setup.md). Stage 3 [remote CI passed](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35004794571). Stage 4 adds registration, session login/logout, CSRF protection, and role/ownership support. See [authentication](docs/authentication.md). Stage 4 was committed and pushed as 13b7692. Stage 5 adds public boards, administrator create/edit/archive controls, and opt-in local demo accounts. See [boards and demo setup](docs/boards.md). Stage 5 was committed and pushed as 4fa6d34. Stage 6 adds question creation, public pagination/detail, and owner editing with archive and conflict protection. See [questions](docs/questions.md). Stage 6 was committed and pushed as 19ce858. Stage 7 adds public replies, member posting, owner editing, and conflict recovery. See [replies](docs/replies.md). Stage 7 was committed and pushed as 4b08546. Stage 8 adds author-only accepted solutions, concurrency protection, and solved/unanswered filtering. See [accepted solutions](docs/accepted-solutions.md). Stage 8 was committed and pushed as 2f8c7b0. Stage 9 packages the frontend, backend, and database with Docker Compose; startup, proxy authentication, deep links, and restart persistence are verified. Stage 9 was committed and pushed as a015a30. Stage 10 adds disposable browser-test infrastructure, a registered multi-member journey, identity-switch and failure-state checks, and deterministic demo conversations. See [browser testing](docs/browser-testing.md). Stage 10 is locally verified and uncommitted. See [Compose setup](docs/compose.md).
+## Start from a fresh checkout
 
-The first milestone delivers accounts, public boards, questions, replies, accepted solutions, server-enforced permissions, tests, and Docker Compose startup.
-
-## Run the complete app
-
-Set local credentials in .env, then run docker compose up -d --build --wait --wait-timeout 180. Open http://127.0.0.1:8081. See [Compose setup](docs/compose.md) for startup, shutdown, host development, persistence, and troubleshooting.
-
-## Selected versions
-
-- Java: Eclipse Temurin JDK 21.0.12.1 (Windows package 21.0.12.101).
-- Node.js: 24.13.1; npm: 11.8.0. Pinned in `.nvmrc`.
-- Git: verified with 2.53.0.windows.1.
-- Docker Desktop: 4.91.0 selected; use its bundled Docker Engine and Compose.
-- Spring Boot: 4.1.1; Maven Wrapper: 3.3.4; Maven: 3.9.16.
-- PostgreSQL: 18.6-alpine3.24, pinned by digest in Compose and integration tests.
-- React and React DOM: 19.3.0.
-- TypeScript: 6.0.3; Vite: 8.3.0; React plugin: 6.1.1.
-- React Router: 8.3.1; TanStack Query: 5.102.8.
-
-Frontend dependencies are pinned in package.json and package-lock.json and passed installation, lint, type checking, tests, and a production build. TypeScript 6.0.3 satisfies the lint tooling peer range. Spring Boot manages backend dependency versions. REST comes first; GraphQL follows the verified core workflow.
-
-## Local prerequisite check
-
-In PowerShell, from this repository:
+Prerequisites: Git and Docker Desktop running Linux containers. The application
+builds Java and frontend assets inside containers.
 
 ```powershell
-. .\scripts\use-dev-tools.ps1
-.\scripts\check-prerequisites.ps1
-.\scripts\check-prerequisites.ps1 -RunContainer
+git clone https://github.com/Lawrence-Nno/commonbeacon.git
+cd commonbeacon
+Copy-Item .env.example .env
 ```
 
-The first command selects installed project tools for the current terminal only. The second checks versions and the Docker engine. The final command additionally pulls/runs a disposable `hello-world:latest` diagnostic container. It creates no project database or persistent volume.
+Edit .env: replace POSTGRES_PASSWORD with a unique local password. For fictional
+demo accounts, set DEMO_SEED_ENABLED=true and a unique DEMO_PASSWORD of 12–128
+characters. Then:
 
-Docker Desktop must be installed and running in Linux-container mode. Complete any first-launch setup before running the checks. See [setup and troubleshooting](docs/development-setup.md).
+```powershell
+docker compose config --quiet
+docker compose up -d --build --wait --wait-timeout 180
+```
 
-## Repository layout
+Open **http://127.0.0.1:8081**. Without demo seeding, use Join the community to
+register a member. Registration never grants administrator privileges.
 
-- `backend/`: Spring Boot application, Flyway migration, Maven Wrapper, and integration tests.
-- `frontend/`: React/TypeScript shell, Vite proxy, component/client tests, and browser smoke checks.
-- `scripts/`: tool selection, database configuration, prerequisite checks, and combined verification.
-- `docs/`: shared setup documentation.
+```powershell
+docker compose logs --tail 100 backend frontend db
+docker compose down
+```
 
-Local planning documents are deliberately excluded from Git. Do not force-add them.
+Ordinary shutdown preserves data. Backend restart signs users out. Never add
+--volumes unless intentionally deleting local data. This is a localhost HTTP
+deployment, not an Internet production configuration.
 
-## Identity
+## Verify
 
-CommonBeacon is an independent learning and portfolio project using original branding. The Java base package is `com.lawrencenno.commonbeacon`.
+Host checks require Java 21, Node 24.13.1, npm 11.8.0, Docker, and Chrome.
+On this Windows setup, use the tool-selection helper; on other systems install
+the pinned tools and run the same Maven/npm commands.
 
-Private remote: https://github.com/Lawrence-Nno/commonbeacon
+```powershell
+. ./scripts/use-dev-tools.ps1
+cd frontend
+npm ci
+cd ..
+./scripts/verify.ps1
+cd frontend
+npm run test:smoke
+```
+
+verify.ps1 runs Java unit/PostgreSQL integration tests and frontend lint, type
+checking, tests, and build. test:smoke builds both container images and runs the
+real browser journey against an isolated, temporary database. It never uses .env
+or the development volume. No host backend is needed.
+
+## Demo accounts
+
+With opt-in demo seeding, all four initially use DEMO_PASSWORD:
+
+- alex.member@example.test — member.
+- sam.member@example.test — member.
+- morgan.moderator@example.test — member capabilities; moderation is future work.
+- avery.admin@example.test — board administration.
+
+Getting started contains two fictional conversations: one solved and one
+unanswered. Reseeding preserves edits, credentials, and solution choices.
+
+## Documentation
+
+- [Compose startup, persistence, troubleshooting](docs/compose.md)
+- [Host tool setup](docs/development-setup.md) and [host backend](docs/backend-setup.md)
+- [Isolated browser tests](docs/browser-testing.md)
+- [REST API examples](docs/api.md)
+- [Architecture decisions and Java learning notes](docs/architecture.md)
+- [Milestone evidence, demo script, and limitations](docs/evidence/milestone-a.md)
+- [Authentication](docs/authentication.md), [boards](docs/boards.md),
+  [questions](docs/questions.md), [replies](docs/replies.md), [solutions](docs/accepted-solutions.md)
+
+## Stack and repository
+
+Java 21; Spring Boot 4.1.1; Maven wrapper 3.9.16; PostgreSQL 18.6;
+React 19.3; TypeScript 6.0.3; Vite 8.3; React Router 8.3.1;
+TanStack Query 5.102.8. Dependency locks and container digests are in source.
+
+backend/ contains the Java application, Flyway migrations, and integration tests.
+frontend/ contains the client and browser tests. scripts/ contains host helpers.
+.github/workflows/ci.yml defines backend, frontend, and container/browser jobs.
+
+Local planning documents, .env, build output, and test artifacts are ignored.
+Never force-add credentials or planning documents. Branding and demo content are
+original and fictional. Java package: com.lawrencenno.commonbeacon.

@@ -5,7 +5,11 @@ import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const frontend = fileURLToPath(new URL("../", import.meta.url));
-const project = "commonbeacon-e2e-" + randomUUID().slice(0, 8);
+const project =
+  process.env.COMMONBEACON_E2E_PROJECT ??
+  "commonbeacon-e2e-" + randomUUID().slice(0, 8);
+if (!/^commonbeacon-e2e-[a-z0-9-]+$/.test(project))
+  throw new Error("Invalid isolated project name.");
 const args = [
   "compose",
   "--project-name",
@@ -45,12 +49,19 @@ try {
 } catch (error) {
   console.error(error.message);
 } finally {
-  const logs = docker(["logs", "--no-color"], true);
-  mkdirSync(new URL("../test-results/", import.meta.url), { recursive: true });
-  writeFileSync(
-    new URL("../test-results/backend-compose.log", import.meta.url),
-    (logs.stdout ?? "") + (logs.stderr ?? ""),
-  );
+  try {
+    const logs = docker(["logs", "--no-color"], true);
+    mkdirSync(new URL("../test-results/", import.meta.url), {
+      recursive: true,
+    });
+    writeFileSync(
+      new URL("../test-results/backend-compose.log", import.meta.url),
+      (logs.stdout ?? "") + (logs.stderr ?? ""),
+    );
+  } catch (error) {
+    console.error("Could not save logs:", error.message);
+    code = 1;
+  }
   const cleanup = docker(["down", "--remove-orphans"]);
   if (cleanup.error || cleanup.status !== 0) {
     console.error("Cleanup failed for disposable project " + project);

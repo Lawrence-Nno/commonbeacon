@@ -115,4 +115,4 @@ running. COMPOSE_ORIGIN can override the default URL.
 - scripts/verify.ps1 passed: 5 backend unit tests, 53 integration tests, 49 frontend tests, lint, type checking, and production build.
 - The dedicated Chrome Compose check passed login, HttpOnly/SameSite cookies, CSRF rejection, direct question URLs and reload, selected-answer persistence through database/backend restart and ordinary down/up, and session expiry on backend restart.
 - The 390px mobile screenshot was inspected and overflow check passed.
-- Stack remains running. This is local verification; Stage 9 is uncommitted and has not run in remote CI.
+- Stack remains running. This is local verification; Stage 9 was pushed as a015a30. Stage 11 adds container/browser CI; see [current evidence](evidence/milestone-a.md).

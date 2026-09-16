@@ -1,3 +1,5 @@
+> Current browser command: npm run test:smoke starts an isolated container stack automatically; no host backend or development credentials are required. See [browser testing](browser-testing.md).
+
 # Stage 4: registration and secure sessions
 
 ## Try it locally

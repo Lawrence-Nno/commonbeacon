@@ -12,14 +12,14 @@ npm run test:smoke
 ```
 
 No running development backend, .env, or demo password is required. The runner
-builds the real backend, starts disposable PostgreSQL, waits for readiness, runs
+builds both production images, starts Nginx, the real backend, and disposable PostgreSQL, waits for readiness, runs
 Playwright, saves logs, and tears down its test stack. For one file:
 
 ```powershell
 npm run test:smoke -- questions.spec.ts
 ```
 
-Ports 4180 (test backend), 4173 (Vite), and 4174 (intentional outage) must be free.
+Ports 4173 (containerized Nginx) and 4174 (intentional Vite outage) must be free.
 Existing servers are not reused. Run one browser suite at a time on this machine.
 The single-worker suite keeps account activity within normal login rate limits;
 it does not disable authentication protections.
@@ -56,7 +56,7 @@ backend retry states. Screenshots, failure traces, and backend-compose.log are i
 ignored frontend/test-results.
 
 scripts/verify.ps1 runs the separate Java and frontend regression suites.
-Browser CI orchestration and artifact upload are Stage 11.
+The Stage 11 workflow runs the same command, uploads reports/traces/logs, and has an always-run cleanup step. The runner accepts only commonbeacon-e2e-* names for its optional CI project override.
 
 ## Development demo content
 
@@ -79,4 +79,4 @@ invoked by npm run test:smoke.
 - Generated test containers/network were removed automatically; the development stack remained healthy.
 - Mobile question and outage screenshots were inspected; long-content overflow and visible keyboard-focus assertions passed.
 - Refreshed the development backend and confirmed both seeded conversations and their solved/unanswered states through the public API.
-- Stage 10 remains uncommitted. Browser CI orchestration is Stage 11.
+- Stage 10 was pushed as 97bab88. See [Stage 11 fresh-copy evidence](evidence/milestone-a.md); its new workflow requires a push before remote execution can be verified.
