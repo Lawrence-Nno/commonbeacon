@@ -5,8 +5,8 @@ PostgreSQL, React/TypeScript, and Docker Compose.
 
 Milestone A implements accounts, boards, questions, replies, accepted solutions,
 owner/role permissions, conflict handling, and repeatable tests. Milestone B adds
-member reporting, a protected moderator queue, and atomic report resolution and
-content hiding with audit reasons. Restoration is planned next. See the milestone evidence
+member reporting, a protected moderator queue, atomic report resolution, and
+content hiding/restoration with private audit history. See the milestone evidence
 for local verification and remote CI status.
 
 ## Start from a fresh checkout
@@ -68,7 +68,7 @@ With opt-in demo seeding, all four initially use DEMO_PASSWORD:
 
 - alex.member@example.test — member.
 - sam.member@example.test — member.
-- morgan.moderator@example.test — member capabilities, report review, resolution, and content hiding.
+- morgan.moderator@example.test — member capabilities, report review, resolution, hiding/restoration, and audit history.
 - avery.admin@example.test — board administration.
 
 Getting started contains two fictional conversations: one solved and one

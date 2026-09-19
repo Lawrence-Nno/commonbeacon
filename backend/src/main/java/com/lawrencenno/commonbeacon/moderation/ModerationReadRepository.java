@@ -51,6 +51,9 @@ public class ModerationReadRepository {
     }
     public Optional<ModerationContext> context(ModerationReport report) {
         UUID replyId = "REPLY".equals(report.targetKind()) ? report.targetId() : null;
+        return context(report.questionId(), replyId);
+    }
+    public Optional<ModerationContext> context(UUID questionId, UUID replyId) {
         return jdbc.query("""
             SELECT b.id AS board_id, b.name AS board_name, b.archived,
                    q.id AS question_id, q.title, q.body AS question_body, q.author_id AS question_author_id,
@@ -71,9 +74,9 @@ public class ModerationReadRepository {
                         rs.getString("reply_body"), new Actor(uuid(rs, "reply_author_id"), rs.getString("reply_author_name")),
                         ContentVisibility.valueOf(rs.getString("reply_visibility")), rs.getLong("reply_version"));
                 return new ModerationContext(new BoardContext(uuid(rs, "board_id"), rs.getString("board_name"), rs.getBoolean("archived")),
-                        question, reply, report.targetKind(), report.targetId(), qVisibility == ContentVisibility.VISIBLE
+                        question, reply, replyId == null ? "QUESTION" : "REPLY", replyId == null ? questionId : replyId, qVisibility == ContentVisibility.VISIBLE
                         && (replyId == null || (reply != null && reply.visibility() == ContentVisibility.VISIBLE)));
-            }, replyId, report.questionId()).stream().findFirst();
+            }, replyId, questionId).stream().filter(context -> replyId == null || context.reply() != null).findFirst();
     }
     private static UUID uuid(ResultSet rs, String name) throws SQLException { return rs.getObject(name, UUID.class); }
     private static Instant instant(ResultSet rs, String name) throws SQLException {

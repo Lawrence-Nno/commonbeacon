@@ -45,18 +45,42 @@ export function readReportPage(value: unknown): ReportPage {
   if (!Array.isArray(v.items) || size < 1 || size > 100) return invalid();
   return { items: v.items.map(report), page: count(v.page), size, totalElements: count(v.totalElements), totalPages: count(v.totalPages) };
 }
-export function readReportDetail(value: unknown): ReportDetail {
-  const v = object(value), c = object(v.context), q = object(c.question), b = object(c.board);
+export type ContentContext = ReportDetail["context"];
+export function readContentContext(value: unknown): ContentContext {
+  const c = object(value), q = object(c.question), b = object(c.board);
   const r = c.reply === null ? null : object(c.reply);
-  if (!Array.isArray(v.availableDecisions) || v.availableDecisions.some((d) => !["DISMISS", "HIDE", "ACKNOWLEDGE_HIDDEN"].includes(String(d)))) return invalid();
-  return { report: report(v.report), context: {
+  return {
     board: { id: text(b.id), name: text(b.name), archived: bool(b.archived) },
     question: { id: text(q.id), title: text(q.title), body: text(q.body), author: actor(q.author),
       visibility: visibility(q.visibility), version: count(q.version), acceptedReplyId: nullable(q.acceptedReplyId) },
     reply: r === null ? null : { id: text(r.id), body: text(r.body), author: actor(r.author), visibility: visibility(r.visibility), version: count(r.version) },
     targetKind: kind(c.targetKind), targetId: text(c.targetId), effectivePublicVisibility: bool(c.effectivePublicVisibility),
-  }, availableDecisions: v.availableDecisions.map(text) };
+  };
 }
+export function readReportDetail(value: unknown): ReportDetail {
+  const v = object(value);
+  if (!Array.isArray(v.availableDecisions) || v.availableDecisions.some((d) => !["DISMISS", "HIDE", "ACKNOWLEDGE_HIDDEN"].includes(String(d)))) return invalid();
+  return { report: report(v.report), context: readContentContext(v.context), availableDecisions: v.availableDecisions.map(text) };
+}
+export type ActionPage = { items: { id: string; actor: Actor; targetKind: "QUESTION" | "REPLY"; targetId: string;
+  action: "HIDE" | "RESTORE"; reason: string; createdAt: string }[]; page: number; size: number; totalElements: number; totalPages: number };
+export function readActionPage(value: unknown): ActionPage {
+  const v = object(value), size = count(v.size);
+  if (!Array.isArray(v.items) || size < 1 || size > 100) return invalid();
+  return { items: v.items.map((value) => {
+    const a = object(value);
+    return { id: text(a.id), actor: actor(a.actor), targetKind: kind(a.targetKind), targetId: text(a.targetId),
+      action: a.action === "HIDE" || a.action === "RESTORE" ? a.action : invalid(), reason: text(a.reason), createdAt: text(a.createdAt) };
+  }), page: count(v.page), size, totalElements: count(v.totalElements), totalPages: count(v.totalPages) };
+}
+const contentPath = (id: string, reply: boolean) => `/api/v1/moderation/${reply ? "replies" : "questions"}/${encodeURIComponent(id)}`;
+export const getContent = (id: string, reply: boolean, signal?: AbortSignal) => getJson(contentPath(id, reply), readContentContext, signal);
+export const getActions = (id: string, reply: boolean, page: number, signal?: AbortSignal) =>
+  getJson(contentPath(id, reply) + `/actions?page=${page}&size=20`, readActionPage, signal);
+export const restoreContent = (context: ContentContext, reason: string) => postJson(contentPath(context.targetId, context.reply !== null) + "/restore", {
+  reason: reason.trim(), expectedTargetVersion: (context.reply ?? context.question).version,
+  ...(context.reply ? { expectedQuestionVersion: context.question.version } : {}),
+}, readContentContext);
 export const listReports = (status: ReportStatus, page: number, signal?: AbortSignal) =>
   getJson(`/api/v1/moderation/reports?status=${status}&page=${page}&size=20`, readReportPage, signal);
 export const getReport = (id: string, signal?: AbortSignal) =>

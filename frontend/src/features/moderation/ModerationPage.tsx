@@ -4,7 +4,7 @@ import { Link, useParams, useSearchParams } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
 import { ApiError } from "../../lib/http";
 import { getReport, listReports, resolveReport } from "./reviewApi";
-import type { ReportDetail, ReportStatus } from "./reviewApi";
+import type { ContentContext, ReportDetail, ReportStatus } from "./reviewApi";
 
 export function ModerationPage() {
   const { user, sessionError } = useAuth();
@@ -83,6 +83,14 @@ function Detail({ data: { report, context } }: { data: ReportDetail }) {
     {report.resolver && <section aria-label="Resolution"><h2>Resolution</h2><p>{report.resolutionDecision?.replaceAll("_", " ")} · {report.resolver.displayName}</p>
       {report.resolvedAt && <time dateTime={report.resolvedAt}>{new Date(report.resolvedAt).toLocaleString()}</time>}
       <p className="moderation-content">{report.resolutionNote}</p></section>}
+    <ContentView context={context} />
+  </>;
+}
+
+export function ContentView({ context }: { context: ContentContext }) {
+  return <>
+    <p><Link className="text-link" to={"/moderation/questions/" + context.question.id}>Question history and restoration</Link></p>
+    {context.reply && <p><Link className="text-link" to={"/moderation/replies/" + context.reply.id}>Reply history and restoration</Link></p>}
     <p>Board: {context.board.name}{context.board.archived && " (archived)"}</p>
     <p>{context.effectivePublicVisibility ? "The reported content is publicly visible." : "The reported content is not publicly visible."}</p>
     <section className="reply-card" aria-label="Question context">

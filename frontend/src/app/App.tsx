@@ -9,6 +9,7 @@ import { AuthControls } from "../features/auth/AuthControls";
 import { Link, NavLink, Route, Routes, useLocation } from "react-router";
 import { useEffect } from "react";
 import { ConnectionCard } from "../features/connection/ConnectionCard";
+import { ModerationContentPage } from "../features/moderation/ModerationContentPage";
 import { ModerationPage } from "../features/moderation/ModerationPage";
 
 function PageTitle() {
@@ -242,6 +243,8 @@ function Shell() {
             <Route path="/boards/:boardId" element={<BoardPage />} />
             <Route path="/admin/boards" element={<AdminBoards />} />
             <Route path="/moderation" element={<ModerationPage />} />
+            <Route path="/moderation/questions/:contentId" element={<ModerationContentPage reply={false} />} />
+            <Route path="/moderation/replies/:contentId" element={<ModerationContentPage reply />} />
             <Route path="/moderation/reports/:reportId" element={<ModerationPage />} />
             <Route
               path="/boards/:boardId/questions/new"

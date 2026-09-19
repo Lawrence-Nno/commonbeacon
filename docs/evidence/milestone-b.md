@@ -4,10 +4,10 @@
 
 Stage 1 is complete: baseline verified and implementation contracts finalized on
 2026-09-19. Stage 2 report submission is committed/pushed as e846e13 and passed
-remote CI. Stage 3 is pushed as 2aac716 and passed remote CI. Stage 4 resolution
-and hiding are implemented and locally verified, including the container/browser
-workflow. Stages 5-13 remain pending, including restoration,
-articles, search, and summary.
+remote CI. Stage 4 is pushed as fa2bd90 and passed remote CI. Stage 5 restoration,
+private history, and concurrency coverage are implemented and locally verified,
+including the full container/browser workflow. Stages 6-13 remain planned, including articles,
+search, and summary.
 
 Baseline revision: `2d33c96de62b6feda06a4b32366e300844f7ff4a`.
 Verification used the existing workspace with documentation changes, not a new
@@ -433,5 +433,105 @@ queue access returns 401. Log: `%TEMP%/commonbeacon-b-stage4-startup.log`.
 
 README, moderation behavior, this evidence record, and the ignored implementation
 plans now record Stage 4. Unrelated interview-preparation edits are preserved.
-Stage 4 remains uncommitted and has not run remotely. Restoration/history endpoints
-and the full accept/hide/restore concurrency matrix remain Stage 5 work.
+At that handoff Stage 4 was uncommitted and had not run remotely. Its subsequent
+commit/push and Stage 5 implementation are recorded below.
+
+
+## Stage 4 commit/push
+
+Committed and pushed `fa2bd90313960790f56c724f883551a3c507178f`, preserving unrelated
+interview-preparation documentation edits. All jobs passed in
+[run 35459273829](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35459273829).
+The local implementation plans remain ignored.
+
+## Stage 5 implementation: 2026-09-19
+
+Added protected question/reply context, bounded newest-first action history, and
+reason-required restoration endpoints. Restoration uses scalar locating reads,
+board -> question -> reply locks, reviewed target/parent versions, one atomic
+RESTORE audit append, and a confirmed context response. It never reopens reports,
+reselects an accepted reply, or overwrites individual child visibility. It works
+on archived boards and retains ordinary owner/archive restrictions. Existing V7
+storage is sufficient; no applied migration was changed and no V8 was added.
+
+Report context now links to independently addressable private question/reply
+history pages. The new pages show actor/action/reason/time, pagination, and the
+hidden-parent distinction. A restoration form appears only for a hidden target.
+It waits for server confirmation, preserves a failed draft for explicit reload
+and review, refreshes affected caches, and discards late responses after account
+changes. Shared context decoding/rendering replaces duplication in the report view.
+
+Added 11 PostgreSQL/HTTP integration cases, including multiple deterministic race
+orders within five cases. Lifecycle tests cover accepted-reply restoration without
+reacceptance, report metadata preservation, mixed hidden/visible children, retained
+selection on parent restoration, hidden-parent restoration, archived boards,
+role/CSRF/service rejection, unknown fields, required versions/reasons, history
+bounds/ties/counts, missing targets, and rollback after a real audit insert followed
+by an injected failure.
+
+Race tests pause the first request after its real board lock, observe the second
+SQL transaction waiting through pg_stat_activity, then release and assert final
+storage, responses, versions, and action cardinality. Scenarios:
+
+- Accept versus hiding the reply or parent, in both orders. A stale hide conflicts;
+  explicit review/retry clears acceptance when hiding the reply. A hidden parent
+  can retain its valid internal selection while public reads remain inaccessible.
+- Question/reply author edits and reply creation versus hiding, in both orders.
+  Waiting writes recheck hidden state; earlier edits force reviewed-version conflicts.
+- Two reports hiding one reply: one transition, one still-open report, and explicit
+  acknowledgement after reviewing the now-hidden target.
+- Restoration versus another hide in both orders: stale/state-incompatible requests
+  fail without events, and a newly reviewed hide creates exactly one next event.
+- Hide/restore versus board archival, in both orders: moderation succeeds without
+  deadlock, and ordinary author edits remain blocked on the archived board.
+
+The initial full run passed the six lifecycle/validation cases but failed the five
+race cases because the test harness called an abstract Spring Data interface method
+through Mockito.callRealMethod. Changed only the harness to invoke the spy's real
+repository delegate. The focused rerun then passed all 11 integration cases.
+One focused shell invocation stopped on Mockito's normal native-stderr warning;
+rerunning with ErrorActionPreference=Continue, matching scripts/verify.ps1, passed.
+The configured `C:/Users/USER/.Codex/issue-rca.md` is still absent.
+Log: `%TEMP%/commonbeacon-b-stage5-races.log`.
+
+Added 13 frontend cases for role gates, private plain-text history, paging and
+parent links, exact version payloads, server-confirmed restoration, hidden-parent
+messaging, conflict/server-failure draft preservation, explicit reload, question
+version shape, reason validation, late mutation/account switching, unavailable
+content, and malformed responses. Lint, all 85 frontend tests, TypeScript, and
+production build passed before the final full run.
+
+Final `./scripts/verify.ps1` exited 0: **5 unit + 87 integration tests (92 backend
+total), 85 frontend tests**, lint, TypeScript checking, and production build passed.
+Log: `%TEMP%/commonbeacon-b-stage5-verify-final.log`.
+
+The full isolated `npm run test:smoke` exited 0: **7 passed (1.5m)** using
+`commonbeacon-e2e-b-stage5-20260919` and disposable PostgreSQL tmpfs. The connected
+report journey hides the accepted reply on an archived board, restores it through
+the private page, verifies a publicly visible reply with no accepted selection,
+checks history after reload, and independently hides/restores the parent. A visible
+reply beneath that hidden parent has no restore button and remains publicly 404
+until its parent is restored. Existing role/account-switch checks also pass.
+Log: `%TEMP%/commonbeacon-b-stage5-browser.log`.
+
+Inspected `restoration-mobile.png` (390px) and
+`restoration-history-desktop.png` (1280px) in the ignored browser output directory.
+The form/reason and focus outline fit the mobile viewport; history shows separate
+HIDE/RESTORE actor, reason, and timestamp entries in newest-first order. Browser
+assertions verify keyboard submission and no horizontal overflow. The existing
+full-page skip-to-content overlay is visible in the mobile capture; no unrelated
+global shell styling changed. This is automated browser/screenshot evidence, not
+manual interactive testing.
+
+The disposable stack removed all containers and its network; follow-up project-label
+queries returned no leftovers. Rebuilt the development stack with
+`docker compose up -d --build --wait --wait-timeout 180`; backend, frontend, and
+database are healthy, with the existing database volume preserved. `/moderation`
+and `/api/v1/boards` return 200 at `http://127.0.0.1:8081/`; anonymous access to a
+privileged content-history URL returns 401.
+Startup log: `%TEMP%/commonbeacon-b-stage5-startup.log`.
+
+README, moderation documentation, this evidence record, and ignored plans now
+record Stage 5. Unrelated interview-preparation edits remain untouched.
+Stage 5 remains uncommitted and has not run remotely. Stage 6 knowledge-article
+implementation is next; search and operational counts remain later work.

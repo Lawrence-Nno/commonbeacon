@@ -47,6 +47,10 @@ public class Question {
     }
 
     public boolean isVisible() { return visibility == ContentVisibility.VISIBLE; }
+    public void restore() {
+        visibility = ContentVisibility.VISIBLE;
+        updatedAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+    }
     public void hide() {
         visibility = ContentVisibility.HIDDEN;
         updatedAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);

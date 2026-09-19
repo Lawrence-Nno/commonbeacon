@@ -1,8 +1,8 @@
 # Milestone B moderation contract
 
-Status: Stages 2-4 implement submission, report queue/context, atomic resolution,
-content hiding, and audit storage locally on 2026-09-19. Restoration and audit-history
-viewing remain Stage 5 work; summary remains Stage 10 work. See the
+Status: Stages 2-5 implement submission, report queue/context, atomic resolution,
+content hiding/restoration, and private audit-history viewing locally on 2026-09-19.
+Summary remains Stage 10 work. See the
 [Milestone B evidence](evidence/milestone-b.md) for verification status.
 
 ## Shared conventions and permissions
@@ -96,8 +96,8 @@ fields are null while open. Text content is loaded through detail, not every row
 `report` is the summary above. `availableDecisions` is an array of the enum values
 below; it is a UI hint, always revalidated transactionally on submission.
 
-Stage 4 uses `availableDecisions` for the resolution form. Restoration controls
-remain future work. OPEN reports return DISMISS plus HIDE for a visible target, or DISMISS
+Stage 4 uses `availableDecisions` for the resolution form. Stage 5 adds independent
+content-history and restoration pages linked from report details. OPEN reports return DISMISS plus HIDE for a visible target, or DISMISS
 plus ACKNOWLEDGE_HIDDEN for a target that is itself hidden; RESOLVED reports return
 an empty array. An internally visible reply under a hidden question still has
 HIDE eligibility, while effective public visibility is false.
@@ -137,7 +137,7 @@ question is hidden. Context loading must be consistent within a database snapsho
 so versions and displayed state correspond to the same review. Do not load an
 unbounded thread or audit collection into a detail DTO.
 
-Add these explicit extensions to the guide in Stage 5:
+Stage 5 implements these explicit extensions to the guide:
 
 - `GET /moderation/questions/{id}` returns `ModerationContext` for any visibility.
 - `GET /moderation/replies/{id}` returns context including the parent at any visibility.
@@ -209,7 +209,7 @@ is suppressed. Separately hiding its accepted reply clears acceptance even when
 the parent is hidden. Restoring a reply under a hidden parent changes its own
 state only: `effectivePublicVisibility` remains false.
 
-Use a later additive migration for `moderation_action`: actor/target FKs,
+V7 added `moderation_action`: actor/target FKs,
 exactly-one-target check, action enum check, required reason, creation timestamp,
 and target/history indexes. Audit records are append-only by application behavior,
 not a tamper-proof compliance log. No failed mutation may leave a misleading event.
@@ -325,3 +325,40 @@ Question editing now loads scalar board ID, locks the board, and then freshly lo
 and checks the visible question. Reply creation/editing already follows this ordering.
 Restoration, history endpoints, and the full two-direction accept/hide race matrix
 remain the next stage.
+
+
+## Stage 5 implementation
+
+The six protected question/reply context, history, and restoration routes above
+are implemented. Context and history reads use REPEATABLE_READ snapshots; history
+pages default to 20, cap at 100, and use newest timestamp/UUID first. History
+contains actor ID/display name, action, private reason, and timestamp, without
+account credentials or report-resolution events. Unknown targets return
+CONTENT_NOT_FOUND. Restoration DTOs reject extra fields and require the reviewed
+parent version for reply targets; question requests omit it or supply null.
+
+Restoration locks board -> question -> reply, checks the target's own visibility
+and reviewed versions, sets only that target to VISIBLE, appends one RESTORE
+entry, flushes, and returns confirmed context. There is no new migration in Stage 5.
+It does not reopen reports or restore acceptance. A question restoration retains
+a still-valid selection and does not alter hidden children. Reply restoration
+under a hidden parent succeeds internally but remains publicly inaccessible.
+Archival does not block moderation and still blocks ordinary author writes.
+
+From any report detail choose **Question history and restoration** or **Reply
+history and restoration**. The private routes are `/moderation/questions/:id`
+and `/moderation/replies/:id`. These independent pages support parent restoration
+without a public hidden-content bypass. Only a hidden target has a restoration
+form. Enter a private reason and submit; failures retain the draft and require
+**Reload content context** before another attempt. No mutation is automatically
+retried or displayed optimistically. History has bounded previous/next controls,
+loading/error/empty states, and account-scoped queries with abort signals.
+
+Deterministic PostgreSQL tests hold the first operation's real board lock,
+observe the second operation waiting in pg_stat_activity, and then release it.
+They cover both lock orders for accept versus reply/parent hide, author edit or
+reply creation versus hide, restoration versus another hide, and board archival
+versus hide/restore. Two reports targeting one reply produce one hide followed
+by an explicit acknowledgement after reload. Injected audit failure proves
+restoration rollback; Stage 4 retains the accepted-reply hide rollback test.
+Personal Java/concurrency rehearsal remains separate from automated verification.
