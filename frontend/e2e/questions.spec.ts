@@ -376,6 +376,7 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
       .getByLabel("Your reply")
       .fill("Private unsent owner draft.");
     await ownerPage.getByRole("button", { name: "Sign out" }).click();
+    await expect(ownerPage.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
     await ownerPage.goto(origin + "/login");
     await ownerPage.getByLabel("Email address").fill(otherEmail);
     await ownerPage.getByLabel("Password", { exact: true }).fill(password!);
@@ -394,6 +395,7 @@ test("members publish and edit questions, recover stale drafts, and cannot edit 
     ).toHaveCount(0);
     await expect(ownerPage.getByLabel("Your reply")).toHaveValue("");
     await ownerPage.getByRole("button", { name: "Sign out" }).click();
+    await expect(ownerPage.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
     await ownerPage.close();
     ownerPage = await login(owner, ownerEmail);
 
