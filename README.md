@@ -4,9 +4,10 @@ An independent customer-support community built to learn Java: Spring Boot,
 PostgreSQL, React/TypeScript, and Docker Compose.
 
 Milestone A implements accounts, boards, questions, replies, accepted solutions,
-owner/role permissions, conflict handling, and repeatable tests. Stage 10 was
-pushed as `97bab88`. Stage 11 adds container/browser CI and the handoff below;
-its new workflow has not yet run remotely.
+owner/role permissions, conflict handling, and repeatable tests. Milestone B adds
+member reporting and a protected, read-only moderator queue with report context.
+Report resolution and hide/restore are planned next. See the milestone evidence
+for local verification and remote CI status.
 
 ## Start from a fresh checkout
 
@@ -67,7 +68,7 @@ With opt-in demo seeding, all four initially use DEMO_PASSWORD:
 
 - alex.member@example.test — member.
 - sam.member@example.test — member.
-- morgan.moderator@example.test — member capabilities; moderation is future work.
+- morgan.moderator@example.test — member capabilities and read-only report review.
 - avery.admin@example.test — board administration.
 
 Getting started contains two fictional conversations: one solved and one
@@ -81,6 +82,7 @@ unanswered. Reseeding preserves edits, credentials, and solution choices.
 - [REST API examples](docs/api.md)
 - [Architecture decisions and Java learning notes](docs/architecture.md)
 - [Milestone evidence, demo script, and limitations](docs/evidence/milestone-a.md)
+- [Reporting and moderator review](docs/moderation.md), [Milestone B evidence](docs/evidence/milestone-b.md)
 - [Authentication](docs/authentication.md), [boards](docs/boards.md),
   [questions](docs/questions.md), [replies](docs/replies.md), [solutions](docs/accepted-solutions.md)
 

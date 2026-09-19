@@ -1,8 +1,8 @@
 # Milestone B moderation contract
 
-Status: Stage 2 report submission, V6 persistence, and member forms are implemented
-locally on 2026-09-19. Queue, resolution, restoration, audit history, and summary
-remain future contracts for Stages 3–5 and 10. See the
+Status: Stage 2 submission and Stage 3 report queue/context are implemented locally
+on 2026-09-19. Resolution, restoration, audit history, and summary remain future
+contracts for Stages 4–5 and 10. See the
 [Milestone B evidence](evidence/milestone-b.md) for verification status.
 
 ## Shared conventions and permissions
@@ -95,6 +95,35 @@ fields are null while open. Text content is loaded through detail, not every row
 `GET /moderation/reports/{id}` returns `{report, context, availableDecisions}`.
 `report` is the summary above. `availableDecisions` is an array of the enum values
 below; it is a UI hint, always revalidated transactionally on submission.
+
+Stage 3 is read-only: `availableDecisions` describes target-state eligibility for
+the future resolution API. The UI intentionally offers no resolve/hide/restore
+buttons. OPEN reports return DISMISS plus HIDE for a visible target, or DISMISS
+plus ACKNOWLEDGE_HIDDEN for a target that is itself hidden; RESOLVED reports return
+an empty array. An internally visible reply under a hidden question still has
+HIDE eligibility, while effective public visibility is false.
+
+Sign in as a moderator or administrator and use **Report review** in navigation,
+or open `/moderation`. The status and page are URL parameters; changing status
+resets to page zero. Select a report to open `/moderation/reports/{id}`; the Back
+to reports link preserves the originating filter/page. Context includes board
+archival, question/reply visibility, author names, retained acceptance, and resolved
+metadata. Reasons and hidden content are rendered as plain text. Invalid filters,
+loading, empty pages, missing reports, forbidden access, and retryable service
+failures have explicit UI states. The queue remains available on archived boards.
+
+Implementation uses `ModerationController`, `ModerationReadService`, and a dedicated
+JDBC `ModerationReadRepository` returning explicit DTO records. Each service call
+is read-only at REPEATABLE_READ isolation: the list/count and report/context queries
+share one PostgreSQL snapshot. Queries use bound parameters and a fixed sort order;
+only requested target context is loaded. No public query or visibility predicate
+was relaxed, and no new migration was needed beyond Stage 2's V6 index.
+
+The API and service both require moderator/administrator roles; success responses
+are no-store. Frontend query keys include the actor ID, and request functions consume
+abort signals. Existing session cancellation/cache clearing plus guarded, account-keyed
+screens prevent loaded or late private responses from appearing after logout or
+account switching. Server-side permissions remain authoritative.
 
 `ModerationContext` has exactly:
 

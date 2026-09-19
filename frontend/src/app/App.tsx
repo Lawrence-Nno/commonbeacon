@@ -9,12 +9,13 @@ import { AuthControls } from "../features/auth/AuthControls";
 import { Link, NavLink, Route, Routes, useLocation } from "react-router";
 import { useEffect } from "react";
 import { ConnectionCard } from "../features/connection/ConnectionCard";
+import { ModerationPage } from "../features/moderation/ModerationPage";
 
 function PageTitle() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    document.title = `${pathname.startsWith("/questions/") ? "Question" : pathname.endsWith("/questions/new") ? "Ask a question" : pathname.startsWith("/boards/") ? "Board" : pathname === "/admin/boards" ? "Manage boards" : pathname === "/about" ? "About" : pathname === "/login" ? "Sign in" : pathname === "/register" ? "Join" : pathname === "/" ? "Community" : "Page not found"} · CommonBeacon`;
+    document.title = `${pathname.startsWith("/moderation") ? "Report review" : pathname.startsWith("/questions/") ? "Question" : pathname.endsWith("/questions/new") ? "Ask a question" : pathname.startsWith("/boards/") ? "Board" : pathname === "/admin/boards" ? "Manage boards" : pathname === "/about" ? "About" : pathname === "/login" ? "Sign in" : pathname === "/register" ? "Join" : pathname === "/" ? "Community" : "Page not found"} · CommonBeacon`;
   }, [pathname]);
   return null;
 }
@@ -179,6 +180,9 @@ function Shell() {
           {user?.role === "ADMINISTRATOR" && (
             <NavLink to="/admin/boards">Manage boards</NavLink>
           )}
+          {(user?.role === "MODERATOR" || user?.role === "ADMINISTRATOR") && (
+            <NavLink to="/moderation">Report review</NavLink>
+          )}
         </nav>
         <div className="sidebar-note">
           <span className="small-beacon" aria-hidden="true">
@@ -221,7 +225,7 @@ function Shell() {
                             ? "Board"
                             : pathname === "/admin/boards"
                               ? "Manage boards"
-                              : "Not found"}
+                              : pathname.startsWith("/moderation") ? "Report review" : "Not found"}
             </strong>
           </span>
           <AuthControls />
@@ -237,6 +241,8 @@ function Shell() {
             <Route path="/about" element={<About />} />
             <Route path="/boards/:boardId" element={<BoardPage />} />
             <Route path="/admin/boards" element={<AdminBoards />} />
+            <Route path="/moderation" element={<ModerationPage />} />
+            <Route path="/moderation/reports/:reportId" element={<ModerationPage />} />
             <Route
               path="/boards/:boardId/questions/new"
               element={<NewQuestionPage />}

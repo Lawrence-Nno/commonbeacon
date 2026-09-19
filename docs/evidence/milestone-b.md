@@ -3,9 +3,10 @@
 ## Status
 
 Stage 1 is complete: baseline verified and implementation contracts finalized on
-2026-09-19. Stage 2 report submission is implemented and locally verified, including
-the final container/browser workflow. Stages 3–13 remain pending.
-Moderation decisions, articles, search, and summary remain future features.
+2026-09-19. Stage 2 report submission is committed/pushed as e846e13 and passed
+remote CI. Stage 3 queue/context is implemented and locally verified, including
+the container/browser workflow. Stages 4–13 remain pending. Moderation
+decisions, articles, search, and summary remain future features.
 
 Baseline revision: `2d33c96de62b6feda06a4b32366e300844f7ff4a`.
 Verification used the existing workspace with documentation changes, not a new
@@ -168,8 +169,8 @@ At the Stage 1 handoff, the next action was Stage 2. Its implementation follows.
 
 ## Stage 2 implementation and local checks: 2026-09-19
 
-Stage 2 changes are currently uncommitted; local source is based on `4da9779` plus
-the report implementation. No Stage 2 remote verification is claimed.
+At the Stage 2 handoff, changes were uncommitted and based on `4da9779` plus the
+report implementation. The later commit/push and remote results are recorded below.
 
 Added V6 content_report storage with real target/reporter/resolver foreign keys,
 exactly-one-target and resolution-state checks, UTF-16-aware reason bounds, and
@@ -261,5 +262,84 @@ Docker label-filter queries returned no remaining containers or networks for thi
 project. Failure and successful runs used only disposable PostgreSQL tmpfs; no
 development database cleanup or rebuild was performed.
 
-Stage 2 remains uncommitted and has not run remotely. Stage 1 plus its browser-test
-fix is pushed and green remotely. Next: Stage 3, privileged report queue/context.
+At that handoff Stage 2 was uncommitted and had not run remotely. Its subsequent
+commit/push and Stage 3 implementation are recorded below.
+
+## Stage 2 commit/push
+
+Committed and pushed Stage 2 as `e846e13e21d16397a22730d1cc8ebb97dda07919`, excluding
+unrelated README/architecture/interview-preparation edits. The planning documents
+remain ignored. [Run 35456325210](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35456325210)
+completed successfully for this revision.
+
+## Stage 3 implementation: 2026-09-19
+
+Local work is based on e846e13 plus the uncommitted Stage 3 changes. Added:
+
+- GET `/api/v1/moderation/reports` with OPEN/RESOLVED filtering, bounded pagination,
+  oldest-first timestamp/UUID order, exact counts, and empty out-of-range pages.
+- GET `/api/v1/moderation/reports/{id}` with a private report summary, selected
+  question/reply and board context, visibility/version/acceptance metadata, and
+  future decision eligibility. Hidden targets remain unavailable to public APIs.
+- Moderator/administrator authorization at both HTTP and service boundaries,
+  no-store responses, explicit DTO projections, bound SQL parameters, and
+  REPEATABLE_READ read-only transactions for consistent compound responses.
+- `/moderation` and `/moderation/reports/:reportId` screens, role-aware navigation,
+  URL filters/pages, detail/back navigation, plain-text content, status/error/retry
+  states, and account-scoped queries consuming abort signals. No mutation controls
+  or new migrations are included in Stage 3.
+
+`./scripts/verify.ps1` exited 0: **5 unit + 67 integration tests (72 backend total),
+69 frontend tests**, lint, type checking, and production build passed. Output:
+`%TEMP%/commonbeacon-b-stage3-verify-final.log`. Existing V1–V6 migrations and
+report-submission behavior are preserved.
+
+Five new ModerationIT tests verify visitor/member denial and moderator/admin
+access, direct service authorization, no-store/public-safe actor DTOs, hidden
+reply/parent context, retained acceptance and archive state, resolved metadata,
+exact filtered counts, timestamp ties, invalid filters/pages, and missing reports.
+A concurrent writer changes question visibility between the report and context
+queries; the response retains its original snapshot, while the following request
+sees the new state. Fixtures change hidden/resolved state only in disposable test
+databases; no premature hide/resolve API is introduced.
+
+Eleven new frontend cases cover both privileged roles, URL paging/filter reset,
+plain-text hidden context, absence of mutation buttons, visitor/member gates,
+empty/invalid/error states, loaded-cache clearing on expiry, and cancellation of
+a pending privileged read during account switch. A late response does not render
+or repopulate the cleared cache.
+
+The first verification run exposed blank status being treated as OPEN by Spring's
+default-value binding. Added an explicit check for supplied blank status/page/size
+values. A whitespace-only cleanup initially read ReportIT with the wrong platform
+encoding and corrupted its emoji fixture; restored it from Git with explicit UTF-8.
+The final diff for that existing test removes only a trailing blank line. Full
+verification passed after both corrections. The configured RCA instruction file
+`C:/Users/USER/.Codex/issue-rca.md` is still absent.
+
+The expanded `npm run test:smoke` completed with exit 0: **7 passed (1.3m)**.
+It used project `commonbeacon-e2e-b-stage3-20260919` and disposable PostgreSQL tmpfs.
+The existing reporting journey now also checks administrator status filtering,
+moderator navigation and context, a deep-link reload, member/visitor API denial,
+and signing out then signing into a member account without private content remaining.
+The real login limiter's bounded Retry-After handling remains enabled.
+Output: `%TEMP%/commonbeacon-b-stage3-browser.log`.
+
+Inspected `moderation-mobile.png` and `moderation-detail-desktop.png` under the
+report browser test's ignored output folder. The queue and context are readable;
+the focused report link is visible; no premature decision buttons are present.
+The browser verifies keyboard navigation from the filter and no horizontal overflow
+at 390px. Hidden/resolved context and the late-response cancellation race are covered
+by backend/component tests, not claimed as manual browser interactions.
+
+All isolated containers and the project network were removed, confirmed by subsequent
+Docker label-filter queries returning no rows. Rebuilt the development stack with
+`docker compose up -d --build --wait --wait-timeout 180`; all three services are healthy
+and the existing database volume was preserved. `/moderation` and `/api/v1/boards`
+return 200 at port 8081; an anonymous `/api/v1/moderation/reports` returns 401.
+Startup log: `%TEMP%/commonbeacon-b-stage3-startup.log`.
+
+README and moderation documentation now describe the read-only queue. Stage 3 remains
+uncommitted and has not run remotely; Stage 2 is pushed and green. No migration,
+moderation mutation, or audit-history endpoint was added. Next: Stage 4, atomic report
+resolution and hiding, with the documented thread-write lock-order prerequisite.

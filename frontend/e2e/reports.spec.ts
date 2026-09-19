@@ -8,6 +8,7 @@ test("members report archived questions and replies without publishing private r
   const member = await browser.newContext();
   const admin = await browser.newContext();
   const visitor = await browser.newContext();
+  const moderator = await browser.newContext();
   async function login(page: Page, email: string) {
     await page.goto(origin + "/login");
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -80,7 +81,46 @@ test("members report archived questions and replies without publishing private r
     }
     // A failed report does not remove content or turn a member into a moderator.
     expect((await page.request.get(origin + "/api/v1/moderation/reports")).status()).toBe(403);
+    expect((await publicPage.request.get(origin + "/api/v1/moderation/reports")).status()).toBe(401);
+    const queueResponse = await adminPage.request.get(origin + "/api/v1/moderation/reports");
+    expect(queueResponse.status()).toBe(200);
+    expect(queueResponse.headers()["cache-control"]).toBe("no-store");
+    const queue = await queueResponse.json();
+    const reportedReply = queue.items.find((item: { targetId: string }) => item.targetId === reply.id);
+    expect(reportedReply).toBeTruthy();
+    await adminPage.goto(origin + "/moderation");
+    await expect(adminPage.getByText("Private fictional question concern")).toBeVisible();
+    await adminPage.getByLabel("Report status").selectOption("RESOLVED");
+    await expect(adminPage.getByText("No reports with this status.")).toBeVisible();
+    const reviewPage = await moderator.newPage();
+    await login(reviewPage, "morgan.moderator@example.test");
+    await reviewPage.getByRole("link", { name: "Report review", exact: true }).click();
+    await expect(reviewPage.getByRole("heading", { name: "Report review", exact: true })).toBeVisible();
+    await reviewPage.setViewportSize({ width: 390, height: 844 });
+    await reviewPage.getByLabel("Report status").focus();
+    await reviewPage.keyboard.press("Tab");
+    await expect(reviewPage.getByRole("link", { name: "Review question report" })).toBeFocused();
+    await reviewPage.screenshot({ path: testInfo.outputPath("moderation-mobile.png"), fullPage: true });
+    expect(await reviewPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await reviewPage.getByRole("link", { name: "Review reply report" }).click();
+    await expect(reviewPage.getByRole("heading", { name: "Reported reply", exact: true })).toBeVisible();
+    await expect(reviewPage.getByText("Private fictional reply concern")).toBeVisible();
+    await expect(reviewPage.getByText("Board: Report test (archived)")).toBeVisible();
+    await expect(reviewPage.getByRole("button", { name: /Resolve|Hide|Restore|Dismiss/ })).toHaveCount(0);
+    await reviewPage.reload();
+    await expect(reviewPage.getByText("Private fictional reply concern")).toBeVisible();
+    await reviewPage.setViewportSize({ width: 1280, height: 900 });
+    await reviewPage.screenshot({ path: testInfo.outputPath("moderation-detail-desktop.png"), fullPage: true });
+    const reviewUrl = reviewPage.url();
+    await reviewPage.getByRole("button", { name: "Sign out", exact: true }).click();
+    await expect(reviewPage.getByRole("heading", { name: "Sign in to review reports." })).toBeVisible();
+    await expect(reviewPage.getByText("Private fictional reply concern")).toHaveCount(0);
+    await login(reviewPage, "sam.member@example.test");
+    await reviewPage.goto(reviewUrl);
+    await expect(reviewPage.getByRole("heading", { name: "Report review is restricted." })).toBeVisible();
+    await expect(reviewPage.getByText("Private fictional reply concern")).toHaveCount(0);
+    expect((await reviewPage.request.get(origin + "/api/v1/moderation/reports/" + reportedReply.id)).status()).toBe(403);
   } finally {
-    await Promise.all([member.close(), admin.close(), visitor.close()]);
+    await Promise.all([member.close(), admin.close(), visitor.close(), moderator.close()]);
   }
 });
