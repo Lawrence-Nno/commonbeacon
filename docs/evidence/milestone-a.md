@@ -2,13 +2,16 @@
 
 ## Status
 
-Stages 1–11 are implemented and locally verified. Stage 10 was pushed as
-97bab88617bedf2c547a1b6f7fe9320cd20b86f9. Stage 11 was verified locally before this handoff commit.
+Stages 1–11 are implemented and locally verified. Stage 11 was committed/pushed as
+2d33c96de62b6feda06a4b32366e300844f7ff4a and passed all three remote CI jobs.
 
 The existing backend/frontend workflow passed remotely for Stage 10:
 [GitHub run 35097348094](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35097348094).
-The new container/browser job and artifact uploads have **not run remotely**.
-Push Stage 11, then inspect all three jobs before claiming remote milestone signoff.
+On 2026-09-19, inspected [Stage 11 run 35100360402](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35100360402)
+for the exact Stage 11 commit. Backend/PostgreSQL, frontend quality, and
+container/browser jobs all completed successfully, including artifact upload and
+isolated cleanup. The fresh-copy notes below describe the earlier local handoff;
+their then-pending remote verification is superseded by this follow-up.
 
 ## Fresh-copy verification: 2026-09-16
 
@@ -49,11 +52,12 @@ Spring backend, and PostgreSQL tmpfs. The intentional-outage check used Vite on
 A deliberate no-matching-tests run returned exit 1. The runner saved logs,
 removed its frontend/backend/database containers and network, and a Docker query
 confirmed no containers remained for commonbeacon-e2e-failure-517d2c93.
-This verifies failure cleanup; remote artifact upload remains unverified locally.
+This verifies local failure cleanup. Remote artifact upload later passed in the
+Stage 11 run linked above.
 
 actionlint 1.7.12 (checksum verified from the upstream release) accepted ci.yml
-with exit 0. Local invocation disabled optional shellcheck; GitHub execution is
-still needed to validate hosted-runner behavior.
+with exit 0. Local invocation disabled optional shellcheck; the subsequent Stage 11
+GitHub run also verified hosted-runner execution.
 
 ## README startup verification
 
@@ -128,7 +132,7 @@ Personal interview fluency requires rehearsing this walkthrough; tests do not pr
 - Browser tests require Docker and Chrome, use fixed localhost ports, and run serially.
 - Planning files remain local. CI requires GitHub Actions capacity and access to
   dependency/container registries.
-- The Stage 11 workflow still needs its first remote run after commit/push.
+- Stage 11 remote verification passed for 2d33c96; later revisions require their own checks.
 
 Milestone B adds moderation, articles, and search. Milestone C adds GraphQL and
 AI assistance after the core authorization and data rules remain verified.
