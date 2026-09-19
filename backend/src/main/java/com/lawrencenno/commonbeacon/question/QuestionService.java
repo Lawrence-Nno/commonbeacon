@@ -70,10 +70,10 @@ public class QuestionService {
     @PreAuthorize("isAuthenticated()")
     @Transactional
     public QuestionDetail update(UUID id, UpdateQuestionRequest request, Authentication authentication) {
-        var question = questions.findByIdAndVisibility(id, ContentVisibility.VISIBLE)
-                .orElseThrow(QuestionService::questionMissing);
+        var boardId = questions.findVisibleBoardId(id).orElseThrow(QuestionService::questionMissing);
+        var board = boards.findForUpdate(boardId).orElseThrow(QuestionService::boardMissing);
+        var question = questions.findVisibleForUpdate(id).orElseThrow(QuestionService::questionMissing);
         identity.requireOwner(authentication, question.getAuthor().getId());
-        var board = boards.findForUpdate(question.getBoard().getId()).orElseThrow(QuestionService::boardMissing);
         requireOpen(board);
         if (question.getVersion() != request.expectedVersion()) {
             throw new ApiFailure(409, "STALE_EDIT", "This question changed. Reload it before saving again.");

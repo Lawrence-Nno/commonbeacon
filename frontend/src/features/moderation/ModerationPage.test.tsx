@@ -51,7 +51,7 @@ it.each(["MODERATOR", "ADMINISTRATOR"])("lets %s page/filter reports and inspect
   expect(screen.getByText("Hidden <script>plain text</script>")).toBeVisible();
   expect(document.querySelector("script")).toBeNull();
   expect(screen.getByText(/hidden question keeps it private/)).toBeVisible();
-  expect(screen.queryByRole("button", { name: /Hide|Dismiss|Restore|Resolve/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Resolve report" })).toBeDisabled();
   expect(screen.getByRole("link", { name: "Back to reports" })).toHaveAttribute("href", "/moderation?status=RESOLVED&page=0");
 });
 
@@ -107,4 +107,73 @@ it("rejects malformed privileged responses", () => {
   expect(() => readReportPage({ ...page, size: 101 })).toThrow();
   expect(() => readReportDetail({ ...detail, context: { ...detail.context, effectivePublicVisibility: "yes" } })).toThrow();
   expect(() => readReportDetail({ ...detail, availableDecisions: ["DELETE"] })).toThrow();
+});
+
+it("preserves the note on conflict and requires reload and a fresh decision before retry", async () => {
+  let posts = 0, reads = 0;
+  const bodies: unknown[] = [];
+  setup("/moderation/reports/report1", "MODERATOR", async (url, init) => {
+    if (url.endsWith("/csrf")) return Response.json({ headerName: "X-CSRF-TOKEN", token: "csrf" });
+    if (url.endsWith("/resolve")) {
+      posts++; bodies.push(JSON.parse(String(init?.body)));
+      if (posts === 1) return Response.json({ detail: "Content changed. Reload it." }, { status: 409, headers: { "Content-Type": "application/problem+json" } });
+      return Response.json({ ...detail, report: { ...report, status: "RESOLVED", version: 1, resolver: moderator,
+        resolvedAt: "2026-09-19T01:00:00Z", resolutionDecision: "HIDE", resolutionNote: "My careful review" }, availableDecisions: [] });
+    }
+    reads++;
+    return Response.json({ ...detail, context: { ...detail.context, reply: { ...detail.context.reply, version: reads === 1 ? 0 : 3 } } });
+  });
+  await screen.findByLabelText("Decision");
+  await userEvent.selectOptions(screen.getByLabelText("Decision"), "HIDE");
+  await userEvent.type(screen.getByLabelText("Resolution note"), "My careful review");
+  await userEvent.click(screen.getByRole("button", { name: "Resolve report" }));
+  await screen.findByText(/Your note is preserved/);
+  expect(screen.getByLabelText("Resolution note")).toHaveValue("My careful review");
+  expect(screen.getByRole("button", { name: "Resolve report" })).toBeDisabled();
+  expect(posts).toBe(1);
+  await userEvent.click(screen.getByRole("button", { name: "Reload report context" }));
+  await waitFor(() => expect(screen.getByLabelText("Decision")).toBeEnabled());
+  expect(screen.getByLabelText("Decision")).toHaveValue("");
+  await userEvent.selectOptions(screen.getByLabelText("Decision"), "HIDE");
+  await userEvent.click(screen.getByRole("button", { name: "Resolve report" }));
+  await screen.findByText("Resolved report");
+  expect(bodies).toEqual([
+    { decision: "HIDE", resolutionNote: "My careful review", expectedVersion: 0, expectedTargetVersion: 0, expectedQuestionVersion: 2 },
+    { decision: "HIDE", resolutionNote: "My careful review", expectedVersion: 0, expectedTargetVersion: 3, expectedQuestionVersion: 2 },
+  ]);
+  expect(screen.queryByLabelText("Resolution note")).not.toBeInTheDocument();
+});
+
+it("validates trimmed note bounds before sending and only offers eligible decisions", async () => {
+  const { mock } = setup("/moderation/reports/report1", "MODERATOR", async () => Response.json({ ...detail,
+    context: { ...detail.context, reply: { ...detail.context.reply, visibility: "HIDDEN" } }, availableDecisions: ["DISMISS", "ACKNOWLEDGE_HIDDEN"] }));
+  await screen.findByLabelText("Decision");
+  expect(screen.queryByRole("option", { name: "Hide reported content" })).not.toBeInTheDocument();
+  await userEvent.selectOptions(screen.getByLabelText("Decision"), "ACKNOWLEDGE_HIDDEN");
+  await userEvent.type(screen.getByLabelText("Resolution note"), " tiny ");
+  await userEvent.click(screen.getByRole("button", { name: "Resolve report" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("5 to 2000");
+  expect(mock.mock.calls.some(([url]) => url.endsWith("/resolve"))).toBe(false);
+});
+
+it("disables duplicate submissions and discards late resolution results after account switch", async () => {
+  let finish!: (response: Response) => void;
+  let posts = 0;
+  const { client } = setup("/moderation/reports/report1", "MODERATOR", async (url) => {
+    if (url.endsWith("/csrf")) return Response.json({ headerName: "X-CSRF-TOKEN", token: "csrf" });
+    if (url.endsWith("/resolve")) { posts++; return new Promise((resolve) => { finish = resolve; }); }
+    return Response.json(detail);
+  });
+  await screen.findByLabelText("Decision");
+  await userEvent.selectOptions(screen.getByLabelText("Decision"), "DISMISS");
+  await userEvent.type(screen.getByLabelText("Resolution note"), "Private decision draft");
+  await userEvent.click(screen.getByRole("button", { name: "Resolve report" }));
+  await waitFor(() => expect(finish).toBeDefined());
+  expect(screen.getByRole("button", { name: "Working..." })).toBeDisabled();
+  expect(posts).toBe(1);
+  await userEvent.click(screen.getByRole("button", { name: "Switch to member" }));
+  await screen.findByRole("heading", { name: "Report review is restricted." });
+  await act(async () => finish(Response.json({ ...detail, report: { ...report, status: "RESOLVED" }, availableDecisions: [] })));
+  expect(client.getQueryCache().getAll()).toHaveLength(0);
+  expect(screen.queryByDisplayValue("Private decision draft")).not.toBeInTheDocument();
 });

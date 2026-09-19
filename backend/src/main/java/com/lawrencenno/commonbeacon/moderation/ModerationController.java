@@ -13,7 +13,16 @@ import com.lawrencenno.commonbeacon.shared.PageResponse;
 @RequestMapping("/api/v1/moderation/reports")
 public class ModerationController {
     private final ModerationReadService reports;
-    public ModerationController(ModerationReadService reports) { this.reports = reports; }
+    private final ModerationResolutionService resolutions;
+    public ModerationController(ModerationReadService reports, ModerationResolutionService resolutions) {
+        this.reports = reports; this.resolutions = resolutions;
+    }
+    @PostMapping("/{id}/resolve")
+    public ResponseEntity<ModerationReportDetail> resolve(@PathVariable UUID id,
+            @jakarta.validation.Valid @RequestBody ResolveReportRequest request,
+            org.springframework.security.core.Authentication authentication) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(resolutions.resolve(id, request, authentication));
+    }
     @GetMapping
     public ResponseEntity<PageResponse<ModerationReport>> list(
             @RequestParam(defaultValue = "OPEN") String status,

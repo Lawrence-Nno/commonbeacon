@@ -1,8 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
 import { ApiError } from "../../lib/http";
-import { getReport, listReports } from "./reviewApi";
+import { getReport, listReports, resolveReport } from "./reviewApi";
 import type { ReportDetail, ReportStatus } from "./reviewApi";
 
 export function ModerationPage() {
@@ -34,7 +35,7 @@ function Queue({ actorId }: { actorId: string }) {
   function go(next: number, nextStatus = status) { setParams({ status: nextStatus, page: String(next) }); }
   return <section className="board-page">
     <p className="eyebrow">COMMUNITY CARE</p><h1>Report review</h1>
-    <p>Private reports, oldest first. Review is currently read-only.</p>
+    <p>Private reports, oldest first. Review the context before resolving a report.</p>
     <div className="question-filter"><label htmlFor="report-status">Report status</label>
       <select id="report-status" value={valid ? status : ""} onChange={(event) => go(0, event.target.value)}>
         {!valid && <option value="" disabled>Choose a status</option>}
@@ -64,13 +65,13 @@ function Queue({ actorId }: { actorId: string }) {
 
 function Review({ id, actorId }: { id: string; actorId: string }) {
   const [params] = useSearchParams();
-  const query = useQuery({ queryKey: ["moderation", actorId, "report", id], queryFn: ({ signal }) => getReport(id, signal), retry: false });
+  const query = useQuery({ queryKey: ["moderation", actorId, "report", id], queryFn: ({ signal }) => getReport(id, signal), retry: false, refetchOnWindowFocus: false, refetchOnReconnect: false });
   return <section className="board-page">
     <Link className="text-link" to={"/moderation?" + params.toString()}>Back to reports</Link>
     <h1>Report details</h1>
     {query.isPending ? <p role="status">Loading report context...</p> : query.isError
       ? <Failure error={query.error} retry={() => void query.refetch()} busy={query.isFetching} />
-      : <Detail data={query.data} />}
+      : <DecisionReview initial={query.data} actorId={actorId} />}
   </section>;
 }
 
@@ -94,6 +95,75 @@ function Detail({ data: { report, context } }: { data: ReportDetail }) {
       <p>By {context.reply.author.displayName} · {context.reply.visibility.toLowerCase()}</p><p className="moderation-content">{context.reply.body}</p>
       {context.reply.visibility === "VISIBLE" && context.question.visibility === "HIDDEN" && <p>This reply is visible internally, but its hidden question keeps it private.</p>}
     </section>}
-    <p className="availability-note">Report review is currently read-only.</p>
+  </>;
+}
+
+function DecisionReview({ initial, actorId }: { initial: ReportDetail; actorId: string }) {
+  // Keep the displayed review and submitted versions together until an explicit reload.
+  const [data, setData] = useState(initial);
+  const [note, setNote] = useState("");
+  const [decision, setDecision] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [mustReload, setMustReload] = useState(false);
+  const [error, setError] = useState("");
+  const [denied, setDenied] = useState(false);
+  const alive = useRef(true);
+  const client = useQueryClient();
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
+  async function reload() {
+    setBusy(true); setError("");
+    try {
+      const fresh = await getReport(data.report.id);
+      if (!alive.current) return;
+      setData(fresh); setDecision(""); setMustReload(false);
+    } catch (failure) {
+      if (!alive.current) return;
+      setError(failure instanceof Error ? failure.message : "Could not reload the report.");
+      if (failure instanceof ApiError && [401, 403].includes(failure.status ?? 0)) setDenied(true);
+    } finally { if (alive.current) setBusy(false); }
+  }
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (busy || mustReload || !data.availableDecisions.includes(decision)) return;
+    const trimmed = note.trim();
+    if (trimmed.length < 5 || trimmed.length > 2000) { setError("Use 5 to 2000 characters for the resolution note."); return; }
+    setBusy(true); setError("");
+    try {
+      const result = await resolveReport(data, decision, trimmed);
+      if (!alive.current) return;
+      setData(result); setNote(""); setDecision("");
+      // Only server-confirmed results change the visible state. Never retry a mutation.
+      void client.invalidateQueries({ queryKey: ["moderation", actorId] });
+      void client.invalidateQueries({ queryKey: ["questions"] });
+      void client.invalidateQueries({ queryKey: ["replies", data.context.question.id] });
+      void client.invalidateQueries({ queryKey: ["boards"] });
+    } catch (failure) {
+      if (!alive.current) return;
+      setError(failure instanceof Error ? failure.message : "Could not resolve the report.");
+      // Network errors may follow a committed response; review before any retry too.
+      setMustReload(true);
+      if (failure instanceof ApiError && [401, 403].includes(failure.status ?? 0)) setDenied(true);
+    } finally { if (alive.current) setBusy(false); }
+  }
+  if (denied) return <p role="alert">Your account no longer has access to report review.</p>;
+  return <><Detail data={data} />
+    {error && <p role="alert" className="form-error">{error}</p>}
+    {data.report.status === "OPEN" && <form onSubmit={(event) => void submit(event)} className="auth-form moderation-form">
+      <h2>Resolve report</h2>
+      <label htmlFor="resolution-decision">Decision</label>
+      <select id="resolution-decision" value={decision} disabled={busy || mustReload} onChange={(event) => setDecision(event.target.value)} required>
+        <option value="">Choose a decision</option>
+        {data.availableDecisions.map((value) => <option key={value} value={value}>
+          {value === "HIDE" ? "Hide reported content" : value === "DISMISS" ? "Dismiss report" : "Acknowledge already hidden content"}
+        </option>)}
+      </select>
+      {decision === "HIDE" && <p>Hiding removes this content from public view. Hiding an accepted reply also clears its selection.</p>}
+      <label htmlFor="resolution-note">Resolution note</label>
+      <textarea id="resolution-note" value={note} disabled={busy} onChange={(event) => setNote(event.target.value)} required rows={5} />
+      <p>5-2000 characters after trimming. Visible only to moderators and administrators.</p>
+      {mustReload && <p role="status">Your note is preserved. Reload and review the latest context, then choose a decision again.</p>}
+      <button className="button" type="submit" disabled={busy || mustReload || !decision}>{busy ? "Working..." : "Resolve report"}</button>
+      <button className="button button-secondary" type="button" disabled={busy} onClick={() => void reload()}>Reload report context</button>
+    </form>}
   </>;
 }

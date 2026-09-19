@@ -9,6 +9,12 @@ import org.springframework.data.jpa.repository.*;
 import org.springframework.data.repository.query.Param;
 
 public interface ReplyRepository extends JpaRepository<Reply, UUID> {
+    @Query("select r.question.id from Reply r where r.id = :id")
+    Optional<UUID> findQuestionId(@Param("id") UUID id);
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Reply r where r.id = :id and r.question.id = :questionId")
+    Optional<Reply> findForUpdate(@Param("id") UUID id, @Param("questionId") UUID questionId);
+
     @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select r from Reply r where r.id = :id and r.question.id = :questionId and r.visibility = 'VISIBLE'")
     Optional<Reply> findVisibleForUpdate(@Param("id") UUID id, @Param("questionId") UUID questionId);

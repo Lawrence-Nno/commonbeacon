@@ -9,6 +9,12 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface QuestionRepository extends JpaRepository<Question, UUID> {
+    @org.springframework.data.jpa.repository.Query("select q.board.id from Question q where q.id = :id")
+    Optional<UUID> findBoardId(@org.springframework.data.repository.query.Param("id") UUID id);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select q from Question q where q.id = :id")
+    Optional<Question> findForUpdate(@org.springframework.data.repository.query.Param("id") UUID id);
+
     @EntityGraph(attributePaths = {"author", "acceptedReply"})
     Page<Question> findByBoardIdAndVisibility(UUID boardId, ContentVisibility visibility, Pageable page);
 

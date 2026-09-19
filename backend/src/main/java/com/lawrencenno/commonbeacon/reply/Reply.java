@@ -42,6 +42,10 @@ public class Reply {
         updatedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
     }
 
+    public void hide() {
+        visibility = ContentVisibility.HIDDEN;
+        updatedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+    }
     public boolean isVisible() { return visibility == ContentVisibility.VISIBLE; }
     public UUID getId() { return id; }
     public Question getQuestion() { return question; }

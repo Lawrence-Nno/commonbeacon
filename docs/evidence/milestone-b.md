@@ -4,9 +4,10 @@
 
 Stage 1 is complete: baseline verified and implementation contracts finalized on
 2026-09-19. Stage 2 report submission is committed/pushed as e846e13 and passed
-remote CI. Stage 3 queue/context is implemented and locally verified, including
-the container/browser workflow. Stages 4–13 remain pending. Moderation
-decisions, articles, search, and summary remain future features.
+remote CI. Stage 3 is pushed as 2aac716 and passed remote CI. Stage 4 resolution
+and hiding are implemented and locally verified, including the container/browser
+workflow. Stages 5-13 remain pending, including restoration,
+articles, search, and summary.
 
 Baseline revision: `2d33c96de62b6feda06a4b32366e300844f7ff4a`.
 Verification used the existing workspace with documentation changes, not a new
@@ -339,7 +340,98 @@ and the existing database volume was preserved. `/moderation` and `/api/v1/board
 return 200 at port 8081; an anonymous `/api/v1/moderation/reports` returns 401.
 Startup log: `%TEMP%/commonbeacon-b-stage3-startup.log`.
 
-README and moderation documentation now describe the read-only queue. Stage 3 remains
-uncommitted and has not run remotely; Stage 2 is pushed and green. No migration,
-moderation mutation, or audit-history endpoint was added. Next: Stage 4, atomic report
-resolution and hiding, with the documented thread-write lock-order prerequisite.
+At that handoff README and moderation documentation described the read-only queue.
+Stage 3 was uncommitted and had not run remotely; Stage 2 was pushed and green.
+No migration, moderation mutation, or audit-history endpoint was added in Stage 3.
+The subsequent commit/push and Stage 4 implementation are recorded below.
+
+
+## Stage 3 commit/push
+
+Committed and pushed `2aac71665191b09103d9941993a08eaf4c03af24`, preserving the
+unrelated interview-preparation documentation changes. All three jobs passed in
+[run 35457992302](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35457992302).
+The local implementation plans remain ignored.
+
+## Stage 4 implementation: 2026-09-19
+
+Added V7 audit storage and the role/CSRF-protected report-resolution endpoint.
+DISMISS, HIDE, and ACKNOWLEDGE_HIDDEN check report, target, and reply-parent
+versions under board -> question -> reply -> report locks. Only the selected
+report is resolved. HIDE appends one action and clears an accepted target reply
+atomically; unrelated reply hides leave question versions alone. Question hides
+retain reply states and internal acceptance while suppressing public reads.
+Archived boards allow moderator safety actions.
+
+Removed the question edit path's pre-lock managed load. It now uses a scalar
+board lookup followed by fresh locked question loading, so a waiting author edit
+cannot overwrite a hidden state. Existing reply creation/edit paths already
+coordinate on the board and question locks.
+
+The detail screen now offers eligible decisions and a trimmed private note.
+It replaces the read-only notice, submits the displayed reviewed versions, waits
+for server confirmation, and invalidates affected moderator/public caches. Failed
+submissions preserve the note and require explicit reload/review and a new choice;
+late responses after account changes are discarded.
+
+`./scripts/verify.ps1` exited 0: **5 unit + 76 integration tests (81 backend total),
+72 frontend tests**, lint, TypeScript checking, and production build passed.
+Log: `%TEMP%/commonbeacon-b-stage4-verify-final.log`.
+The first pass also passed before the final concurrency and component cases were
+added; the final pass includes all nine new ModerationResolutionIT cases and all
+three new component cases.
+
+Backend tests cover accepted/unrelated reply hides, archived boards, hidden-parent
+selection, public thread exclusion, dismissal and acknowledgement, other reports
+remaining open, role/CSRF/DTO/version rejection, unknown fields, database audit
+constraints, rollback after an injected audit insert failure, and simultaneous
+resolution of one report producing exactly one hide action. A deterministic lock
+observation test blocks author edit and reply creation behind the board lock,
+hides the parent, and verifies both waiting writes return 404 without changes.
+The injected failure is expected to return HTTP 500; persisted visibility,
+acceptance, versions, report state, and action count are unchanged afterwards.
+
+Component tests cover exact reviewed-version payloads, stale conflict note
+preservation, explicit reload with updated versions, required fresh decision
+selection, successful resolved state, note validation, eligible decisions,
+duplicate-submit disabling, and late mutation completion after account switch.
+The Stage 3 read-only-button assertion now checks the initially disabled resolution
+button. No restoration or history-viewing UI is introduced.
+
+The full isolated `npm run test:smoke` run exited 0: **7 passed (1.4m)** using
+`commonbeacon-e2e-b-stage4-20260919`. The reporting journey now accepts a reply
+before archival, reports it, resolves it through the moderator form, and verifies
+the reply is publicly 404, the question is unanswered with null acceptedReply,
+the other question report remains open, and resolution survives a page reload.
+Keyboard submission and the existing account-switch/private-content checks pass.
+Log: `%TEMP%/commonbeacon-b-stage4-browser.log`.
+
+Final review added scoped textarea/select styling and corrected a Windows-shell
+encoding conversion in the note-length helper. Lint, all 72 frontend tests, and
+TypeScript/production build passed again. The first sandboxed frontend rerun was
+blocked by Vite's helper-process `spawn EPERM`; the approved rerun passed without
+an application change. The configured `C:/Users/USER/.Codex/issue-rca.md` remains
+absent. A final isolated run of `npm run test:smoke -- e2e/reports.spec.ts` passed
+**1 test (6.9s)** against the final form under project
+`commonbeacon-e2e-b-stage4-final-20260919`.
+Log: `%TEMP%/commonbeacon-b-stage4-browser-final.log`.
+
+Inspected final `resolution-mobile.png` (390px) and `resolution-desktop.png`
+(1280px) in the ignored report-test output directory. The mobile form, focus
+outline, note, and action controls fit without horizontal overflow; desktop shows
+the confirmed resolution reason and hidden reply without a retained acceptance.
+The full-page mobile capture includes the existing skip-to-content link overlay;
+no unrelated global shell styling was changed. This is automated browser and
+screenshot evidence, not a claim of manual interactive testing.
+
+Both disposable stacks removed their containers and networks; follow-up label
+queries found no leftovers. Rebuilt the development stack with
+`docker compose up -d --build --wait --wait-timeout 180`. All three services are
+healthy, V7 upgraded the existing database, and its volume was preserved.
+`http://127.0.0.1:8081/moderation` and `/api/v1/boards` return 200; anonymous report
+queue access returns 401. Log: `%TEMP%/commonbeacon-b-stage4-startup.log`.
+
+README, moderation behavior, this evidence record, and the ignored implementation
+plans now record Stage 4. Unrelated interview-preparation edits are preserved.
+Stage 4 remains uncommitted and has not run remotely. Restoration/history endpoints
+and the full accept/hide/restore concurrency matrix remain Stage 5 work.

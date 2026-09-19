@@ -36,6 +36,17 @@ public class ContentReport {
         report.updatedAt = report.createdAt;
         return report;
     }
+    public UUID getQuestionId() { return questionId; }
+    public UUID getReplyId() { return replyId; }
+    public long getVersion() { return version; }
+    void resolve(UUID actorId, ResolveReportRequest request) {
+        status = Status.RESOLVED;
+        resolverId = actorId;
+        resolvedAt = Instant.now().truncatedTo(ChronoUnit.MICROS);
+        updatedAt = resolvedAt;
+        resolutionDecision = request.decision().name();
+        resolutionNote = request.resolutionNote();
+    }
     public UUID getId() { return id; }
     public Status getStatus() { return status; }
     public Instant getCreatedAt() { return createdAt; }

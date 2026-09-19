@@ -46,6 +46,14 @@ public class Question {
         updatedAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
     }
 
+    public boolean isVisible() { return visibility == ContentVisibility.VISIBLE; }
+    public void hide() {
+        visibility = ContentVisibility.HIDDEN;
+        updatedAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
+    }
+    public void clearAcceptanceOf(UUID replyId) {
+        if (acceptedReply != null && acceptedReply.getId().equals(replyId)) accept(null);
+    }
     public UUID getId() { return id; }
     public com.lawrencenno.commonbeacon.reply.Reply getAcceptedReply() { return acceptedReply; }
     public boolean isSolved() { return acceptedReply != null && acceptedReply.isVisible(); }

@@ -1,4 +1,4 @@
-import { ApiError, getJson } from "../../lib/http";
+import { ApiError, getJson, postJson } from "../../lib/http";
 
 export type ReportStatus = "OPEN" | "RESOLVED";
 type Actor = { id: string; displayName: string };
@@ -61,3 +61,11 @@ export const listReports = (status: ReportStatus, page: number, signal?: AbortSi
   getJson(`/api/v1/moderation/reports?status=${status}&page=${page}&size=20`, readReportPage, signal);
 export const getReport = (id: string, signal?: AbortSignal) =>
   getJson("/api/v1/moderation/reports/" + encodeURIComponent(id), readReportDetail, signal);
+
+export function resolveReport(data: ReportDetail, decision: string, resolutionNote: string) {
+  return postJson("/api/v1/moderation/reports/" + encodeURIComponent(data.report.id) + "/resolve", {
+    decision, resolutionNote: resolutionNote.trim(), expectedVersion: data.report.version,
+    expectedTargetVersion: (data.context.reply ?? data.context.question).version,
+    ...(data.context.reply ? { expectedQuestionVersion: data.context.question.version } : {}),
+  }, readReportDetail);
+}

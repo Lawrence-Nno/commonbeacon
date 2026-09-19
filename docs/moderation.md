@@ -1,8 +1,8 @@
 # Milestone B moderation contract
 
-Status: Stage 2 submission and Stage 3 report queue/context are implemented locally
-on 2026-09-19. Resolution, restoration, audit history, and summary remain future
-contracts for Stages 4–5 and 10. See the
+Status: Stages 2-4 implement submission, report queue/context, atomic resolution,
+content hiding, and audit storage locally on 2026-09-19. Restoration and audit-history
+viewing remain Stage 5 work; summary remains Stage 10 work. See the
 [Milestone B evidence](evidence/milestone-b.md) for verification status.
 
 ## Shared conventions and permissions
@@ -96,9 +96,8 @@ fields are null while open. Text content is loaded through detail, not every row
 `report` is the summary above. `availableDecisions` is an array of the enum values
 below; it is a UI hint, always revalidated transactionally on submission.
 
-Stage 3 is read-only: `availableDecisions` describes target-state eligibility for
-the future resolution API. The UI intentionally offers no resolve/hide/restore
-buttons. OPEN reports return DISMISS plus HIDE for a visible target, or DISMISS
+Stage 4 uses `availableDecisions` for the resolution form. Restoration controls
+remain future work. OPEN reports return DISMISS plus HIDE for a visible target, or DISMISS
 plus ACKNOWLEDGE_HIDDEN for a target that is itself hidden; RESOLVED reports return
 an empty array. An internally visible reply under a hidden question still has
 HIDE eligibility, while effective public visibility is false.
@@ -232,12 +231,11 @@ Source inspection at `2d33c96` found:
   scalar parent ID, then uses it, loads the reply and relies on its UPDATE/version
   check for the final reply write. No managed reply is loaded before the board lock.
 
-Before enabling hiding in Stage 4, change question editing to scalar lookup ->
-board lock -> fresh locked question -> visibility/ownership/version checks.
-Recheck all reply paths as moderation is added. Existing visible-only lock queries
-cannot restore hidden rows; add separate privileged lock queries rather than
-loosening public predicates. This is future implementation work, not a fix made
-in Stage 1, and the inspection alone is not evidence of a current failed invariant.
+Stage 4 implements the required question-edit change: scalar lookup -> board lock
+-> fresh locked question -> visibility/ownership/version checks. Reply paths were
+rechecked and retain their coordinating locks. Separate privileged lock queries
+include hidden rows while public predicates remain visible-only. This change was
+not part of Stage 1; its deterministic regression evidence is recorded for Stage 4.
 
 For all moderation writes use board -> question -> target reply if any -> report
 if resolving. Obtain locating IDs through scalar queries without preloading managed
@@ -293,3 +291,37 @@ reviewed intent, and a constraint protects stored structure. A preloaded managed
 entity can remain stale after waiting for a lock; a fresh locked read avoids making
 decisions from that state. Rehearse this with source; this document does not certify
 personal fluency.
+
+## Stage 4 implementation
+
+Moderators and administrators can resolve an open report from its detail screen.
+Choose a decision and enter a private resolution note (5-2000 trimmed characters).
+The form displays and submits one reviewed snapshot. Failed submissions preserve
+its note and require **Reload report context**, review, and a new decision selection;
+mutations are never automatically retried. Account changes remove private drafts,
+and late responses cannot repopulate another account's cache.
+
+`POST /api/v1/moderation/reports/{id}/resolve` implements the contract above.
+The transaction locates scalar IDs, locks board -> question -> target reply ->
+report, checks state and versions, and flushes the content and report before
+reading the confirmed result. A standalone context read uses REPEATABLE_READ;
+the resolution response joins its existing write transaction with content locks held.
+
+V7 creates `moderation_action` with actor/target foreign keys, exactly one target,
+HIDE/RESTORE action values, trimmed reason bounds, and target-history indexes.
+Only HIDE is emitted in Stage 4. The application repository exposes an append
+operation and no update/delete endpoint; this is not tamper-proof storage.
+Dismissal and acknowledgement update resolution metadata without adding an action.
+Other reports on the target stay open for explicit review and acknowledgement.
+
+Hiding an accepted reply clears the selection and advances both reply and question
+versions in the same transaction, including beneath a hidden question. Hiding an
+unrelated reply leaves the question's version/selection unchanged. Hiding a question
+preserves its internal selection and reply states, while public thread APIs exclude
+it. Archived boards permit these safety actions without granting moderators general
+permission to edit other authors' content or select their solutions.
+
+Question editing now loads scalar board ID, locks the board, and then freshly locks
+and checks the visible question. Reply creation/editing already follows this ordering.
+Restoration, history endpoints, and the full two-direction accept/hide race matrix
+remain the next stage.
