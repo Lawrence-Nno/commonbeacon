@@ -3,14 +3,16 @@
 ## Status
 
 Stage 1 is complete: baseline verified and implementation contracts finalized on
-2026-09-19. Stages 2–13 are pending. Reports, moderation actions, articles, search,
-and the operational summary remain implementation targets, not working features.
+2026-09-19. Stage 2 report submission is implemented and locally verified, including
+the final container/browser workflow. Stages 3–13 remain pending.
+Moderation decisions, articles, search, and summary remain future features.
 
 Baseline revision: `2d33c96de62b6feda06a4b32366e300844f7ff4a`.
 Verification used the existing workspace with documentation changes, not a new
 clean checkout. No backend/frontend source, dependency, migration, or verification
 script changed during Stage 1. Pre-existing README, architecture, evidence-link,
-and interview-preparation edits were preserved. Stage 1 changes are uncommitted.
+and interview-preparation edits were preserved. These paragraphs record the Stage 1
+baseline; its later commit/push and Stage 2 work are recorded below.
 
 ## Stage 1 contracts and inspection
 
@@ -133,17 +135,131 @@ completed successfully for the exact baseline SHA above on 2026-09-16. Inspected
 all three job results: backend/PostgreSQL integration tests, frontend quality
 checks, and container images/real browser journey. The browser job's artifact
 upload and isolated cleanup steps also succeeded. This corrects the older claim
-that Stage 11 had not run remotely. It is baseline evidence only; the Stage 1
-documentation changes have not been committed, pushed, or remotely tested.
+that Stage 11 had not run remotely. This was baseline evidence only at the Stage 1
+handoff; the later Stage 1 commit/push and remote results are recorded below.
 
-## Limitations and next action
+## Stage 1 handoff limitations and next action (historical)
 
-No Milestone B feature tests exist yet because Stage 1 establishes contracts.
+No Milestone B feature tests existed at that handoff because Stage 1 established contracts.
 No new clean-install, upgrade, persistence-restart, search performance, or
 accept-versus-hide experiment was performed here; those belong to later stages.
 The baseline's in-memory sessions, single-instance throttling, and board-level
 write serialization remain unchanged. Java discussion prompts were documented;
 personal rehearsal is not certified by test results.
 
-Proceed to Stage 2: implement report persistence, submission, duplicate/visibility
-rules, and member forms against the finalized moderation contract.
+At the Stage 1 handoff, the next action was Stage 2. Its implementation follows.
+
+## Stage 1 commit/push and CI follow-up
+
+- Committed/pushed the ignore rule, moderation/knowledge contracts, Stage 1 evidence,
+  and only the Stage 1 Milestone A evidence corrections as `d90ab67`. Unrelated
+  interview-preparation changes, including the evidence-page link, stayed unstaged.
+- [Run 35454701087](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35454701087)
+  passed backend and frontend jobs but failed the existing question browser journey
+  while waiting for a login form after closing the previous page.
+- Source inspection found navigation/page closure immediately after clicking Sign
+  out, before its asynchronous CSRF/logout requests and UI transition completed.
+  Added assertions waiting for the Sign in link before navigating or closing.
+  This changes test synchronization, not application logout behavior.
+- Committed/pushed that isolated two-line fix as `4da9779`.
+  [Run 35455367702](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35455367702)
+  passed all three jobs (backend/PostgreSQL, frontend, container/browser). The six
+  existing journeys also passed locally with the fix during Stage 2 verification.
+
+## Stage 2 implementation and local checks: 2026-09-19
+
+Stage 2 changes are currently uncommitted; local source is based on `4da9779` plus
+the report implementation. No Stage 2 remote verification is claimed.
+
+Added V6 content_report storage with real target/reporter/resolver foreign keys,
+exactly-one-target and resolution-state checks, UTF-16-aware reason bounds, and
+separate partial unique indexes for open reports on questions and replies. No
+existing migration was edited. Resolution metadata is stored for later stages;
+no queue, resolve, or restore endpoint has been added.
+
+Added authenticated `POST /api/v1/reports`, service-level authorization, session-derived
+reporter, DTO-local unknown-field rejection, board -> question -> reply locking,
+post-lock visibility checks, duplicate conflicts, and minimal no-store receipts.
+Reporting is allowed on archived boards and does not mutate public content.
+
+Added question/reply report forms, typed response decoding, report ProblemDetail
+handling, pending-submit protection, retained failed drafts, and account/target-keyed
+form state. Existing edit and acceptance controls retain their behavior.
+
+Final `./scripts/verify.ps1` passed with exit 0:
+
+```text
+Tests run: 5, Failures: 0, Errors: 0, Skipped: 0
+Tests run: 62, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS
+Tests  58 passed (58)
+All backend and frontend checks passed.
+```
+
+That is 67 Java tests including 8 new ReportIT cases, and 58 frontend tests
+including 9 report cases. Lint, type checking, and production build passed.
+After the browser-test synchronization/rate-limit adjustments, frontend lint and
+type checking passed again. Log: `%TEMP%/commonbeacon-b-stage2-verify-final.log`.
+
+The report integration tests cover real sessions, all signed-in roles, self-reports,
+archived boards, missing/hidden targets and parents, forged fields, invalid reasons,
+CSRF, unauthenticated direct service calls, concurrent duplicate submissions on both
+target types, independent reporters, database constraints, reporting after a resolved
+record, and public response privacy. A synchronized PostgreSQL test holds the board
+lock, observes both report requests waiting, hides the parent, commits, and proves
+both requests return 404 without inserting reports. Unicode boundary cases prove
+HTTP validation and database length checks agree.
+
+Frontend tests cover trimmed submission and CSRF headers, 400/401/404/409/500 and
+network failures, preserved reasons, duplicate-submit disablement, malformed receipts,
+reply-only targets, and draft/late-result isolation after account switching.
+
+### Verification issues addressed
+
+- First backend run: the copied report fixture shared the reply suite's cached
+  application context and exceeded the real login limiter during setup (429).
+  Gave ReportIT its own demo-password configuration/context. Production limits
+  were not changed; all integration tests then passed.
+- Review found Java/JavaScript UTF-16 bounds could disagree with PostgreSQL
+  character counts for emoji. Updated the new, uncommitted V6 constraints and
+  verified both minimum and maximum supplementary-character boundaries on a
+  fresh disposable database. Existing V1–V5 migrations remain untouched.
+- First expanded browser run: six existing tests passed; the new report journey's
+  second login hit the shared Nginx-address rate limit. Added one bounded retry
+  honoring the server's Retry-After header, retaining real authentication and
+  throttling. The test has an explicit overall timeout. Cleanup still removed
+  the failed run's isolated project.
+- Docker image packaging was slow but completed successfully; no build timeout,
+  dependency change, or packaging workaround was required. Final browser results
+  below must come from the rebuilt image containing the final V6 migration.
+- The configured `C:/Users/USER/.Codex/issue-rca.md` remains absent. Observed logs
+  and source were used to diagnose failures; no absent instructions were assumed.
+
+### Final browser workflow and visual inspection
+
+Ran `npm run test:smoke` from `frontend` with the session tool selector and
+`COMMONBEACON_E2E_PROJECT=commonbeacon-e2e-b-stage2-final-20260919`, judging native
+exit status rather than normal Docker stderr progress. Exit 0: **7 passed (1.3m)**.
+The report test honored the real login limiter's 60-second Retry-After once.
+Both application images built successfully; the backend included the final V6.
+Log: `%TEMP%/commonbeacon-b-stage2-browser-final.log`.
+
+The new browser journey reports both a question and a reply on an archived board,
+reloads and checks a duplicate rejection preserves the reason, verifies visitors
+have no reporting controls, checks public JSON contains no private reasons or
+resolution data, and confirms members cannot open the moderator queue. It exercises
+Tab/Enter submission and verifies no horizontal overflow at 390px.
+
+Inspected the generated `report-mobile.png` in the report test's ignored
+`frontend/test-results` directory: label, textarea, private-report guidance, actions,
+and archived-board context are readable and contained in the narrow layout. The
+existing full-page screenshot also captures the skip-to-content link; no new visual
+styling or manual interactive-browser inspection is claimed.
+
+Runner logs show all test containers and the project network removed; subsequent
+Docker label-filter queries returned no remaining containers or networks for this
+project. Failure and successful runs used only disposable PostgreSQL tmpfs; no
+development database cleanup or rebuild was performed.
+
+Stage 2 remains uncommitted and has not run remotely. Stage 1 plus its browser-test
+fix is pushed and green remotely. Next: Stage 3, privileged report queue/context.

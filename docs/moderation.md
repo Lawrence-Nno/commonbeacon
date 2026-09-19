@@ -1,7 +1,9 @@
 # Milestone B moderation contract
 
-Status: contract finalized in Stage 1 on 2026-09-19; endpoints and schema below
-are planned for Stages 2–5 and 10, not implemented by this document.
+Status: Stage 2 report submission, V6 persistence, and member forms are implemented
+locally on 2026-09-19. Queue, resolution, restoration, audit history, and summary
+remain future contracts for Stages 3–5 and 10. See the
+[Milestone B evidence](evidence/milestone-b.md) for verification status.
 
 ## Shared conventions and permissions
 
@@ -57,7 +59,7 @@ Duplicate open reports by the same reporter/target return `409 REPORT_ALREADY_OP
 Other reporters can submit independently. Resolution frees that reporter/target
 pair for a new report only when the target is publicly visible again.
 
-The next available migration is V6 at Stage 1. Implement `content_report` with
+V6 (`V6__create_content_report.sql`) creates `content_report` with
 reporter and target foreign keys, exactly-one-target check, `OPEN`/`RESOLVED`
 check, created/updated timestamps, version, nullable resolver, resolved timestamp,
 resolution decision, and resolution note. Store the decision explicitly; a note
@@ -65,6 +67,21 @@ alone cannot distinguish dismissal from acknowledgement. OPEN rows have null
 resolution metadata; RESOLVED rows have all resolution metadata. Add one partial
 unique index per target kind for `(reporter_id, target_id) WHERE status = 'OPEN'`.
 Reasons are retained; do not add report editing/deletion/reopening endpoints.
+
+The member UI offers Report question and Report reply on visible content, including
+archived boards. Expand the form, enter a reason, and submit. Success clears the
+draft and displays a receipt notice. Duplicate reports display the server conflict;
+validation/network failures preserve the typed reason. Reloading does not expose
+existing private reports; the backend remains the authority on duplicates. Switching
+accounts or targets discards private form state. Submission does not hide content,
+change its version, clear accepted answers, or promise a completed moderator review.
+
+Implementation lives in the backend `moderation` package and frontend
+`features/moderation`. The service reuses board/question/reply locking repositories
+and obtains the reporter through IdentityService. V6's text constraints count UTF-16
+units (including supplementary characters) consistently with the request validator.
+`ReportIT`, `ReportControl.test.tsx`, and `e2e/reports.spec.ts` verify this slice;
+the remaining moderation scenarios below are requirements for later stages.
 
 ## Queue, report details, and restoration context: Stages 3 and 5
 

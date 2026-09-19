@@ -7,6 +7,7 @@ import { getQuestion, updateQuestion } from "./api";
 import type { Question, QuestionInput } from "./api";
 import { Replies } from "../replies/Replies";
 import { QuestionForm } from "./QuestionForm";
+import { ReportControl } from "../moderation/ReportControl";
 
 export function QuestionPage({ editing = false }: { editing?: boolean }) {
   const { questionId = "" } = useParams();
@@ -112,6 +113,7 @@ export function QuestionPage({ editing = false }: { editing?: boolean }) {
           Edit question
         </Link>
       )}
+      <ReportControl target={{ questionId: question.id }} />
       <Replies question={question} />
     </article>
   );

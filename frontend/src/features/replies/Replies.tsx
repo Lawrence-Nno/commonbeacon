@@ -10,6 +10,7 @@ import type { Question } from "../questions/api";
 import { createReply, getReply, listReplies, updateReply } from "./api";
 import type { Reply } from "./api";
 import { ReplyForm } from "./ReplyForm";
+import { ReportControl } from "../moderation/ReportControl";
 
 export function Replies({ question }: { question: Question }) {
   const { user } = useAuth();
@@ -189,6 +190,7 @@ function ReplyThread({ question }: { question: Question }) {
                       Edit reply
                     </button>
                   )}
+                  <ReportControl target={{ replyId: reply.id }} />
                 </article>
               ))}
             </div>
