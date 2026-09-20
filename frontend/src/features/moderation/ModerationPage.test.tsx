@@ -26,6 +26,7 @@ function SwitchAccount() {
 function setup(route = "/moderation", role: string | null = "MODERATOR", responder?: (url: string, init?: RequestInit) => Promise<Response>) {
   const mock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/auth/me")) return role === null ? new Response(null, { status: 401 }) : Response.json({ ...moderator, role });
+    if (url.endsWith("/moderation/summary")) return Response.json({ unansweredQuestions: 0, openReports: 21, publishedArticles: 0 });
     if (responder) return responder(url, init);
     return Response.json(url.includes("/reports/") ? detail : page);
   });
@@ -65,7 +66,7 @@ it.each(["MEMBER", null])("blocks %s before fetching privileged data", async (ro
 it("shows empty and invalid-filter states without inventing results", async () => {
   const { mock } = setup("/moderation?page=-1", "MODERATOR", async () => Response.json({ ...page, items: [], totalElements: 0, totalPages: 0 }));
   await screen.findByText(/Invalid report filters/);
-  expect(mock).toHaveBeenCalledTimes(1);
+  expect(mock.mock.calls.some(([url]) => url.includes("/moderation/reports?"))).toBe(false);
   await userEvent.click(screen.getByRole("button", { name: "Reset filters" }));
   expect(await screen.findByText("No reports with this status.")).toBeVisible();
 });

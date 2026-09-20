@@ -1,0 +1,64 @@
+BEGIN
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+INSERT 0 10000
+INSERT 0 10000
+INSERT 0 6000
+INSERT 0 3000
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+ANALYZE
+ANALYZE
+ANALYZE
+ANALYZE
+PREPARE
+ unanswered | reports | articles
+------------+---------+----------
+       6000 |    2000 |     1000
+(1 row)
+
+                                                                QUERY PLAN
+------------------------------------------------------------------------------------------------------------------------------------------
+ Result  (cost=804.62..804.63 rows=1 width=24) (actual time=5.484..5.487 rows=1.00 loops=1)
+   Buffers: local hit=235
+   InitPlan 1
+     ->  Aggregate  (cost=607.59..607.60 rows=1 width=8) (actual time=4.903..4.905 rows=1.00 loops=1)
+           Buffers: local hit=158
+           ->  Hash Right Anti Join  (cost=319.00..593.21 rows=5750 width=0) (actual time=4.346..4.682 rows=6000.00 loops=1)
+                 Hash Cond: ((r.id = q.accepted_reply_id) AND (r.question_id = q.id))
+                 Buffers: local hit=158
+                 ->  Seq Scan on reply r  (cost=0.00..209.00 rows=7500 width=32) (actual time=0.019..0.678 rows=7500.00 loops=1)
+                       Filter: (visibility = 'VISIBLE'::text)
+                       Rows Removed by Filter: 2500
+                       Buffers: local hit=84
+                 ->  Hash  (cost=199.00..199.00 rows=8000 width=32) (actual time=2.877..2.877 rows=8000.00 loops=1)
+                       Buckets: 8192  Batches: 1  Memory Usage: 502kB
+                       Buffers: local hit=74
+                       ->  Seq Scan on question q  (cost=0.00..199.00 rows=8000 width=32) (actual time=0.022..1.170 rows=8000.00 loops=1)
+                             Filter: (visibility = 'VISIBLE'::text)
+                             Rows Removed by Filter: 2000
+                             Buffers: local hit=74
+   InitPlan 2
+     ->  Aggregate  (cost=129.00..129.01 rows=1 width=8) (actual time=0.366..0.367 rows=1.00 loops=1)
+           Buffers: local hit=49
+           ->  Seq Scan on content_report  (cost=0.00..124.00 rows=2000 width=0) (actual time=0.011..0.291 rows=2000.00 loops=1)
+                 Filter: (status = 'OPEN'::text)
+                 Rows Removed by Filter: 4000
+                 Buffers: local hit=49
+   InitPlan 3
+     ->  Aggregate  (cost=68.00..68.01 rows=1 width=8) (actual time=0.210..0.210 rows=1.00 loops=1)
+           Buffers: local hit=28
+           ->  Seq Scan on knowledge_article  (cost=0.00..65.50 rows=1000 width=0) (actual time=0.018..0.172 rows=1000.00 loops=1)
+                 Filter: (status = 'PUBLISHED'::text)
+                 Rows Removed by Filter: 2000
+                 Buffers: local hit=28
+ Planning Time: 0.010 ms
+ Execution Time: 5.826 ms
+(35 rows)
+
+DEALLOCATE
+ROLLBACK

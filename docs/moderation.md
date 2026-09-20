@@ -362,3 +362,43 @@ versus hide/restore. Two reports targeting one reply produce one hide followed
 by an explicit acknowledgement after reload. Injected audit failure proves
 restoration rollback; Stage 4 retains the accepted-reply hide rollback test.
 Personal Java/concurrency rehearsal remains separate from automated verification.
+
+## Operational overview (Stage 10)
+
+Moderators and administrators see three cards above the report queue at
+`/moderation`. The protected `/api/v1/moderation/summary` endpoint returns only
+`unansweredQuestions`, `openReports`, and `publishedArticles`.
+
+- Unanswered questions are VISIBLE questions without a VISIBLE accepted reply
+  belonging to the same question. An unselected reply does not make a question
+  solved. Archived boards remain included; hidden questions are excluded.
+- Open reports count OPEN rows, including separate reports about the same target.
+- Published articles count PUBLISHED rows, excluding drafts and archived articles.
+
+Hiding an accepted reply clears acceptance and increases the unanswered count
+for its visible parent. Restoring that reply alone does not reaccept it. Hiding
+a question excludes it; restoring a question with a retained valid selection
+keeps it solved. These rules reuse the existing moderation transactions.
+
+The service uses one aggregate SQL statement with a NOT EXISTS predicate, rather
+than loading entities or issuing three separate counts. Under PostgreSQL's
+[Read Committed isolation](https://www.postgresql.org/docs/18/transaction-iso.html),
+the statement sees one committed snapshot. Counts may change immediately afterward;
+they are not a live feed or a promise about a later list request.
+
+Cards have loading, explicit zero, denied, and retryable failure states. Errors
+hide previously cached counts. Links open the existing boards, open-report queue,
+and public knowledge library; the board/library links are not new count-filtered
+lists. Account-specific cache keys, cancellable requests, session cache clearing,
+and `no-store` responses protect private counts across logout/account changes.
+Successful question creation, solution changes, reporting, moderation, and article
+mutations invalidate overview data. Returning to the page or browser focus refreshes
+it; changes in another session are not pushed automatically.
+
+The rollback-only [measurement script](../scripts/measure-operational-summary.sql)
+uses 10,000 questions, 10,000 replies, 6,000 reports, and 3,000 articles. The
+[captured PostgreSQL plan](evidence/summary-stage10-plan.txt) returned exact counts
+6,000/2,000/1,000 in 5.826 ms, using a hash anti-join and sequential scans. These
+temporary, reduced-column fixtures are diagnostic rather than a production latency
+benchmark. No new index or schema migration is justified by this measurement;
+exact counts still require work proportional to eligible data as the dataset grows.

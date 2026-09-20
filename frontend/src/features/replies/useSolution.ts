@@ -15,6 +15,7 @@ export function useSolution(question: Question) {
     try {
       const updated = await selectSolution(question, replyId);
       client.setQueryData(["questions", question.id], updated);
+      void client.invalidateQueries({ queryKey: ["moderation"] });
       setMessage(replyId === null ? "Solution cleared." : "Solution selected.");
       await client.invalidateQueries({
         queryKey: ["questions", "board", question.board.id],

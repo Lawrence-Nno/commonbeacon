@@ -42,17 +42,21 @@ afterEach(() => vi.unstubAllGlobals());
 it("selects and clears server-confirmed solutions with versions and refreshes board caches", async () => {
   const { mock, client } = setup();
   const select = await screen.findByRole("button", { name: "Accept as solution" });
+  client.setQueryData(["moderation", "owner", "summary"], { unansweredQuestions: 1 });
   client.setQueryData(["questions", "board", "b1", 0, "all"], "cached");
   await userEvent.click(select);
   const panel = (await screen.findByRole("heading", { name: "Accepted answer" })).closest("section")!;
   expect(within(panel).getByText(reply.body)).toBeVisible();
   expect(panel.querySelector("b")).toBeNull();
   expect(client.getQueryState(["questions", "board", "b1", 0, "all"])?.isInvalidated).toBe(true);
+  expect(client.getQueryState(["moderation", "owner", "summary"])?.isInvalidated).toBe(true);
   const put = mock.mock.calls.find((call) => call[1]?.method === "PUT")!;
   expect(JSON.parse(put[1]!.body as string)).toEqual({ replyId: "r1", expectedVersion: 0 });
+  client.setQueryData(["moderation", "owner", "summary"], { unansweredQuestions: 0 });
   await userEvent.click(screen.getByRole("button", { name: "Clear solution" }));
   await waitFor(() => expect(screen.queryByRole("heading", { name: "Accepted answer" })).not.toBeInTheDocument());
   expect(mock.mock.calls.find((call) => call[1]?.method === "DELETE")?.[0]).toContain("expectedVersion=1");
+  expect(client.getQueryState(["moderation", "owner", "summary"])?.isInvalidated).toBe(true);
 });
 
 it("keeps the accepted panel available without the selected reply on the current page", async () => {

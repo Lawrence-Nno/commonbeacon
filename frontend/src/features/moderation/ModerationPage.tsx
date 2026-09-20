@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams, useSearchParams } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
 import { ApiError } from "../../lib/http";
+import { ModerationSummary } from "./ModerationSummary";
 import { getReport, listReports, resolveReport } from "./reviewApi";
 import type { ContentContext, ReportDetail, ReportStatus } from "./reviewApi";
 
@@ -35,6 +36,7 @@ function Queue({ actorId }: { actorId: string }) {
   function go(next: number, nextStatus = status) { setParams({ status: nextStatus, page: String(next) }); }
   return <section className="board-page">
     <p className="eyebrow">COMMUNITY CARE</p><h1>Report review</h1>
+    <ModerationSummary />
     <p>Private reports, oldest first. Review the context before resolving a report.</p>
     <div className="question-filter"><label htmlFor="report-status">Report status</label>
       <select id="report-status" value={valid ? status : ""} onChange={(event) => go(0, event.target.value)}>

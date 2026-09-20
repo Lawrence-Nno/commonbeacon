@@ -70,6 +70,7 @@ export function NewQuestionPage() {
     const question = await createQuestion(boardId, input);
     client.setQueryData(["questions", question.id], question);
     void client.invalidateQueries({ queryKey: ["search"] });
+    void client.invalidateQueries({ queryKey: ["moderation"] });
     await client.invalidateQueries({
       queryKey: ["questions", "board", boardId],
     });

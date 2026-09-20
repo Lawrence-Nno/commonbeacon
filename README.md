@@ -10,7 +10,9 @@ content hiding/restoration with private audit history. Administrator knowledge-a
 APIs and screens support drafts, publication, live edits, and archival. Browse
 published guides at `/knowledge`; administrators manage them at `/admin/articles`.
 Search visible questions and published articles by title and body at `/search`,
-with weighted English full-text matching. See the milestone evidence
+with weighted English full-text matching. Moderators and administrators see
+unanswered-question, open-report, and published-article counts at `/moderation`.
+See the milestone evidence
 for local verification and remote CI status.
 
 ## Start from a fresh checkout

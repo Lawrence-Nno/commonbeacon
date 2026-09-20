@@ -1,4 +1,5 @@
-import { useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { FormEvent } from "react";
 import { ApiError } from "../../lib/http";
 import { useAuth } from "../auth/AuthProvider";
@@ -13,6 +14,9 @@ export function ReportControl({ target }: { target: ReportTarget }) {
 }
 
 function ReportForm({ target }: { target: ReportTarget }) {
+  const client = useQueryClient();
+  const alive = useRef(true);
+  useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const pending = useRef(false);
@@ -38,15 +42,18 @@ function ReportForm({ target }: { target: ReportTarget }) {
     setBusy(true);
     try {
       await createReport(target, trimmed);
+      if (!alive.current) return;
+      void client.invalidateQueries({ queryKey: ["moderation"] });
       setSent(true);
       setReason("");
       setOpen(false);
     } catch (failure) {
+      if (!alive.current) return;
       setError(failure instanceof Error ? failure.message : "Could not submit your report.");
       if (failure instanceof ApiError) setField(failure.fieldErrors?.reason ?? "");
     } finally {
       pending.current = false;
-      setBusy(false);
+      if (alive.current) setBusy(false);
     }
   }
 

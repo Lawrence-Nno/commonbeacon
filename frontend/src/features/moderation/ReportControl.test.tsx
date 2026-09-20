@@ -1,4 +1,6 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, render as renderView, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement } from "react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { ReportControl } from "./ReportControl";
@@ -7,6 +9,11 @@ import { createReport, readReportReceipt } from "./api";
 const auth = vi.hoisted(() => ({ user: null as { id: string } | null }));
 vi.mock("../auth/AuthProvider", () => ({ useAuth: () => auth }));
 const receipt = { id: "report-1", status: "OPEN", createdAt: "2026-09-19T00:00:00Z" };
+function render(ui: ReactElement) {
+  const client = new QueryClient();
+  client.setQueryData(["moderation", "member-1", "summary"], { openReports: 0 });
+  return { client, ...renderView(ui, { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> }) };
+}
 beforeEach(() => { auth.user = { id: "member-1" }; });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -23,10 +30,11 @@ async function open() {
 
 it("submits a trimmed reason with CSRF and shows only confirmed success", async () => {
   const fetch = mockRequests(async () => Response.json(receipt, { status: 201 }));
-  render(<ReportControl target={{ questionId: "q1" }} />);
+  const { client } = render(<ReportControl target={{ questionId: "q1" }} />);
   await open();
   await userEvent.click(screen.getByRole("button", { name: "Submit report" }));
   expect(await screen.findByRole("status")).toHaveTextContent("Your report was submitted.");
+  expect(client.getQueryState(["moderation", "member-1", "summary"])?.isInvalidated).toBe(true);
   expect(fetch).toHaveBeenLastCalledWith("/api/v1/reports", expect.objectContaining({
     method: "POST", credentials: "same-origin",
     headers: expect.objectContaining({ "X-CSRF-TOKEN": "test-token" }),

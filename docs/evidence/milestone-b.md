@@ -892,5 +892,67 @@ README, REST/knowledge/search documentation, this evidence, and ignored plans no
 record Stage 9. Documentation covers generated-column tradeoffs, English parser
 semantics, ranking limits, prefix snippets, no typo tolerance/reply search, and
 cross-request page shifts. Unrelated interview-preparation edits are preserved.
-Stage 9 remains uncommitted and has not run remotely. Next: Stage 10 operational
-summary and dashboard.
+Stage 9 was subsequently committed/pushed as `8aa605b` (weighted PostgreSQL
+full-text search). All jobs passed in [CI run 35523110150](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35523110150).
+
+## Stage 10 - operational summary and dashboard (2026-09-20)
+
+Added protected GET `/api/v1/moderation/summary`, returning three long counts in
+one aggregate SQL statement and a `no-store` response. HTTP and service access
+require MODERATOR/ADMINISTRATOR. Unanswered questions include archived boards,
+exclude hidden parents, and require no effective visible accepted reply belonging
+to the same question. OPEN reports count rows rather than targets; only PUBLISHED
+articles count. No migration or new production index was added.
+
+Added three labeled cards above the moderation queue, with existing destination
+links, loading/zero/denied/error states, explicit retry, account-scoped query keys,
+and abortable reads. Successful question creation, report submission, and solution
+selection/clearing now invalidate moderation queries; existing moderation/article
+invalidation already covers lifecycle changes. Report submission ignores late
+responses after its account-scoped form unmounts. Failed refreshes hide stale counts.
+
+Backend verification passed **116 tests: 5 unit and 111 integration**, including
+four new PostgreSQL/HTTP tests for permissions/DTO/cache headers, exact mixed
+fixtures, real accept/hide/restore transitions, and concurrent atomic article/report
+transitions. Forty summary reads preserved the coupled-count invariant while a
+writer committed changes. Log: `%TEMP%/commonbeacon-b-stage10-verify.log`.
+
+Frontend verification passed **127 tests**, ESLint, TypeScript, and production
+build. Thirteen new component cases cover both operator roles, visitor/member
+gates, zero/loading states, malformed counts, backend retry, 403, 401 expiry, and
+late aborted responses after logout/account switching. Existing report/solution
+tests now assert summary invalidation. The initial run found an obsolete global
+fetch-count assertion in the invalid-report-filter test; it now checks that no
+report-list request occurs, while the independent summary may load. A Windows
+sandbox path-resolution failure was resolved by rerunning the frontend tools with
+required filesystem/process access. Log: `%TEMP%/commonbeacon-b-stage10-frontend.log`.
+
+The rollback-only [measurement script](../../scripts/measure-operational-summary.sql)
+uses 10,000 questions, 10,000 replies, 6,000 reports, and 3,000 articles with
+representative existing indexes. [Captured plan](summary-stage10-plan.txt): exact
+counts 6,000/2,000/1,000; hash right anti-join plus sequential scans; 502 kB hash,
+235 local buffer hits, 5.826 ms execution. Reduced-column temporary fixtures do not
+establish production latency or an improvement over another implementation. The
+measurement provides no justification for another index. It rolled back without
+changing application rows/schema. Log: `%TEMP%/commonbeacon-b-stage10-query-plan.log`.
+
+The full isolated browser suite passed **10 tests (2.6m)**. The new overview journey
+checks administrator/moderator cards, archived-board eligibility, two reporters
+on one target, accepted-reply hide/restore counts, publication/archival, existing
+links, mobile overflow, keyboard focus, anonymous/member direct access, and logout
+followed by a member login. It measures deltas from its own baseline, independently
+of other test fixtures. The real login limiter remains enabled and Retry-After is
+respected. Desktop/mobile screenshots were inspected under ignored
+`frontend/test-results/zzzz-summary-operators-see-62356-cards-disappear-on-sign-out/`.
+The cards fit both layouts. Log: `%TEMP%/commonbeacon-b-stage10-browser.log`.
+The isolated containers and network were removed after the successful run.
+
+Rebuilt the development stack with its database/.env preserved; all three services
+are healthy at port 8081. `/moderation` returns SPA HTML 200, anonymous summary
+access returns 401, and Flyway remains at V9. No demo rows were added to development
+data. Log: `%TEMP%/commonbeacon-b-stage10-startup.log`.
+
+README, moderation/API documentation, this evidence, the captured plan, and ignored
+local plans now record Stage 10. Interview-preparation files remain ignored and
+pre-existing unrelated documentation edits are preserved. Stage 10 is uncommitted
+and has not run remotely. Next: Stage 11 fictional demo data and the integrated journey.

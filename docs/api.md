@@ -148,3 +148,15 @@ items share a snapshot and visibility predicates.
 
 Use `/search?q=setup&page=0` in the browser. See [search documentation](search.md)
 for parser examples, V9 backfill/index design, limitations, tests, and query plans.
+
+## Operational summary (Stage 10)
+
+GET `/api/v1/moderation/summary` requires MODERATOR or ADMINISTRATOR and returns
+exactly `{unansweredQuestions,openReports,publishedArticles}` as nonnegative
+integer counts. Visitors receive 401 and members 403. The response uses
+`Cache-Control: no-store`; query parameters are rejected with 400 INVALID_REQUEST.
+
+One SQL statement counts visible questions without an effective visible accepted
+reply belonging to that question (including archived boards), OPEN report rows,
+and PUBLISHED articles. Counts share one database snapshot and contain no content,
+report reasons, or identifiers. See [the overview behavior](moderation.md#operational-overview-stage-10).
