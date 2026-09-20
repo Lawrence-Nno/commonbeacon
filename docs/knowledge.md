@@ -1,9 +1,10 @@
 # Milestone B knowledge and search contracts
 
 Status: Stage 6 article lifecycle/public APIs and Stage 7 article screens are
-implemented locally as of 2026-09-20. Search remains Stages 8-9. See
+implemented locally as of 2026-09-20. Stage 8 title search is also implemented;
+weighted full-text search remains Stage 9. See
 [Milestone B evidence](evidence/milestone-b.md) for verification and commit status.
-The detailed search implementation notes will become `docs/search.md` in Stage 8.
+See [search implementation notes](search.md) for the Stage 8 API and browser route.
 
 ## Shared conventions
 

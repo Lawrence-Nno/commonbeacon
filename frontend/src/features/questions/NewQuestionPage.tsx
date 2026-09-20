@@ -69,6 +69,7 @@ export function NewQuestionPage() {
   async function save(input: QuestionInput) {
     const question = await createQuestion(boardId, input);
     client.setQueryData(["questions", question.id], question);
+    void client.invalidateQueries({ queryKey: ["search"] });
     await client.invalidateQueries({
       queryKey: ["questions", "board", boardId],
     });

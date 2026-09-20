@@ -30,7 +30,9 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(ApiFailure.class)
     ProblemDetail application(ApiFailure exception) {
-        return ApiProblems.problem(exception.status(), exception.code(), exception.getMessage());
+        var problem = ApiProblems.problem(exception.status(), exception.code(), exception.getMessage());
+        if (!exception.fieldErrors().isEmpty()) problem.setProperty("fieldErrors", exception.fieldErrors());
+        return problem;
     }
 
     @ExceptionHandler(OptimisticLockingFailureException.class)

@@ -9,7 +9,8 @@ member reporting, a protected moderator queue, atomic report resolution, and
 content hiding/restoration with private audit history. Administrator knowledge-article
 APIs and screens support drafts, publication, live edits, and archival. Browse
 published guides at `/knowledge`; administrators manage them at `/admin/articles`.
-See the milestone evidence
+Search visible question and published article titles together at `/search`.
+Weighted full-text search remains Stage 9. See the milestone evidence
 for local verification and remote CI status.
 
 ## Start from a fresh checkout
@@ -87,6 +88,7 @@ unanswered. Reseeding preserves edits, credentials, and solution choices.
 - [Milestone evidence, demo script, and limitations](docs/evidence/milestone-a.md)
 - [Reporting and moderator review](docs/moderation.md), [Milestone B evidence](docs/evidence/milestone-b.md)
 - [Knowledge-article screens, APIs, and search contracts](docs/knowledge.md)
+- [Public title search, visibility, and query plans](docs/search.md)
 - [Authentication](docs/authentication.md), [boards](docs/boards.md),
   [questions](docs/questions.md), [replies](docs/replies.md), [solutions](docs/accepted-solutions.md)
 

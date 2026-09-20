@@ -1,4 +1,5 @@
 import { AdminArticles } from "../features/knowledge/AdminArticles";
+import { SearchPage } from "../features/search/SearchPage";
 import { KnowledgePage, KnowledgeArticlePage } from "../features/knowledge/KnowledgePage";
 import { NewQuestionPage } from "../features/questions/NewQuestionPage";
 import { QuestionPage } from "../features/questions/QuestionPage";
@@ -18,7 +19,7 @@ function PageTitle() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    document.title = `${pathname.startsWith("/admin/articles") ? "Manage articles" : pathname.startsWith("/knowledge") ? "Knowledge" : pathname.startsWith("/moderation") ? "Report review" : pathname.startsWith("/questions/") ? "Question" : pathname.endsWith("/questions/new") ? "Ask a question" : pathname.startsWith("/boards/") ? "Board" : pathname === "/admin/boards" ? "Manage boards" : pathname === "/about" ? "About" : pathname === "/login" ? "Sign in" : pathname === "/register" ? "Join" : pathname === "/" ? "Community" : "Page not found"} · CommonBeacon`;
+    document.title = `${pathname === "/search" ? "Search" : pathname.startsWith("/admin/articles") ? "Manage articles" : pathname.startsWith("/knowledge") ? "Knowledge" : pathname.startsWith("/moderation") ? "Report review" : pathname.startsWith("/questions/") ? "Question" : pathname.endsWith("/questions/new") ? "Ask a question" : pathname.startsWith("/boards/") ? "Board" : pathname === "/admin/boards" ? "Manage boards" : pathname === "/about" ? "About" : pathname === "/login" ? "Sign in" : pathname === "/register" ? "Join" : pathname === "/" ? "Community" : "Page not found"} · CommonBeacon`;
   }, [pathname]);
   return null;
 }
@@ -178,6 +179,7 @@ function Shell() {
             <span aria-hidden="true">◈</span> Community
           </NavLink>
           <NavLink to="/knowledge">Knowledge</NavLink>
+          <NavLink to="/search">Search</NavLink>
           <NavLink to="/about">
             <span aria-hidden="true">◎</span> About this space
           </NavLink>
@@ -229,7 +231,7 @@ function Shell() {
                             ? "Board"
                             : pathname === "/admin/boards"
                               ? "Manage boards"
-                              : pathname.startsWith("/admin/articles") ? "Manage articles" : pathname.startsWith("/knowledge") ? "Knowledge" : pathname.startsWith("/moderation") ? "Report review" : "Not found"}
+                              : pathname === "/search" ? "Search" : pathname.startsWith("/admin/articles") ? "Manage articles" : pathname.startsWith("/knowledge") ? "Knowledge" : pathname.startsWith("/moderation") ? "Report review" : "Not found"}
             </strong>
           </span>
           <AuthControls />
@@ -244,6 +246,7 @@ function Shell() {
             <Route path="/" element={<Home />} />
             <Route path="/about" element={<About />} />
             <Route path="/knowledge" element={<KnowledgePage />} />
+            <Route path="/search" element={<SearchPage />} />
             <Route path="/knowledge/:slug" element={<KnowledgeArticlePage />} />
             <Route path="/admin/articles" element={<AdminArticles />} />
             <Route path="/admin/articles/new" element={<AdminArticles creating />} />

@@ -142,6 +142,7 @@ function DecisionReview({ initial, actorId }: { initial: ReportDetail; actorId: 
       setData(result); setNote(""); setDecision("");
       // Only server-confirmed results change the visible state. Never retry a mutation.
       void client.invalidateQueries({ queryKey: ["moderation", actorId] });
+      void client.invalidateQueries({ queryKey: ["search"] });
       void client.invalidateQueries({ queryKey: ["questions"] });
       void client.invalidateQueries({ queryKey: ["replies", data.context.question.id] });
       void client.invalidateQueries({ queryKey: ["boards"] });

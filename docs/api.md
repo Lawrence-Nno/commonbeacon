@@ -125,3 +125,22 @@ See [the knowledge contract](knowledge.md) for exact public/admin DTOs, limits,
 publication timestamp behavior, and a complete session-based walkthrough.
 Article screens are available at `/knowledge`, `/knowledge/:slug`, and
 `/admin/articles`; see the [article UI walkthrough](knowledge.md#stage-7-screens-and-browser-walkthrough).
+
+## Public title search (Stage 8 baseline)
+
+GET `/api/v1/search?q=setup&page=0&size=20` requires no session. It combines visible
+question titles and published article titles in one page; archived-board questions
+remain eligible. Bodies, replies, and private moderation data are not searched.
+Matches are case-insensitive literal substrings; `%`, `_`, quotes, and backslashes
+do not act as operators. Missing/blank q returns an empty page. Trimmed q is bounded
+to 200 UTF-16 units; overlength returns 400 VALIDATION_FAILED with fieldErrors.q.
+
+Each hit has `{kind,id,title,snippet,url,rank}`. Snippets are plain text, at most 240
+UTF-16 units. Rank is zero; ordering is ARTICLE before QUESTION, then UUID ascending.
+Pagination defaults to 0/20, maximum size 100 and offset 2,147,483,647. Invalid pages
+return 400 INVALID_PAGE even for blank searches. Unknown/repeated parameters return
+400 INVALID_REQUEST. Count and items share a snapshot and visibility predicates.
+
+The browser route is `/search?q=setup&page=0`. See [search documentation](search.md)
+for response examples, cache refresh, test coverage, and measured baseline limits.
+Weighted full-text matching/ranking remains Stage 9.

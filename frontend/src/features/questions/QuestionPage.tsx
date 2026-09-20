@@ -127,6 +127,7 @@ function OwnerEditor({ question }: { question: Question }) {
   async function save(input: QuestionInput) {
     const updated = await updateQuestion(base, input);
     client.setQueryData(["questions", updated.id], updated);
+    void client.invalidateQueries({ queryKey: ["search"] });
     await client.invalidateQueries({
       queryKey: ["questions", "board", base.board.id],
     });

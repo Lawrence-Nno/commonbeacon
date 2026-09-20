@@ -6,9 +6,10 @@ Stage 1 is complete: baseline verified and implementation contracts finalized on
 2026-09-19. Stage 2 report submission is committed/pushed as e846e13 and passed
 remote CI. Stage 5 is pushed as a35159d and passed remote CI. Stage 6 article APIs
 are pushed as b0db30b and passed remote CI run 35505191732. Stage 7 article screens
-are implemented and locally verified on 2026-09-20: 103 backend tests, 103 frontend
-tests, lint/type checking/build, and eight browser tests passed. Stage 7 remains
-uncommitted and has not run remotely. Stages 8-13 remain planned.
+are pushed as 7c1d654 and passed remote CI run 35517586020. Stage 8 public title
+search is complete locally on 2026-09-20: 110 backend tests, 114 frontend tests,
+lint/type checking/build, and nine browser tests passed; details are below.
+Stage 8 is uncommitted and has not run remotely. Stages 9-13 remain planned.
 
 Baseline revision: `2d33c96de62b6feda06a4b32366e300844f7ff4a`.
 Verification used the existing workspace with documentation changes, not a new
@@ -707,5 +708,112 @@ records were inserted into the development database. Startup log:
 
 README, article/API documentation, this evidence, and ignored local plans record
 Stage 7. Existing interview-preparation documentation edits remain preserved.
-Stage 7 remains uncommitted and has not run remotely. Next: Stage 8 bounded title
-search. Search, summary, and later milestone work remain planned.
+At that handoff Stage 7 was uncommitted and had not run remotely. Its subsequent
+commit/push and Stage 8 title-search implementation are recorded below.
+
+## Stage 7 commit/push
+
+Committed and pushed `7c1d654cdf7c1d6da183522ce5b1d3a4ff59e139`. All jobs passed in
+[run 35517586020](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35517586020),
+inspected on 2026-09-20. The commit includes Stage 7 code/tests/documentation and
+excludes the unrelated interview-preparation links in README, architecture, and
+Milestone A evidence. Local plans and interview-preparation files remain ignored.
+
+## Stage 8 implementation: 2026-09-20
+
+Added public GET `/api/v1/search` and typed SearchHit records. SearchController
+rejects unknown/repeated parameters and malformed integer pagination. SearchService
+validates nonnegative page, size 1-100, 32-bit offset, and trimmed 200-unit UTF-16 q
+before returning empty results for blank input. ApiFailure now optionally carries
+immutable fieldErrors, allowing overlength q to return the promised fieldErrors.q;
+existing failures retain their previous shapes when no fields are supplied.
+
+SearchRepository binds all user text as JDBC parameters. ILIKE uses explicit `!`
+escaping for literal `!`, `%`, and `_`; quotes/backslashes are data. One shared
+UNION ALL expression filters PUBLISHED articles and VISIBLE questions for both
+count and hits. Global ordering is rank 0, ARTICLE before QUESTION, UUID ascending;
+global LIMIT/OFFSET follows the merge. Count/hits share a read-only REPEATABLE_READ
+snapshot. Archived-board questions remain eligible; bodies are snippet sources,
+not matches; replies/reports/history are not searched. Database body projection is
+bounded to 241 code points, then Java produces at most 240 UTF-16 units including
+an ellipsis, without splitting a surrogate pair. No migration/index was added.
+
+Added `/search` and shared Search navigation. Query/page live in the URL; new
+queries reset page, same-query submission refreshes, and history/deep links work.
+The UI handles blank/loading/empty/invalid/error/retry states, renders plain text,
+validates hit URLs and response shapes, and hides stale hits on failed refetch.
+Query keys include q/page and consume abort signals, so late obsolete responses
+cannot replace newer results. Navigation/focus refetches current results. Question
+creation/editing and moderation resolution/restoration now invalidate search;
+Stage 7 article mutations already invalidate that prefix. Added responsive form
+and focus styling. No real-time cross-browser removal is claimed.
+
+Seven new SearchIT cases passed against real PostgreSQL/HTTP: mixed global pages
+and cross-kind UUID ties, archived-board eligibility, every-role public parity,
+hidden/draft/archived/reply/report/body-only exclusion, literal pattern characters
+and quotes, blank/oversized/invalid input, Unicode-safe plain-text snippets,
+committed edit/visibility changes, and a latch-controlled concurrent archive
+between count and hits that proves snapshot consistency. Full backend verification
+passed **5 unit + 105 integration tests (110 total)**.
+
+Eleven new component cases passed: mixed kinds/text/links, URL query/page history
+and reset, blank input, invalid routes, abort/late-response isolation, stale-result
+removal on error plus retry, server field validation, out-of-range recovery, and
+unsafe/malformed response rejection. Final frontend lint, type checking,
+**114 tests**, and production build exited 0.
+
+The initial combined script stopped after its successful backend run because a
+nullable aliased query error was not narrowed by TypeScript. Reading the narrowed
+query error in that branch resolved it. Two component selectors incorrectly used
+Playwright's `exact` option in Testing Library; removing the unsupported option
+resolved their type errors. The initial browser run passed eight previous journeys
+and the new search journey through paging/deep links/literal matching/mobile checks,
+then failed its moderation fixture: public report receipts intentionally omit
+version. A second attempt used the detail's top level instead of its nested report.
+The final fixture fetches privileged report detail and uses report.version and the
+reviewed target version; a fresh run loaded that final correction. No report API
+change was needed. The configured
+`C:/Users/USER/.Codex/issue-rca.md` remains absent.
+
+Added `scripts/measure-title-search.sql`: rollback-only temporary tables shadow
+source names in one psql session, holding 2,000 articles and 2,000 questions. On
+PostgreSQL 18.6, selective matching returned two eligible rows, with count/hits
+execution 2.334/2.403 ms. Broad matching returned 3,098 eligible rows, with count
+2.770 ms and first-page hits 6.834 ms. Both sources used sequential scans; selective
+hits used 26 kB quicksort and broad hits a 42 kB top-N heapsort. Each query touched
+668 local buffers. These single warm measurements on index-free temporary fixtures
+are not a production performance promise or index comparison. The transaction
+rolled back and no application rows/schema changed. Full plans:
+`%TEMP%/commonbeacon-b-stage8-query-plans.log`.
+
+Verification logs: `%TEMP%/commonbeacon-b-stage8-verify.log` (successful backend and
+initial frontend type failure), `%TEMP%/commonbeacon-b-stage8-frontend.log` (114
+passing component tests), and `%TEMP%/commonbeacon-b-stage8-browser.log` (initial
+browser fixture failure).
+
+Rebuilt the development stack with `docker compose up -d --build --wait
+--wait-timeout 180`. All three services are healthy at port 8081; the existing
+database volume and .env were preserved. `/search?q=setup&page=0` returns SPA HTML
+200, public search and blank search return JSON 200, blank q with page=-1 returns
+400, and anonymous administrator API access remains 401. Search adds no persistent
+fixtures or demo records. Startup log: `%TEMP%/commonbeacon-b-stage8-startup.log`.
+
+Final full isolated browser run exited 0: **9 passed (1.5m)**, including the new
+visitor search journey. It creates 21 published article fixtures plus one visible
+question on an archived board, proves 20+2 global paging and deep-link/history
+behavior, excludes a private draft, searches literal `%_!`, and verifies hide,
+restore, archive, and publish changes via renewed searches. Keyboard focus, 390px
+layout, and plain-text rendering passed. Inspected `search-mobile.png` and
+`search-desktop.png` under ignored
+`frontend/test-results/zzz-search-visitors-search-27137-es-and-refreshed-visibility/`.
+Lint/type checking also passed before this final run. Log:
+`%TEMP%/commonbeacon-b-stage8-browser-verified.log`; the intermediate incorrect
+nested-version attempt is `%TEMP%/commonbeacon-b-stage8-browser-final.log`.
+The disposable containers/network were removed and project-label queries confirmed
+no leftovers.
+
+README, REST/knowledge/search documentation, this evidence, and ignored plans now
+record Stage 8. Existing unrelated interview-preparation documentation changes are
+preserved, and the interview-preparation folder remains ignored. Stage 8 remains
+uncommitted and has not run remotely. Next: Stage 9 weighted PostgreSQL full-text
+search; title-only search does not complete Milestone B's full-text requirement.

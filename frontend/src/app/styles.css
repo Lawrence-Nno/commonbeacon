@@ -1056,3 +1056,10 @@ a.board-card:hover {
 .article-form textarea:focus-visible { outline: 3px solid #a8782b; outline-offset: 2px; }
 .article-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
 .article-actions p { flex-basis: 100%; }
+
+.search-form { margin: 24px 0; }
+.search-form label { display: block; margin-bottom: 8px; font-weight: 600; }
+.search-form > div { display: flex; flex-wrap: wrap; gap: 12px; }
+.search-form input { flex: 1 1 220px; min-width: 0; padding: 12px; border: 1px solid #aabbad; border-radius: 5px; font: inherit; }
+.search-form input:focus-visible { outline: 3px solid #a8782b; outline-offset: 2px; }
+.search-snippet { white-space: pre-wrap; overflow-wrap: anywhere; }

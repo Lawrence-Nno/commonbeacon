@@ -59,6 +59,7 @@ function Restoration({ initial, actorId }: { initial: ContentContext; actorId: s
       if (!alive.current) return;
       setContext(result); setReason("");
       void client.invalidateQueries({ queryKey: ["moderation", actorId] });
+      void client.invalidateQueries({ queryKey: ["search"] });
       void client.invalidateQueries({ queryKey: ["questions"] });
       void client.invalidateQueries({ queryKey: ["replies", context.question.id] });
       void client.invalidateQueries({ queryKey: ["boards"] });
