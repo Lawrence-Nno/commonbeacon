@@ -28,7 +28,7 @@ it("shows both result kinds, literal text and safe detail links", async () => {
   expect(screen.getByRole("link", { name: question.title })).toHaveAttribute("href", question.url);
   expect(screen.getAllByText(article.snippet)).toHaveLength(2);
   expect(document.querySelector("script, img")).toBeNull();
-  expect(screen.getByText(/currently matches titles only/)).toBeVisible();
+  expect(screen.getByText(/English stemming is applied/)).toBeVisible();
   await userEvent.click(screen.getByRole("link", { name: article.title }));
   expect(await screen.findByRole("heading", { name: "Article detail" })).toBeVisible();
 });
@@ -39,12 +39,12 @@ it("keeps query/page in navigation history and resets page for a new query", asy
   await userEvent.click(screen.getByRole("button", { name: "Next results" }));
   await screen.findByText("Page 2 of 2");
   expect(screen.getByRole("button", { name: "Next results" })).toBeDisabled();
-  await userEvent.clear(screen.getByLabelText("Search titles"));
-  await userEvent.type(screen.getByLabelText("Search titles"), "  50%_off!  ");
+  await userEvent.clear(screen.getByLabelText("Search titles and bodies"));
+  await userEvent.type(screen.getByLabelText("Search titles and bodies"), "  50%_off!  ");
   await userEvent.click(screen.getByRole("button", { name: "Search" }));
   await waitFor(() => expect(mock).toHaveBeenCalledWith("/api/v1/search?q=50%25_off%21&page=0&size=20", expect.anything()));
   await screen.findByText("Page 1 of 2");
-  expect(screen.getByLabelText("Search titles")).toHaveValue("50%_off!");
+  expect(screen.getByLabelText("Search titles and bodies")).toHaveValue("50%_off!");
   await userEvent.click(screen.getByRole("button", { name: "Go back" }));
   expect(await screen.findByDisplayValue("setup")).toBeVisible();
   await screen.findByText("Page 2 of 2");
@@ -52,7 +52,7 @@ it("keeps query/page in navigation history and resets page for a new query", asy
 
 it("prompts for blank queries without requesting every public record", async () => {
   const { mock } = setup("/search?q=%20%20");
-  expect(screen.getByText(/Enter a title or part/)).toBeVisible();
+  expect(screen.getByText(/Enter words to search/)).toBeVisible();
   expect(mock).not.toHaveBeenCalled();
 });
 
@@ -69,12 +69,12 @@ it("cancels the older query and ignores its late response", async () => {
   });
   await screen.findByText("Searching...");
   await waitFor(() => expect(finish).toBeDefined());
-  await userEvent.clear(screen.getByLabelText("Search titles")); await userEvent.type(screen.getByLabelText("Search titles"), "newer");
+  await userEvent.clear(screen.getByLabelText("Search titles and bodies")); await userEvent.type(screen.getByLabelText("Search titles and bodies"), "newer");
   await userEvent.click(screen.getByRole("button", { name: "Search" }));
   await screen.findByRole("link", { name: "Newer result" }); expect(oldSignal?.aborted).toBe(true);
   await act(async () => finish(Response.json(page)));
   expect(screen.queryByRole("link", { name: article.title })).not.toBeInTheDocument();
-  expect(screen.getByLabelText("Search titles")).toHaveValue("newer");
+  expect(screen.getByLabelText("Search titles and bodies")).toHaveValue("newer");
 });
 
 it("clears stale hits on refresh errors and supports retry", async () => {
@@ -84,7 +84,7 @@ it("clears stale hits on refresh errors and supports retry", async () => {
   await act(async () => { await client.invalidateQueries({ queryKey: ["search"] }); });
   expect(await screen.findByRole("alert")).toHaveTextContent("Search unavailable");
   expect(screen.queryByRole("link", { name: article.title })).not.toBeInTheDocument();
-  expect(screen.getByLabelText("Search titles")).toHaveValue("setup");
+  expect(screen.getByLabelText("Search titles and bodies")).toHaveValue("setup");
   fail = false; await userEvent.click(screen.getByRole("button", { name: "Retry search" }));
   await screen.findByRole("link", { name: article.title });
 });
@@ -97,7 +97,7 @@ it("shows server query validation without a retry loop", async () => {
 
 it("offers first-page recovery for an empty out-of-range page", async () => {
   const { mock } = setup("/search?q=missing&page=4", async () => Response.json({ ...page, items: [], totalElements: 0, totalPages: 0 }));
-  await screen.findByText("No matching titles on this page.");
+  await screen.findByText("No matching results on this page.");
   await userEvent.click(screen.getByRole("button", { name: "First page" }));
   await waitFor(() => expect(mock).toHaveBeenCalledWith(expect.stringContaining("page=0"), expect.anything()));
 });

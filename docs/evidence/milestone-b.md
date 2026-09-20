@@ -6,10 +6,11 @@ Stage 1 is complete: baseline verified and implementation contracts finalized on
 2026-09-19. Stage 2 report submission is committed/pushed as e846e13 and passed
 remote CI. Stage 5 is pushed as a35159d and passed remote CI. Stage 6 article APIs
 are pushed as b0db30b and passed remote CI run 35505191732. Stage 7 article screens
-are pushed as 7c1d654 and passed remote CI run 35517586020. Stage 8 public title
-search is complete locally on 2026-09-20: 110 backend tests, 114 frontend tests,
-lint/type checking/build, and nine browser tests passed; details are below.
-Stage 8 is uncommitted and has not run remotely. Stages 9-13 remain planned.
+are pushed as 7c1d654 and passed remote CI run 35517586020. Stage 8 is pushed as
+08c45b1 and passed remote CI run 35522390347. Stage 9 weighted full-text search is
+complete locally on 2026-09-20: 112 backend tests, 114 frontend tests, lint/type
+checking/build, and nine browser tests passed. Stage 9 is uncommitted and has not
+run remotely. Stages 10-13 remain planned.
 
 Baseline revision: `2d33c96de62b6feda06a4b32366e300844f7ff4a`.
 Verification used the existing workspace with documentation changes, not a new
@@ -814,6 +815,82 @@ no leftovers.
 
 README, REST/knowledge/search documentation, this evidence, and ignored plans now
 record Stage 8. Existing unrelated interview-preparation documentation changes are
-preserved, and the interview-preparation folder remains ignored. Stage 8 remains
-uncommitted and has not run remotely. Next: Stage 9 weighted PostgreSQL full-text
-search; title-only search does not complete Milestone B's full-text requirement.
+preserved, and the interview-preparation folder remains ignored. At that handoff Stage 8 was uncommitted and had not run remotely. Its subsequent
+commit/push and Stage 9 implementation are recorded below.
+
+
+## Stage 8 commit/push
+
+Committed and pushed `08c45b1e8db674190fdd86451d91bbcf2d08ba4e`. All jobs passed in
+[run 35522390347](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35522390347),
+inspected on 2026-09-20. The Stage 8 commit excludes unrelated interview-preparation
+links; local plans and interview-preparation files remain ignored.
+
+## Stage 9 implementation: 2026-09-20
+
+Added V9 stored generated weighted tsvectors to question and knowledge_article,
+using explicit english configuration, title weight A and body weight B. Partial
+GIN indexes cover VISIBLE questions and PUBLISHED articles. The migration backfills
+existing rows, and PostgreSQL maintains vectors/index membership on subsequent
+inserts, edits, and lifecycle changes. Earlier migrations are unchanged.
+
+Replaced literal ILIKE title matching and constant rank with parameter-bound
+websearch_to_tsquery and ts_rank_cd over title/body vectors. Blank/tokenless/stop-word
+queries yield empty results; phrases, OR, minus exclusions, and English stemming
+follow the chosen parser. Rank is nonnegative and globally ordered before kind/UUID
+ties. Shared public predicates, count/items REPEATABLE_READ snapshot, query/page
+bounds, exact hit DTO shape, and bounded plain-text prefix snippets remain intact.
+The UI now explains body search and parser syntax instead of literal title-only
+matching. Existing mutation invalidation, cancellation, and normal focus/navigation
+refetches remain in effect; there is no cross-browser push-removal claim.
+
+Updated SearchIT to verify body inclusion and distinctive private body exclusion,
+parser punctuation/phrases/OR/exclusion/stemming/stop words, and positive ranked
+ties. Added comparable cross-kind title-over-body ranking with global page order,
+and live body replacement removing an old match. Added an isolated-schema V8-to-V9
+upgrade test: populate old questions/articles, apply exactly one migration, verify
+backfilled body search, edit body text and verify generated vectors change, check
+two GIN indexes, and rerun migration with zero changes. The schema is removed in
+finally. Fresh-database bootstrap assertions now require V9.
+
+`./scripts/verify.ps1` exited 0 on the first run: **5 unit + 107 integration tests
+(112 backend total), 114 frontend tests**, lint, type checking, and production build
+passed. Nine SearchIT cases passed. Existing frontend cases were updated for the
+new search labels/help text; no weaker decoding or privacy assertions were added.
+Log: `%TEMP%/commonbeacon-b-stage9-verify.log`.
+
+Expanded the search browser journey with a body-only article, cross-page relevance
+ordering below comparable title matches, phrase query, published body replacement,
+stemming, and stop-word-only empty results. Existing global pagination, role/privacy,
+hide/restore, publish/archive, deep-link/history, keyboard and mobile checks remain.
+The full isolated suite exited 0: **9 passed (1.5m)**. Inspected search-mobile.png
+and search-desktop.png under ignored
+`frontend/test-results/zzz-search-visitors-search-83c58-es-and-refreshed-visibility/`.
+The mobile form explains parser syntax and fits the viewport; literal markup remains
+visible as text. Disposable containers/network cleanup was confirmed by project-label
+queries returning no leftovers. Log: `%TEMP%/commonbeacon-b-stage9-browser.log`.
+
+Added `scripts/measure-full-text-search.sql` and captured
+[full query plans](search-stage9-plans.txt). Rollback-only temporary fixtures contain
+20,000 articles and 20,000 questions, generated weighted vectors, partial GIN indexes,
+and analyzed statistics. PostgreSQL 18.6 chose bitmap GIN/heap scans for the two-hit
+selective query: count 0.139 ms, hits 0.258 ms, 26 kB quicksort. The 30,998-hit broad
+query used sequential scans: count 80.352 ms, first 20 ranked hits 1,822.290 ms,
+42 kB top-N heapsort. Broad ranking remains expensive; no forced index plan or
+unmeasured speedup is claimed. Stage 8's different dataset is not a controlled
+performance comparison. Full source/log: `%TEMP%/commonbeacon-b-stage9-query-plans.log`.
+The script rolled back without changing application rows or schema.
+
+Rebuilt/upgraded the development stack with `docker compose up -d --build --wait
+--wait-timeout 180`, preserving its database and .env. All three services are healthy.
+Flyway history confirms successful V9; all eight existing questions have vectors
+and the existing article table remains empty. `/search?q=setup` serves SPA HTML 200;
+public search returns JSON 200 and stop-word-only input returns zero results. No
+demo content was inserted. Log: `%TEMP%/commonbeacon-b-stage9-startup.log`.
+
+README, REST/knowledge/search documentation, this evidence, and ignored plans now
+record Stage 9. Documentation covers generated-column tradeoffs, English parser
+semantics, ranking limits, prefix snippets, no typo tolerance/reply search, and
+cross-request page shifts. Unrelated interview-preparation edits are preserved.
+Stage 9 remains uncommitted and has not run remotely. Next: Stage 10 operational
+summary and dashboard.

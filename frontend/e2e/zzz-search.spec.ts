@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 
-test("visitors search mixed public titles with global pages and refreshed visibility", async ({ browser }, testInfo) => {
+test("visitors search ranked public titles and bodies with global pages and refreshed visibility", async ({ browser }, testInfo) => {
   test.setTimeout(180_000);
   const origin = "http://127.0.0.1:4173", marker = "Search" + randomUUID().replaceAll("-", "");
   const admin = await browser.newContext(), visitor = await browser.newContext();
@@ -35,8 +35,8 @@ test("visitors search mixed public titles with global pages and refreshed visibi
     const draft = await mutation("/api/v1/admin/articles", { slug: "private-" + randomUUID(), title: marker + " Private draft", body: "Private draft text must not appear in search." }, 201);
     await mutation(`/api/v1/boards/${board.id}`, { archived: true, expectedVersion: board.version }, 200, "PATCH");
     await page.goto(origin + "/knowledge"); await page.getByRole("link", { name: "Search", exact: true }).click();
-    await expect(page.getByText(/Enter a title or part/)).toBeVisible();
-    await page.getByLabel("Search titles").fill(marker); await page.getByLabel("Search titles").press("Enter");
+    await expect(page.getByText(/Enter words to search/)).toBeVisible();
+    await page.getByLabel("Search titles and bodies").fill(marker); await page.getByLabel("Search titles and bodies").press("Enter");
     await expect(page.getByRole("status")).toContainText("22 results");
     await expect(page.locator("main ol > li")).toHaveCount(20);
     await expect(page.getByText("Private draft text must not appear in search.")).toHaveCount(0);
@@ -49,10 +49,10 @@ test("visitors search mixed public titles with global pages and refreshed visibi
     await page.getByRole("link", { name: question.title, exact: true }).click();
     await expect(page.getByText("Literal <script>question snippet</script>")).toBeVisible();
     await page.goBack(); await expect(page.getByText("Page 2 of 2")).toBeVisible();
-    await page.getByLabel("Search titles").fill(marker + " 50%_!"); await page.getByLabel("Search titles").press("Enter");
+    await page.getByLabel("Search titles and bodies").fill(marker + " 50%_!"); await page.getByLabel("Search titles and bodies").press("Enter");
     await expect(page.getByRole("status")).toContainText("1 results"); await expect(page).toHaveURL(/page=0/);
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.getByLabel("Search titles").focus(); await page.getByLabel("Search titles").press("Tab");
+    await page.getByLabel("Search titles and bodies").focus(); await page.getByLabel("Search titles and bodies").press("Tab");
     await expect(page.getByRole("button", { name: "Search", exact: true })).toBeFocused();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
     await page.screenshot({ path: testInfo.outputPath("search-mobile.png"), fullPage: true });
@@ -69,12 +69,30 @@ test("visitors search mixed public titles with global pages and refreshed visibi
     await page.getByRole("button", { name: "Search", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("1 results");
     await mutation(`/api/v1/admin/articles/${articles[0].id}/archive`, { expectedVersion: articles[0].version });
-    await page.getByLabel("Search titles").fill(marker); await page.getByLabel("Search titles").press("Enter");
+    await page.getByLabel("Search titles and bodies").fill(marker); await page.getByLabel("Search titles and bodies").press("Enter");
     await expect(page.getByRole("status")).toContainText("21 results");
     await mutation(`/api/v1/admin/articles/${draft.id}/publish`, { expectedVersion: draft.version });
     await page.getByRole("button", { name: "Search", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("22 results");
-    await page.getByLabel("Search titles").fill("unmatched-" + randomUUID()); await page.getByLabel("Search titles").press("Enter");
-    await expect(page.getByText("No matching titles on this page.")).toBeVisible();
+    const bodyDraft = await mutation("/api/v1/admin/articles", { slug: "body-" + randomUUID(), title: "Fictional astronomy reference", body: marker + " telescope instructions appear only in this body." }, 201);
+    const bodyArticle = await mutation(`/api/v1/admin/articles/${bodyDraft.id}/publish`, { expectedVersion: bodyDraft.version });
+    await page.getByRole("button", { name: "Search", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("23 results");
+    await page.getByRole("button", { name: "Next results" }).click();
+    await expect(page.locator("main ol > li").last().getByRole("link")).toHaveText("Fictional astronomy reference");
+    await page.getByLabel("Search titles and bodies").fill(`"${marker} telescope"`);
+    await page.getByLabel("Search titles and bodies").press("Enter");
+    await expect(page.getByRole("status")).toContainText("1 results");
+    await expect(page.getByRole("link", { name: "Fictional astronomy reference" })).toBeVisible();
+    await mutation(`/api/v1/admin/articles/${bodyArticle.id}`, { title: bodyArticle.title, body: marker + " microscope instructions replace the old body.", expectedVersion: bodyArticle.version }, 200, "PATCH");
+    await page.getByRole("button", { name: "Search", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("0 results");
+    await page.getByLabel("Search titles and bodies").fill(marker + " microscopes"); await page.getByLabel("Search titles and bodies").press("Enter");
+    await expect(page.getByRole("status")).toContainText("1 results");
+    await page.getByLabel("Search titles and bodies").fill("the and of"); await page.getByLabel("Search titles and bodies").press("Enter");
+    await expect(page.getByRole("status")).toContainText("0 results");
+    await page.getByLabel("Search titles and bodies").fill(marker); await page.getByLabel("Search titles and bodies").press("Enter");
+    await page.getByLabel("Search titles and bodies").fill("unmatched-" + randomUUID()); await page.getByLabel("Search titles and bodies").press("Enter");
+    await expect(page.getByText("No matching results on this page.")).toBeVisible();
   } finally { await admin.close(); await visitor.close(); }
 });

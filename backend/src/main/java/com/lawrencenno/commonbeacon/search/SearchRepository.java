@@ -13,28 +13,25 @@ public class SearchRepository {
     // One shared visibility/matching expression for both count and globally paged hits.
     private static final String MATCHES = """
             SELECT 'ARTICLE' AS kind, id, title, left(body, 241) AS snippet,
-                   '/knowledge/' || slug AS url, 0::double precision AS rank
-            FROM knowledge_article WHERE status='PUBLISHED' AND title ILIKE ? ESCAPE '!'
+                   '/knowledge/' || slug AS url, ts_rank_cd(search_vector, parsed.query) AS rank
+            FROM knowledge_article CROSS JOIN websearch_to_tsquery('english', ?) AS parsed(query)
+            WHERE status='PUBLISHED' AND numnode(parsed.query)>0 AND search_vector @@ parsed.query
             UNION ALL
             SELECT 'QUESTION' AS kind, id, title, left(body, 241) AS snippet,
-                   '/questions/' || id::text AS url, 0::double precision AS rank
-            FROM question WHERE visibility='VISIBLE' AND title ILIKE ? ESCAPE '!'
+                   '/questions/' || id::text AS url, ts_rank_cd(search_vector, parsed.query) AS rank
+            FROM question CROSS JOIN websearch_to_tsquery('english', ?) AS parsed(query)
+            WHERE visibility='VISIBLE' AND numnode(parsed.query)>0 AND search_vector @@ parsed.query
             """;
 
-    static String pattern(String query) {
-        return "%" + query.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
-    }
     public long count(String query) {
-        String pattern = pattern(query);
-        return jdbc.queryForObject("SELECT count(*) FROM (" + MATCHES + ") hits", Long.class, pattern, pattern);
+        return jdbc.queryForObject("SELECT count(*) FROM (" + MATCHES + ") hits", Long.class, query, query);
     }
     public List<SearchHit> hits(String query, int size, long offset) {
-        String pattern = pattern(query);
         return jdbc.query("SELECT * FROM (" + MATCHES + """
                 ) hits ORDER BY rank DESC, CASE kind WHEN 'ARTICLE' THEN 0 ELSE 1 END, id ASC
                 LIMIT ? OFFSET ?
                 """, (rs, row) -> new SearchHit(SearchHit.Kind.valueOf(rs.getString("kind")),
                         rs.getObject("id", UUID.class), rs.getString("title"), SearchHit.snippet(rs.getString("snippet")),
-                        rs.getString("url"), rs.getDouble("rank")), pattern, pattern, size, offset);
+                        rs.getString("url"), rs.getDouble("rank")), query, query, size, offset);
     }
 }

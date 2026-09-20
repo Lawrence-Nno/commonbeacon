@@ -1,134 +1,149 @@
-# Public search: Stage 8 title baseline
+# Public search: Stage 9 weighted full-text search
 
-Stage 8 adds `GET /api/v1/search` and the `/search` browser route. It searches
-case-insensitive literal substrings in titles of visible questions and published
-knowledge articles. This is an intermediate baseline: weighted English full-text
-search and its indexes remain Stage 9. Body text is used only for snippets, never
-for matching at this stage. There is no relevance ranking, typo correction, reply
-search, highlighting, or real-time push to other browsers.
+`GET /api/v1/search` and `/search` now search titles and bodies of visible questions
+and published articles with PostgreSQL English full-text matching. Stage 9 replaces
+the Stage 8 literal-title baseline while preserving the bounded response shape and
+public visibility rules. English stemming, phrase/OR/exclusion syntax, and relevance
+ranking are supported. There is no typo correction, separate reply search, HTML
+highlighting, or real-time push to other browsers.
 
-## API contract
+## API contract and query syntax
 
-`GET /api/v1/search?q=setup&page=0&size=20` is available without signing in and
-returns the same public results for every role. Parameters are optional; defaults
-are empty q, page 0, size 20. Unsupported or repeated parameters return
-`400 INVALID_REQUEST`. Malformed integer parameters, negative pages, sizes outside
-1-100, or offsets above 2,147,483,647 return `400 INVALID_PAGE` even when q is blank.
+`GET /api/v1/search?q=setup&page=0&size=20` is public and returns identical eligible
+content for every role. Parameters default to empty q, page 0, size 20. Unknown or
+repeated parameters return 400 INVALID_REQUEST. Invalid integers, negative pages,
+sizes outside 1-100, and offsets above 2,147,483,647 return 400 INVALID_PAGE even for
+blank queries. Trimmed q is bounded to 200 UTF-16 units; excess length returns
+400 VALIDATION_FAILED with fieldErrors.q. Blank, punctuation-only, and stop-word-only
+queries have no searchable tokens and return empty results, not a broad query.
 
-Trim q using Java String.trim. Blank/whitespace queries return no hits and zero
-totals. More than 200 UTF-16 units after trimming returns `400 VALIDATION_FAILED`
-with `fieldErrors.q`. The UI also checks length before requesting results.
+The parser is explicitly `websearch_to_tsquery('english', q)` with q bound through
+JDBC. Unquoted words combine with AND; double quotes request a phrase; OR combines
+alternatives; a leading minus excludes a term. Other punctuation is processed by
+PostgreSQL's text parser, rather than Stage 8's literal substring rules. For example,
+`running` can match `run`, `"setup guide"` requests an ordered phrase, and
+`setup -printer` excludes printer matches. Wildcard/prefix and raw tsquery syntax
+are not supported. A negative-only query can match many eligible documents and
+may have rank zero. See [PostgreSQL query parsing and ranking](https://www.postgresql.org/docs/18/textsearch-controls.html).
 
-```json
-{
-  "items": [{
-    "kind": "ARTICLE",
-    "id": "00000000-0000-0000-0000-000000000008",
-    "title": "Setup guide",
-    "snippet": "Follow these fictional setup instructions.",
-    "url": "/knowledge/setup-guide",
-    "rank": 0.0
-  }],
-  "page": 0,
-  "size": 20,
-  "totalElements": 1,
-  "totalPages": 1
-}
+Each hit remains exactly `{kind,id,title,snippet,url,rank}`, in the standard
+`{items,page,size,totalElements,totalPages}` envelope. Kind is ARTICLE or QUESTION.
+URLs are relative `/knowledge/{slug}` or `/questions/{id}`. Rank is a finite,
+nonnegative `ts_rank_cd` value, not a percentage or confidence score. Global order
+is rank descending, then ARTICLE before QUESTION, then PostgreSQL UUID ascending.
+The same UUID in different content kinds remains two distinct hits.
+
+Snippets remain bounded plain-text body prefixes, at most 240 UTF-16 units including
+an ellipsis, without splitting surrogate pairs. SQL projects at most 241 code
+points and Java applies the UTF-16 bound. A deep body match may be outside the
+prefix; snippets are neither match-centered nor highlighted. The UI renders titles
+and snippets as text and rejects malformed hits or unsafe/mismatched result URLs.
+
+## V9 vectors, indexes, and ranking
+
+V9 adds a STORED generated search_vector to question and knowledge_article:
+
+```sql
+setweight(to_tsvector('english'::regconfig, title), 'A') ||
+setweight(to_tsvector('english'::regconfig, body), 'B')
 ```
 
-Each hit is exactly `{kind,id,title,snippet,url,rank}`. Kind is ARTICLE or QUESTION;
-question URLs are `/questions/{id}`, article URLs `/knowledge/{slug}`. Rank is
-always zero for this baseline. Snippets contain at most 240 UTF-16 units, including
-a final ellipsis when truncated. A boundary never splits a surrogate pair. The
-database projects at most 241 body code points, then Java applies the UTF-16 bound.
-Titles and snippets are plain text; the UI renders neither as HTML.
+The migration computes vectors for existing V8 rows. Inserts and title/body edits
+maintain them automatically, including direct SQL updates; there is no application
+reindex call or trigger to forget. The explicit configuration makes vectors
+independent of the session default. This follows the generated-column approach in
+[PostgreSQL text-search tables and indexes](https://www.postgresql.org/docs/18/textsearch-tables.html).
 
-## Query and visibility design
+Stored vectors cost storage and write-time computation, but avoid reparsing each
+candidate document during reads. Generated columns keep this invariant in the
+schema, rather than in application callbacks or custom triggers. Adding stored
+columns and building indexes happens during normal Flyway startup; this migration
+is not an online/concurrent-index deployment. V1-V8 are unchanged. Hibernate does
+not map the derived column; PostgreSQL owns its value.
 
-SearchRepository uses bound JDBC parameters with `ILIKE ... ESCAPE '!'`. Escape
-`!` first, then `%` and `_`, before adding the enclosing substring wildcards.
-Quotes, backslashes, and other punctuation are literal bound data. These semantics
-follow [PostgreSQL 18 pattern matching](https://www.postgresql.org/docs/18/functions-matching.html).
+Partial GIN indexes cover VISIBLE questions and PUBLISHED articles. Visibility and
+publication changes automatically update index membership. Hidden/draft vectors
+still exist in private rows, but public predicates exclude them before counts,
+ranking, and pagination. GIN locates matching candidates; ranking and global sorting
+remain query work. `ts_rank_cd` uses title A weight 1.0 and body B weight 0.4. Controlled
+comparable fixtures rank titles above body-only matches; frequency/proximity can
+also affect the score, so not every title match must outrank every body match.
+Concatenated vector positions can allow phrases across the title/body boundary.
 
-One shared SQL expression selects PUBLISHED articles and VISIBLE questions and
-combines them with UNION ALL. Count and item queries use that same expression.
-The combined result is ordered by rank descending, explicit ARTICLE-before-QUESTION
-kind order, then PostgreSQL UUID ascending order. LIMIT/OFFSET apply to the combined
-set, as described in [PostgreSQL's combined-query rules](https://www.postgresql.org/docs/18/queries-union.html).
-The same UUID in two content kinds remains two distinct hits.
+## Visibility, consistency, and the browser
 
-SearchService wraps count and items in a read-only REPEATABLE_READ transaction.
-Archival or hiding that commits between the two statements cannot produce a
-mixed snapshot. The next search sees the committed change. Separate offset-page
-requests may shift when content changes; snapshot consistency is per response.
+One shared UNION ALL expression filters eligible questions/articles for both count
+and hits. Global LIMIT/OFFSET follows ranking and merge. SearchService retains its
+read-only REPEATABLE_READ transaction, so a hide/archive committing between count
+and items cannot create a mixed snapshot. Searches begun after commit see the new
+state. Pages across separate requests may shift as content changes.
 
-Hidden questions and draft/archived articles contribute no hit, snippet, or total.
-Visible questions on archived boards remain searchable. Replies, report reasons,
-resolution notes, moderation history, users, and article drafts are not search
-sources. Privacy predicates run before pagination, never as client-side filtering.
-No schema migration or index is introduced in Stage 8.
+Visible questions on archived boards remain eligible. Hidden questions, draft and
+archived articles, replies, report reasons, resolution notes, and audit records
+contribute no public hits, snippets, or totals. Bodies now participate in matching;
+this changes Stage 8 behavior but does not expand public eligibility.
 
-## Browser behavior and cache updates
-
-Search appears in the shared navigation from both community and knowledge pages.
 `/search?q=...&page=...` supports direct loading, refresh, and back/forward history.
-Submitting a new query resets page to zero; submitting the same query refreshes
-the first page. Invalid pages have first-page recovery. Blank, loading, no-match,
-unavailable, and validation states are explicit; retry does not clear the query.
+Submitting a new query resets page; the same query refreshes page zero. Blank,
+loading, no-match, invalid-page, failure, and retry states remain explicit. The form
+now explains English title/body matching and parser syntax instead of literal title
+matching. It has labelled controls, visible focus, and a wrapping mobile layout.
 
-Query keys contain normalized q and page. Requests consume AbortSignal; a late
-response from an obsolete query cannot replace the current query's results.
-Results refetch on navigation/focus, and errors hide stale result text. Successful
-question creation/editing, report resolution, content restoration, and article
-mutations invalidate the search prefix. The shared authentication provider also
-clears query caches when accounts change. Another browser's already-rendered
-content remains until it searches or refreshes; no remote erasure is claimed.
+Query keys include q/page and requests consume AbortSignal. Obsolete responses
+cannot overwrite newer results; failed refetches hide stale text. Navigation/focus
+refetches results. Existing question create/edit, moderation resolve/restore, and
+article mutations invalidate the search prefix. Authentication changes clear caches.
+Already-rendered text in another browser remains until a normal refresh/search;
+there is no remote erasure promise.
 
-The form has an explicit label, keyboard submission, focus styling, and a wrapping
-layout. The decoder rejects malformed hits, excessive snippets, nonfinite/negative
-ranks, unknown kinds, and external or mismatched result URLs.
+## Verification and measured query plans
 
-## Verification and query plans
+SearchIT covers body matching, comparable weighting, global mixed-kind rank/tie
+pagination, every-role public parity, private title/body exclusion, archived-board
+questions, phrases/OR/exclusion/punctuation/stemming, blank/stop words/no matches,
+input bounds, Unicode-safe snippets, committed edits and visibility changes, and
+snapshot consistency during concurrent archival. An isolated schema is migrated
+to V8, populated, and upgraded to V9 to prove backfill, vector maintenance, index
+creation, and repeatable migration. Fresh database tests now require V9.
 
-SearchIT tests the real HTTP API/PostgreSQL behavior: merged pages and UUID ties,
-role parity and private exclusion, archived-board eligibility, literal pattern
-characters and quotes, blank/invalid bounds, UTF-16 snippets, committed edits and
-visibility changes, and concurrent archival between count and items. Component
-tests cover text rendering, URLs/history, page reset, cancellation/late responses,
-error/retry states, validation, and safe response decoding. The browser journey
-uses real API fixtures and checks mixed pagination, private exclusion, deep links,
-literal punctuation, keyboard/mobile use, and publication/moderation refresh.
-See [milestone evidence](evidence/milestone-b.md) for actual runs and counts.
+The browser journey retains public paging and moderation/publication checks and
+adds a body-only article, cross-page relevance ordering, phrase matching, immediate
+live-body edits, stemming, and stop-word results. Component tests retain URL/history,
+validation, safe decoding, plain text, cancellation, and late-response coverage.
+See [milestone evidence](evidence/milestone-b.md) for actual test counts and status.
 
-`scripts/measure-title-search.sql` creates temporary tables shadowing the two
-source names within its psql session. It creates 2,000 article and 2,000 question
-fixtures, runs ANALYZE, and records EXPLAIN (ANALYZE, BUFFERS) for selective/broad
-count and first-page queries, then rolls back. Application rows and tables are
-untouched. These temporary fixtures intentionally have no indexes; results are a
-small measured baseline, not a production performance guarantee or an index
-comparison. Stage 9 needs separate measurements of its actual weighted query and
-GIN indexes on stated datasets.
+`scripts/measure-full-text-search.sql` creates 20,000 article and 20,000 question
+fixtures in temporary tables with the actual generated-vector expressions and
+partial GIN predicates, runs ANALYZE, and captures count/first-page plans before
+rolling back. Application data is untouched. Measured on local PostgreSQL 18.6 on
+2026-09-20:
 
-Measured on local PostgreSQL 18.6 on 2026-09-20, the selective query matched two
-rows: count execution 2.334 ms and hits 2.403 ms. The broad query matched 3,098
-rows: count 2.770 ms and first 20 hits 6.834 ms. Both scanned the temporary sources
-sequentially. The selective result used a 26 kB quicksort; the broad first page
-used a 42 kB top-N heapsort. Each query touched 668 local buffers. These are single
-warm local observations on index-free fixtures, not latency targets or evidence
-of an indexed production speedup. Full plans were recorded at
-`%TEMP%/commonbeacon-b-stage8-query-plans.log`.
+- `selectivebeacon`: two eligible hits. Count 0.139 ms; hits 0.258 ms. Both sources
+  used GIN bitmap index/heap scans; result sorting used 26 kB quicksort.
+- `common`: 30,998 eligible hits. Count 80.352 ms; first 20 hits 1,822.290 ms. The
+  planner chose sequential scans and a 42 kB top-N heapsort. Broad ranking remains
+  substantially more work; forcing index scans is not justified by this evidence.
 
-Run the rollback-only measurement against the local Compose database:
+These single local observations are not production latency targets. Stage 8 used
+4,000 index-free fixtures, so its times are not a controlled before/after speed
+comparison. The observed selective plans support retaining the partial GIN indexes.
+Full [captured plans](evidence/search-stage9-plans.txt) include query labels, rows,
+buffer activity, and timings; the repeatable script records the fixture definitions.
+Run with:
 
 ```powershell
-Get-Content -Raw scripts/measure-title-search.sql |
+Get-Content -Raw scripts/measure-full-text-search.sql |
   docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1'
 ```
 
+The historical title baseline remains reproducible with
+`scripts/measure-title-search.sql` and the Stage 8 evidence record. Current matching
+semantics are the Stage 9 semantics above.
+
 ## Java discussion checkpoint
 
-Trace URL input through bounded validation, JDBC parameter binding, typed record
-projection, the shared visibility predicate, snapshot transaction, and React query
-key. Explain why independent source pagination or removing private rows after
-paging breaks counts and page boundaries. Constant rank is a contract placeholder,
-not a relevance score. Personal explanation practice is separate from test results.
+Trace bounded URL input through JDBC binding, typed projection, weighted vectors,
+public predicates, snapshot transaction, and the React query key. Explain why GIN
+candidate lookup does not remove ranking/sorting costs, why broad queries can choose
+sequential scans, and why filtering private rows after pagination breaks totals.
+Personal explanation practice is separate from automated verification.

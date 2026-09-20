@@ -1,0 +1,142 @@
+BEGIN
+CREATE TABLE
+CREATE TABLE
+INSERT 0 20000
+INSERT 0 20000
+CREATE INDEX
+CREATE INDEX
+ANALYZE
+ANALYZE
+PREPARE
+PREPARE
+Selective: 2 eligible matches in 40000 fixture records
+ count
+-------
+     2
+(1 row)
+
+                                                                            QUERY PLAN
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=586.57..586.58 rows=1 width=8) (actual time=0.060..0.061 rows=1.00 loops=1)
+   Buffers: local hit=8
+   ->  Append  (cost=13.12..586.18 rows=155 width=0) (actual time=0.033..0.055 rows=2.00 loops=1)
+         Buffers: local hit=8
+         ->  Subquery Scan on "*SELECT* 1"  (cost=13.12..284.19 rows=75 width=0) (actual time=0.032..0.033 rows=1.00 loops=1)
+               Buffers: local hit=4
+               ->  Bitmap Heap Scan on knowledge_article  (cost=13.12..283.44 rows=75 width=148) (actual time=0.032..0.033 rows=1.00 loops=1)
+                     Recheck Cond: ((search_vector @@ '''selectivebeacon'''::tsquery) AND (status = 'PUBLISHED'::text))
+                     Heap Blocks: exact=1
+                     Buffers: local hit=4
+                     ->  Bitmap Index Scan on knowledge_article_search_vector_idx  (cost=0.00..13.10 rows=75 width=0) (actual time=0.012..0.012 rows=1.00 loops=1)
+                           Index Cond: (search_vector @@ '''selectivebeacon'''::tsquery)
+                           Index Searches: 1
+                           Buffers: local hit=3
+         ->  Subquery Scan on "*SELECT* 2"  (cost=13.16..301.22 rows=80 width=0) (actual time=0.020..0.020 rows=1.00 loops=1)
+               Buffers: local hit=4
+               ->  Bitmap Heap Scan on question  (cost=13.16..300.42 rows=80 width=148) (actual time=0.020..0.020 rows=1.00 loops=1)
+                     Recheck Cond: ((search_vector @@ '''selectivebeacon'''::tsquery) AND (visibility = 'VISIBLE'::text))
+                     Heap Blocks: exact=1
+                     Buffers: local hit=4
+                     ->  Bitmap Index Scan on question_search_vector_idx  (cost=0.00..13.14 rows=80 width=0) (actual time=0.008..0.008 rows=1.00 loops=1)
+                           Index Cond: (search_vector @@ '''selectivebeacon'''::tsquery)
+                           Index Searches: 1
+                           Buffers: local hit=3
+ Planning:
+   Buffers: local hit=2
+ Planning Time: 0.216 ms
+ Execution Time: 0.139 ms
+(28 rows)
+
+                                                                                         QUERY PLAN
+---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=592.26..592.31 rows=20 width=140) (actual time=0.175..0.176 rows=2.00 loops=1)
+   Buffers: shared hit=3, local hit=8
+   ->  Sort  (cost=592.26..592.65 rows=155 width=140) (actual time=0.174..0.175 rows=2.00 loops=1)
+         Sort Key: (ts_rank_cd(knowledge_article.search_vector, '''selectivebeacon'''::tsquery)) DESC, (CASE ('ARTICLE'::text) WHEN 'ARTICLE'::text THEN 0 ELSE 1 END), knowledge_article.id
+         Sort Method: quicksort  Memory: 26kB
+         Buffers: shared hit=3, local hit=8
+         ->  Result  (cost=13.12..588.13 rows=155 width=140) (actual time=0.071..0.124 rows=2.00 loops=1)
+               Buffers: local hit=8
+               ->  Append  (cost=13.12..586.20 rows=155 width=136) (actual time=0.069..0.122 rows=2.00 loops=1)
+                     Buffers: local hit=8
+                     ->  Bitmap Heap Scan on knowledge_article  (cost=13.12..284.00 rows=75 width=134) (actual time=0.069..0.069 rows=1.00 loops=1)
+                           Recheck Cond: ((search_vector @@ '''selectivebeacon'''::tsquery) AND (status = 'PUBLISHED'::text))
+                           Heap Blocks: exact=1
+                           Buffers: local hit=4
+                           ->  Bitmap Index Scan on knowledge_article_search_vector_idx  (cost=0.00..13.10 rows=75 width=0) (actual time=0.008..0.008 rows=1.00 loops=1)
+                                 Index Cond: (search_vector @@ '''selectivebeacon'''::tsquery)
+                                 Index Searches: 1
+                                 Buffers: local hit=3
+                     ->  Bitmap Heap Scan on question  (cost=13.16..301.42 rows=80 width=137) (actual time=0.052..0.052 rows=1.00 loops=1)
+                           Recheck Cond: ((search_vector @@ '''selectivebeacon'''::tsquery) AND (visibility = 'VISIBLE'::text))
+                           Heap Blocks: exact=1
+                           Buffers: local hit=4
+                           ->  Bitmap Index Scan on question_search_vector_idx  (cost=0.00..13.14 rows=80 width=0) (actual time=0.006..0.006 rows=1.00 loops=1)
+                                 Index Cond: (search_vector @@ '''selectivebeacon'''::tsquery)
+                                 Index Searches: 1
+                                 Buffers: local hit=3
+ Planning:
+   Buffers: shared hit=53, local hit=2
+ Planning Time: 0.729 ms
+ Execution Time: 0.258 ms
+(30 rows)
+
+Broad: 30998 eligible common-title matches in 40000 fixture records
+ count
+-------
+ 30998
+(1 row)
+
+                                                                  QUERY PLAN
+----------------------------------------------------------------------------------------------------------------------------------------------
+ Aggregate  (cost=9142.47..9142.48 rows=1 width=8) (actual time=80.268..80.272 rows=1.00 loops=1)
+   Buffers: local read=8000
+   ->  Append  (cost=0.00..9064.97 rows=30998 width=0) (actual time=0.033..76.794 rows=30998.00 loops=1)
+         Buffers: local read=8000
+         ->  Subquery Scan on "*SELECT* 1"  (cost=0.00..4449.99 rows=14999 width=0) (actual time=0.032..34.231 rows=14999.00 loops=1)
+               Buffers: local read=4000
+               ->  Seq Scan on knowledge_article  (cost=0.00..4300.00 rows=14999 width=148) (actual time=0.032..32.662 rows=14999.00 loops=1)
+                     Filter: ((search_vector @@ '''common'''::tsquery) AND (status = 'PUBLISHED'::text))
+                     Rows Removed by Filter: 5001
+                     Buffers: local read=4000
+         ->  Subquery Scan on "*SELECT* 2"  (cost=0.00..4459.99 rows=15999 width=0) (actual time=0.127..39.865 rows=15999.00 loops=1)
+               Buffers: local read=4000
+               ->  Seq Scan on question  (cost=0.00..4300.00 rows=15999 width=148) (actual time=0.126..38.254 rows=15999.00 loops=1)
+                     Filter: ((search_vector @@ '''common'''::tsquery) AND (visibility = 'VISIBLE'::text))
+                     Rows Removed by Filter: 4001
+                     Buffers: local read=4000
+ Planning:
+   Buffers: local read=2
+ Planning Time: 0.362 ms
+ Execution Time: 80.352 ms
+(20 rows)
+
+                                                                                     QUERY PLAN
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=10279.79..10279.84 rows=20 width=140) (actual time=1822.189..1822.193 rows=20.00 loops=1)
+   Buffers: local read=8000
+   ->  Sort  (cost=10279.79..10357.29 rows=30998 width=140) (actual time=1822.187..1822.189 rows=20.00 loops=1)
+         Sort Key: (ts_rank_cd(knowledge_article.search_vector, '''common'''::tsquery)) DESC, (CASE ('ARTICLE'::text) WHEN 'ARTICLE'::text THEN 0 ELSE 1 END), knowledge_article.id
+         Sort Method: top-N heapsort  Memory: 42kB
+         Buffers: local read=8000
+         ->  Result  (cost=0.00..9454.94 rows=30998 width=140) (actual time=0.123..1791.557 rows=30998.00 loops=1)
+               Buffers: local read=8000
+               ->  Append  (cost=0.00..9067.47 rows=30998 width=136) (actual time=0.120..1778.087 rows=30998.00 loops=1)
+                     Buffers: local read=8000
+                     ->  Seq Scan on knowledge_article  (cost=0.00..4412.49 rows=14999 width=134) (actual time=0.120..958.191 rows=14999.00 loops=1)
+                           Filter: ((search_vector @@ '''common'''::tsquery) AND (status = 'PUBLISHED'::text))
+                           Rows Removed by Filter: 5001
+                           Buffers: local read=4000
+                     ->  Seq Scan on question  (cost=0.00..4499.99 rows=15999 width=137) (actual time=0.081..813.868 rows=15999.00 loops=1)
+                           Filter: ((search_vector @@ '''common'''::tsquery) AND (visibility = 'VISIBLE'::text))
+                           Rows Removed by Filter: 4001
+                           Buffers: local read=4000
+ Planning:
+   Buffers: local read=2
+ Planning Time: 0.437 ms
+ Execution Time: 1822.290 ms
+(22 rows)
+
+DEALLOCATE
+DEALLOCATE
+ROLLBACK

@@ -28,6 +28,7 @@ class SearchIT {
     @LocalServerPort int port;
     @Autowired JdbcTemplate jdbc;
     @Autowired ObjectMapper json;
+    @Autowired javax.sql.DataSource dataSource;
     @MockitoSpyBean SearchRepository searches;
     HttpClient visitor;
     UUID author, board;
@@ -83,12 +84,12 @@ class SearchIT {
         assertThat(identities(page(q, 0, 3))).isEqualTo(identities(first));
         for (var hit : first.get("items")) {
             assertThat(hit.properties().stream().map(Map.Entry::getKey).toList()).containsExactlyInAnyOrder("kind", "id", "title", "snippet", "url", "rank");
-            assertThat(hit.get("rank").asDouble()).isZero();
+            assertThat(hit.get("rank").asDouble()).isPositive();
             assertThat(hit.get("url").asText()).isEqualTo(hit.get("kind").asText().equals("ARTICLE") ? "/knowledge/guide-" + hit.get("id").asText() : "/questions/" + hit.get("id").asText());
         }
     }
 
-    @Test void excludesPrivateContentRepliesAndBodyOnlyMatchesForEveryRole() throws Exception {
+    @Test void excludesPrivateContentAndRepliesButIncludesPublicBodiesForEveryRole() throws Exception {
         String q = token(), privateText = "Private text " + token();
         UUID visible = question(q + " public question", "Public question body", "VISIBLE");
         article(q + " public article", "Public article body", "PUBLISHED");
@@ -100,8 +101,9 @@ class SearchIT {
         jdbc.update("INSERT INTO reply(id,question_id,author_id,body) VALUES (?,?,?,?)", UUID.randomUUID(), visible, author, q + " reply only private marker");
         jdbc.update("INSERT INTO content_report(id,reporter_id,question_id,reason) VALUES (?,?,?,?)", UUID.randomUUID(), author, visible, q + " report only private marker");
         var expected = search(q);
-        assertThat(expected.get("totalElements").asLong()).isEqualTo(2);
-        assertThat(expected.toString()).doesNotContain(privateText, "body only", "reply only", "report only", "email", "version");
+        assertThat(expected.get("totalElements").asLong()).isEqualTo(4);
+        assertThat(expected.toString()).doesNotContain(privateText, "reply only", "report only", "email", "version");
+        assertThat(search(privateText).get("totalElements").asLong()).isZero();
         for (String email : List.of("alex.member@example.test", "morgan.moderator@example.test", "avery.admin@example.test")) {
             try (var actor = HttpClient.newBuilder().cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL)).build()) {
                 var csrfResponse = actor.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:" + port + "/api/v1/auth/csrf")).GET().build(), HttpResponse.BodyHandlers.ofString());
@@ -115,15 +117,33 @@ class SearchIT {
         }
     }
 
-    @Test void treatsPunctuationQuotesAndPatternCharactersLiterally() throws Exception {
-        for (String literal : List.of("%", "_", "!", "\\", "'", "\"", "' OR 1=1 --", "(a|b).*", "!?%_\\")) {
-            String q = token() + " " + literal;
-            article(q + " guide", "Literal article body", "PUBLISHED");
-            question(q + " question", "Literal question body", "VISIBLE");
-            article(q.replace(literal, "expanded") + " guide", "Decoy article body", "PUBLISHED");
-            assertThat(search(q).get("totalElements").asLong()).as(literal).isEqualTo(2);
-        }
+    @Test void parsesPhrasesAlternativesExclusionStemmingAndEmptyTokens() throws Exception {
+        String q = token();
+        article(q + " running fox", "A quiet fictional forest", "PUBLISHED");
+        question(q + " fox running", "A quiet fictional forest", "VISIBLE");
+        assertThat(search(q + " run").get("totalElements").asLong()).isEqualTo(2);
+        assertThat(search(q + " \"running fox\"").get("totalElements").asLong()).isEqualTo(1);
+        assertThat(search(q + " -fox").get("totalElements").asLong()).isZero();
+        assertThat(search(q + " OR " + token()).get("totalElements").asLong()).isEqualTo(2);
+        for (String punctuation : List.of("%", "_", "!", "\\", "'", "\"", "!?%_"))
+            assertThat(search(q + " " + punctuation).get("totalElements").asLong()).as(punctuation).isEqualTo(2);
+        for (String empty : List.of("the and of", "%_!", "\"\"", "...", "-the"))
+            assertThat(search(empty).get("totalElements").asLong()).as(empty).isZero();
         assertThat(search(token()).get("totalElements").asLong()).isZero();
+    }
+
+    @Test void ranksComparableTitleMatchesAboveBodyMatchesAcrossKinds() throws Exception {
+        String q = token();
+        UUID title = question(q + " guide", "Fictional content without the term", "VISIBLE");
+        UUID body = article("Unrelated guide title", q + " fictional content", "PUBLISHED");
+        var result = page(q, 0, 1);
+        assertThat(result.get("totalElements").asLong()).isEqualTo(2);
+        assertThat(identities(result)).containsExactly("QUESTION:" + title);
+        var second = page(q, 1, 1);
+        assertThat(identities(second)).containsExactly("ARTICLE:" + body);
+        assertThat(result.get("items").get(0).get("rank").asDouble()).isGreaterThan(second.get("items").get(0).get("rank").asDouble());
+        jdbc.update("UPDATE knowledge_article SET body=? WHERE id=?", "Completely replaced body text", body);
+        assertThat(search(q).get("totalElements").asLong()).isEqualTo(1);
     }
 
     @Test void boundsQueryAndPageEvenForBlankInput() throws Exception {
@@ -208,5 +228,26 @@ class SearchIT {
             } finally { release.countDown(); }
         } finally { org.mockito.Mockito.reset(searches); }
         assertThat(search(q).get("totalElements").asLong()).isZero();
+    }
+
+    @Test void migrationBackfillsVersionEightRowsAndMaintainsGeneratedVectors() {
+        String schema = "search_upgrade_" + UUID.randomUUID().toString().replace("-", "");
+        try {
+            org.flywaydb.core.Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).target("8").load().migrate();
+            jdbc.update("INSERT INTO " + schema + ".app_user SELECT * FROM public.app_user WHERE id=?", author);
+            jdbc.update("INSERT INTO " + schema + ".board SELECT * FROM public.board WHERE id=?", board);
+            UUID id = UUID.randomUUID();
+            jdbc.update("INSERT INTO " + schema + ".question(id,board_id,author_id,title,body) VALUES (?,?,?,?,?)", id, board, author, "Earlier milestone question", "Migrating fictional telescopes safely");
+            jdbc.update("INSERT INTO " + schema + ".knowledge_article(id,slug,title,body,status,author_id,published_at) VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)", id, "upgrade-guide", "Earlier article title", "Migrating fictional telescopes safely", "PUBLISHED", author);
+            var upgrade = org.flywaydb.core.Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).load();
+            assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
+            assertThat(upgrade.migrate().migrationsExecuted).isZero();
+            for (String table : List.of("question", "knowledge_article")) {
+                assertThat(jdbc.queryForObject("SELECT search_vector @@ websearch_to_tsquery('english','telescope') FROM " + schema + "." + table + " WHERE id=?", Boolean.class, id)).isTrue();
+                jdbc.update("UPDATE " + schema + "." + table + " SET body='Changed fictional microscopes safely' WHERE id=?", id);
+                assertThat(jdbc.queryForObject("SELECT search_vector @@ websearch_to_tsquery('english','microscope') AND NOT search_vector @@ websearch_to_tsquery('english','telescope') FROM " + schema + "." + table + " WHERE id=?", Boolean.class, id)).isTrue();
+            }
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM pg_indexes WHERE schemaname=? AND indexdef LIKE '%USING gin%'", Integer.class, schema)).isEqualTo(2);
+        } finally { jdbc.execute("DROP SCHEMA IF EXISTS " + schema + " CASCADE"); }
     }
 }
