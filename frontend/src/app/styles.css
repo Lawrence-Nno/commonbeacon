@@ -609,6 +609,7 @@ h1 em {
   }
   .sidebar nav {
     display: flex;
+    flex-wrap: wrap;
     margin-top: 17px;
     gap: 10px;
   }
@@ -1049,3 +1050,9 @@ a.board-card:hover {
 .accepted-answer h2 { margin-top: 0; }
 .question-filter { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-block: 1rem; }
 .question-filter select { font: inherit; padding: .5rem .75rem; border-radius: .5rem; }
+
+.article-form { min-width: 0; margin: 24px 0; }
+.article-form textarea { width: 100%; min-width: 0; box-sizing: border-box; resize: vertical; padding: 12px; border: 1px solid #aabbad; border-radius: 5px; font: inherit; }
+.article-form textarea:focus-visible { outline: 3px solid #a8782b; outline-offset: 2px; }
+.article-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 20px 0; }
+.article-actions p { flex-basis: 100%; }

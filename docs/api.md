@@ -123,4 +123,5 @@ parameters and invalid status/page values fail with 400.
 
 See [the knowledge contract](knowledge.md) for exact public/admin DTOs, limits,
 publication timestamp behavior, and a complete session-based walkthrough.
-Article screens are Stage 7 work.
+Article screens are available at `/knowledge`, `/knowledge/:slug`, and
+`/admin/articles`; see the [article UI walkthrough](knowledge.md#stage-7-screens-and-browser-walkthrough).

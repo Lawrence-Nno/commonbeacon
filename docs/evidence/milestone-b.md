@@ -5,9 +5,10 @@
 Stage 1 is complete: baseline verified and implementation contracts finalized on
 2026-09-19. Stage 2 report submission is committed/pushed as e846e13 and passed
 remote CI. Stage 5 is pushed as a35159d and passed remote CI. Stage 6 article APIs
-are implemented and passed full local backend/frontend verification and the
-container/browser regression suite.
-Stage 7 article screens and Stages 8-13 search, summary, and later work remain planned.
+are pushed as b0db30b and passed remote CI run 35505191732. Stage 7 article screens
+are implemented and locally verified on 2026-09-20: 103 backend tests, 103 frontend
+tests, lint/type checking/build, and eight browser tests passed. Stage 7 remains
+uncommitted and has not run remotely. Stages 8-13 remain planned.
 
 Baseline revision: `2d33c96de62b6feda06a4b32366e300844f7ff4a`.
 Verification used the existing workspace with documentation changes, not a new
@@ -623,4 +624,88 @@ Log: `%TEMP%/commonbeacon-b-stage6-startup.log`.
 Ignored plans mark Stage 6 complete locally and identify Stage 7 article
 administration/public pages as next. Unrelated interview-preparation edits are
 preserved; no .env credentials or development content were changed.
-Stage 6 remains uncommitted and has not run remotely.
+At that handoff Stage 6 was uncommitted and had not run remotely. Its subsequent
+commit/push is recorded below.
+
+## Stage 6 commit/push
+
+Committed and pushed `b0db30be8cecf5ce08155db79d12650d43eec43e`. All jobs passed in
+[run 35505191732](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35505191732),
+inspected on 2026-09-20. Local plans and docs/interview-preparation remain ignored;
+interview preparation has no tracked files.
+
+## Stage 7 implementation: 2026-09-20
+
+Added public Knowledge navigation, `/knowledge` pagination, and `/knowledge/:slug`
+with title, author, publication/update timestamps, and plain-text body. Invalid
+page, empty, loading, not-found, and retry states are explicit. Errors hide stale
+public content; focus/navigation refetches allow archived content to disappear.
+There is no cross-browser real-time removal promise.
+
+Added administrator article list/status filters, `/admin/articles/new`, and
+`/admin/articles/:articleId`. The editor creates drafts, saves title/body, publishes,
+and archives using the existing Stage 6 API. Slug is immutable after creation.
+Published editors warn that saves are immediately public. Unsaved edits disable
+lifecycle buttons; successful responses confirm changes before showing new state.
+Archived records are read-only and cannot be republished.
+
+Validation failures keep form content. Conflicting or uncertain existing-record
+writes block resubmission until Load latest article, explicit review, and Use
+server copy or Keep my draft after review. The next save carries the reviewed
+version. Archived server copies offer no keep-draft write path. No mutation is
+automatically retried. Successful writes invalidate private/public article caches
+and reserved search/moderation prefixes. Actor-keyed private editors unmount on
+logout, expiry, or account changes; reads consume abort signals and late writes
+cannot restore cached/form data or navigate after unmount.
+
+Added 18 component cases (100 initial frontend tests, then 103 after three further
+acceptance cases), covering role gates, filters/pages, trimmed creation, immutable
+slug, validation, conflict/server-error draft recovery, reviewed versions,
+publication confirmation, invalidation, live-edit warning, terminal archival,
+cancelled/late private reads, late saves after expiry, plain text, empty/error and
+decoder behavior, archived-copy reconciliation, public pagination, and removal of
+previously displayed public text after a 404 refetch.
+
+Added one real browser journey with independent administrator, moderator, member,
+and visitor contexts. It covers draft creation/editing, private URL/API denial,
+publication, live editing, a two-tab stale conflict and explicit reconciliation,
+archival and public disappearance, status filtering, logout/account switching,
+SPA deep-link refresh, mobile width, and keyboard form submission. It uses the
+existing login rate limiter and respects Retry-After when needed.
+
+The first verification run passed **5 Java unit + 98 integration tests (103 backend
+total)**, then stopped on a TypeScript fixture whose nullable publication time
+had been inferred too narrowly. Explicit AdminArticle fixture types resolved it.
+An invalidation assertion then exposed the test client's zero cache-retention
+setting; retaining that inactive fixture cache made the intended assertion valid.
+Neither correction changed production API behavior. The first browser run passed
+seven existing journeys but detected horizontal overflow in the expanded mobile
+administrator navigation. Adding flex-wrap to mobile navigation fixed the actual
+layout defect. The configured RCA instruction file remains absent.
+
+Final frontend lint, type checking, **103 tests**, and production build all exited
+0. Backend source and migrations are unchanged since the successful backend run.
+Final full isolated browser suite exited 0: **8 passed (1.5m)**. Inspected
+`article-editor-mobile.png` and `article-public-desktop.png` in the ignored
+`frontend/test-results/zz-knowledge-administrator-042fe-while-other-roles-only-read/`
+directory: mobile navigation wraps, labels and focus are visible, and public text
+is readable. The disposable PostgreSQL tmpfs stack and its network were removed;
+project-label queries returned no leftovers.
+
+Logs: `%TEMP%/commonbeacon-b-stage7-verify.log` (successful backend, initial frontend
+type failure), `%TEMP%/commonbeacon-b-stage7-frontend-final.log` (103 frontend tests),
+`%TEMP%/commonbeacon-b-stage7-browser.log` (initial overflow), and
+`%TEMP%/commonbeacon-b-stage7-browser-final.log` (passing rerun).
+
+Rebuilt the development app with `docker compose up -d --build --wait
+--wait-timeout 180`, preserving the database volume and .env. All three services
+are healthy. `/knowledge`, a knowledge detail deep link, `/admin/articles`, and
+`/admin/articles/new` return SPA HTML 200 at port 8081. The public article API
+returns 200 and anonymous administrator API access returns 401. No article demo
+records were inserted into the development database. Startup log:
+`%TEMP%/commonbeacon-b-stage7-startup.log`.
+
+README, article/API documentation, this evidence, and ignored local plans record
+Stage 7. Existing interview-preparation documentation edits remain preserved.
+Stage 7 remains uncommitted and has not run remotely. Next: Stage 8 bounded title
+search. Search, summary, and later milestone work remain planned.

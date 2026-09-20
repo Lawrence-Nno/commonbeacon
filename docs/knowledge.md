@@ -1,7 +1,7 @@
 # Milestone B knowledge and search contracts
 
-Status: Stage 6 article lifecycle and public read APIs are implemented locally on
-2026-09-19. Article UI remains Stage 7; search remains Stages 8-9. See
+Status: Stage 6 article lifecycle/public APIs and Stage 7 article screens are
+implemented locally as of 2026-09-20. Search remains Stages 8-9. See
 [Milestone B evidence](evidence/milestone-b.md) for verification and commit status.
 The detailed search implementation notes will become `docs/search.md` in Stage 8.
 
@@ -195,6 +195,54 @@ Using the session and fresh CSRF flow in [the API reference](api.md):
    Expect ARCHIVED/version 3; public detail returns 404 and public totals exclude it.
 
 Replace example versions with the version actually reviewed. A lost response or
-409 requires a reload before deciding whether to submit again. These are API
-workflows; no `/knowledge` or article editor screen is added until Stage 7. JSON
-bodies are plain text, including literal markup; Stage 7 must render them as text.
+409 requires a reload before deciding whether to submit again. JSON bodies are
+plain text, including literal markup; the article screens render them as text.
+
+## Stage 7 screens and browser walkthrough
+
+Public navigation includes Knowledge. `/knowledge?page=0` lists published guides
+in pages of 20; `/knowledge/:slug` shows title, original author, publication time,
+last update, and plain-text body. Empty, invalid-page, loading, unavailable, and
+not-found states are explicit. Public queries refresh on navigation/focus and
+discard displayed content on failed reads, including 404 after archival. Other
+browsers already showing content do not receive real-time removal notifications.
+
+Administrators have Manage articles navigation. `/admin/articles` supports all,
+DRAFT, PUBLISHED, and ARCHIVED filters with URL-backed pagination. Create article
+opens `/admin/articles/new`; saved records open `/admin/articles/:articleId`.
+Visitors, members, and moderators cannot load private editor queries. Backend
+authorization remains authoritative.
+
+1. Sign in as an administrator and choose Manage articles, then Create article.
+   Enter a unique lowercase hyphenated slug, title, and plain-text body. Create
+   draft saves a private record and makes the slug read-only.
+2. Edit and save the draft. Publish article is enabled only after edits are saved.
+   Open its public URL in a separate visitor session to verify publication.
+3. The published editor warns that saving changes updates the public article
+   immediately. There is no unpublished working revision of a published article.
+4. Open the editor in two tabs. Save one, then submit the other to see the stale
+   version conflict. The second tab preserves its text and blocks further writes.
+   Load latest article displays the current server title, body, and status beside
+   the form. Choose Use server copy or Keep my draft after review, then explicitly
+   submit again. An archived server copy cannot be reconciled into another write.
+5. Archive article removes public availability and makes the editor read-only.
+   Archival is terminal. Public draft/archived URLs return the same not-found view.
+
+Validation failures preserve form content for correction. Network, server, and
+conflict failures on existing records require explicit reload/reconciliation;
+mutations never retry automatically. Failed creation keeps its fields for a
+manual retry; the globally unique slug prevents duplicate creation if the first
+request committed but its response was lost.
+
+Successful mutations invalidate administrator lists/details, public article
+queries, and the reserved search/moderation query prefixes for future views.
+Private queries include the actor ID and consume cancellation signals. Logout,
+expiry, and account changes use the shared authentication cache cancellation and
+clear operation; actor-keyed editors unmount, clearing draft state. Late mutation
+responses cannot update caches, form state, or navigation after unmount. Drafts
+are held in memory only; leaving or reloading the editor discards unsaved changes.
+
+Forms use labelled inputs, native keyboard controls, visible focus, wrapped action
+buttons, and a responsive textarea. The browser suite exercises the lifecycle,
+two-tab reconciliation, role boundaries, SPA deep links, keyboard submission,
+mobile layout, and logout/account switching against the real API.

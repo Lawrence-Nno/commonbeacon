@@ -7,8 +7,9 @@ Milestone A implements accounts, boards, questions, replies, accepted solutions,
 owner/role permissions, conflict handling, and repeatable tests. Milestone B adds
 member reporting, a protected moderator queue, atomic report resolution, and
 content hiding/restoration with private audit history. Administrator knowledge-article
-APIs support drafts, publication, live edits, and archival; article screens are
-planned for Stage 7. See the milestone evidence
+APIs and screens support drafts, publication, live edits, and archival. Browse
+published guides at `/knowledge`; administrators manage them at `/admin/articles`.
+See the milestone evidence
 for local verification and remote CI status.
 
 ## Start from a fresh checkout
@@ -71,7 +72,7 @@ With opt-in demo seeding, all four initially use DEMO_PASSWORD:
 - alex.member@example.test — member.
 - sam.member@example.test — member.
 - morgan.moderator@example.test — member capabilities, report review, resolution, hiding/restoration, and audit history.
-- avery.admin@example.test — board administration and knowledge-article lifecycle APIs.
+- avery.admin@example.test — board administration and article creation, editing, publication, and archival through Manage articles.
 
 Getting started contains two fictional conversations: one solved and one
 unanswered. Reseeding preserves edits, credentials, and solution choices.
@@ -85,7 +86,7 @@ unanswered. Reseeding preserves edits, credentials, and solution choices.
 - [Architecture decisions and Java learning notes](docs/architecture.md)
 - [Milestone evidence, demo script, and limitations](docs/evidence/milestone-a.md)
 - [Reporting and moderator review](docs/moderation.md), [Milestone B evidence](docs/evidence/milestone-b.md)
-- [Knowledge-article APIs and search contracts](docs/knowledge.md)
+- [Knowledge-article screens, APIs, and search contracts](docs/knowledge.md)
 - [Authentication](docs/authentication.md), [boards](docs/boards.md),
   [questions](docs/questions.md), [replies](docs/replies.md), [solutions](docs/accepted-solutions.md)
 

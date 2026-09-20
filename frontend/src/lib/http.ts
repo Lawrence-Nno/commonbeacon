@@ -43,6 +43,8 @@ export async function getJson<T>(
           path === "/api/v1/boards" ||
           path === "/api/v1/reports" ||
           path.startsWith("/api/v1/moderation/") ||
+          path.startsWith("/api/v1/admin/articles") ||
+          path.startsWith("/api/v1/articles") ||
           path.startsWith("/api/v1/boards/") ||
           path.startsWith("/api/v1/questions/") ||
           path.startsWith("/api/v1/replies/")) &&
