@@ -954,5 +954,114 @@ data. Log: `%TEMP%/commonbeacon-b-stage10-startup.log`.
 
 README, moderation/API documentation, this evidence, the captured plan, and ignored
 local plans now record Stage 10. Interview-preparation files remain ignored and
-pre-existing unrelated documentation edits are preserved. Stage 10 is uncommitted
-and has not run remotely. Next: Stage 11 fictional demo data and the integrated journey.
+pre-existing unrelated documentation edits are preserved. Stage 10 was subsequently
+pushed as `5d12e61`. [CI run 35524230843](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35524230843)
+failed in the overview browser test: it navigated immediately after clicking Sign
+out, before waiting for logout completion. Stage 11 adds the missing wait for the
+signed-out heading before navigation; remote verification of that fix requires
+a later push. Next: Stage 11 fictional demo data and the integrated journey.
+
+## Stage 11 - fictional operations data and integrated journey (2026-09-20)
+
+Extended the local, explicitly enabled seeder with two articles (published/draft)
+and two Product help questions: one OPEN question report, and one HIDDEN reply
+with a RESOLVED/HIDE report and matching actor/reason/timestamp audit entry.
+Stable IDs and fixed timestamps keep the examples deterministic. Article inserts
+preserve existing ID/slug owners; the newly inserted question gates each whole
+moderation bundle. All changes participate in the existing startup transaction.
+No migration, new board, credential reset, or replayed moderation action is added.
+
+Added `DemoOperationsIT` with two real-PostgreSQL tests. Initial-state checks cover
+report statuses, hidden visibility, coherent report/audit times and actors, draft
+publication rules, and generated search vectors. Full row snapshots before/after
+two reseeds are equal, both initially and after changes to credentials, article
+body/status, report resolution, reply restoration/audit, and question acceptance.
+Existing unit coverage still verifies opt-in/local profile, production exclusion,
+and invalid-password failure before any writes.
+
+`scripts/verify.ps1` passed: **118 backend tests (5 unit + 113 integration), 127
+frontend tests**, ESLint, TypeScript, and production build. No skips/failures.
+Log: `%TEMP%/commonbeacon-b-stage11-verify.log`.
+
+Expanded the report browser journey with overview deltas through acceptance,
+reply hide/restore, and parent hide/restore; added stale moderator-tab rejection,
+retained note, disabled resubmission, and explicit context reload. Report lookup
+uses its fixture target IDs and no longer assumes an empty seeded resolved queue.
+Expanded the article journey with draft/published/archive overview deltas,
+body search before/after live changes, failed-save draft preservation and explicit
+reconciliation, and 2,000-character unbroken mobile content. Existing duplicate,
+unauthorized, stale article, session expiry, account-switch, keyboard, backend
+outage, and original ask/reply/accept coverage remains in the full suite.
+
+The complete isolated browser suite passed **10 tests (2.6m)**. After correcting
+the Stage 10 logout/navigation race, a fresh isolated run of only
+`e2e/zzzz-summary.spec.ts` passed **1 test (5.2s)**; lint/type checking also passed
+after that final edit. Logs: `%TEMP%/commonbeacon-b-stage11-browser.log` and
+`%TEMP%/commonbeacon-b-stage11-logout.log`. Both disposable stacks cleaned up;
+project-label checks found no remaining containers or networks.
+
+Inspected the long article mobile screenshot and the desktop restoration history:
+unbroken text wraps inside the viewport, literal markup stays text, and the
+separate hide/restore records are readable. Full-suite artifacts were preserved
+before the targeted rerun at `%TEMP%/commonbeacon-b-stage11-full-browser-artifacts`.
+The targeted run's artifacts remain under ignored `frontend/test-results`.
+
+Rebuilt the development stack and verified all three services healthy at port
+8081, still on schema V9. Compared fingerprints of all 21 pre-existing rows across
+accounts, boards, questions, replies, reports, audit history, and articles: every
+row remained unchanged. Exactly eight intended seed rows were added: two questions,
+one reply, two reports, one audit action, and two articles. Public board listing
+still contains only Getting started, Product help, and the pre-existing Compose
+verification board; the nine previously removed random browser-test boards remain
+absent. The public knowledge list contains the new published guide. Startup log:
+`%TEMP%/commonbeacon-b-stage11-startup.log`.
+
+Added the fictional demo walkthrough and updated README, browser verification docs,
+this evidence, and ignored local plans. Stage 11 remains uncommitted and has not
+run remotely; the Stage 10 CI logout fix awaits the next push. Existing unrelated
+interview links remain preserved and personal preparation files remain ignored.
+Next: Stage 12 migration-upgrade, persistence/restart, container, and CI verification.
+
+### Requested onboarding-content expansion (2026-09-20)
+
+Added a curated nine-lesson catalog at `backend/src/main/resources/demo/onboarding.json`.
+Getting started, Product help, and Using CommonBeacon each have three practical
+questions with one accepted explanation and four explicitly labeled misconceptions,
+each followed by a correction. The lessons cover registration, first steps,
+question writing, reports, acceptance, restoration, sessions/saved work, search,
+and archived boards. There are 45 visible replies; the prior hidden moderation
+reply remains private. Updated the About-page availability copy and walkthrough.
+
+The transactional opt-in seeder expands untouched known examples once, using
+deterministic lesson/reply IDs and a completed-bundle marker. Later lesson edits,
+acceptance changes, and visibility choices remain untouched. The original
+persistence-verification board and conversation are adopted into Using CommonBeacon
+without changing their IDs or creating a fourth board. Existing prior edits are
+guarded by versions; the wording cleanup is restricted to original seed IDs/text.
+No migration or change to credentials was introduced.
+
+The first regression run executed 5 unit and 115 integration tests; 119 passed,
+and the new legacy-board conversion test caught an invalid board `updated_at`
+reference. Boards have no such column. Removed that assignment, then reran all
+four DemoOperationsIT cases successfully (plus all 5 unit tests). Those cases cover
+exact 9/45 counts and accepted content, conversion without duplicates, and repeated
+seeding preservation. Frontend lint/type checking/build and **127 tests passed**.
+Logs: `%TEMP%/commonbeacon-onboarding-verify.log`,
+`%TEMP%/commonbeacon-onboarding-seeder-recheck.log`, and
+`%TEMP%/commonbeacon-onboarding-frontend.log`.
+
+Rebuilt the local app and checked every lesson through its public APIs: exactly
+three boards, three questions per board, five visible replies per question, four
+labeled misconceptions, and nine accepted answers. The prior persistence board is
+now Using CommonBeacon. No removed random browser-test boards were recreated.
+Inspected the onboarding mobile screenshot: explanations wrap within the viewport,
+the accepted panel is distinct, and alternative answers include explicit corrections.
+Startup log: `%TEMP%/commonbeacon-onboarding-startup.log`.
+
+The complete isolated browser suite passed **11 tests (2.6m)**, including the new
+onboarding journey and all existing lifecycle/privacy tests. The test runner
+removed its disposable containers/network. Log:
+`%TEMP%/commonbeacon-onboarding-browser.log`. A final live database text check found
+zero occurrences of the unwanted wording across boards, questions, replies,
+articles, reports, and moderation history. This content expansion and the prior
+Stage 11 changes remain uncommitted; remote verification is pending a later push.

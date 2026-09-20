@@ -69,6 +69,8 @@ test("operators see exact overview changes and private cards disappear on sign o
     await region.getByRole("link", { name: "Review open reports" }).click();
     await expect(mod).toHaveURL(/status=OPEN&page=0/);
     await mod.getByRole("button", { name: "Sign out" }).click();
+    // Wait for server-confirmed logout before navigation can cancel its request.
+    await expect(mod.getByRole("heading", { name: "Sign in to review reports." })).toBeVisible();
     await mod.goto(origin + "/moderation");
     await expect(mod.getByRole("heading", { name: "Sign in to review reports." })).toBeVisible();
     await expect(region).toHaveCount(0);

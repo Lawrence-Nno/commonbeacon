@@ -77,8 +77,13 @@ With opt-in demo seeding, all four initially use DEMO_PASSWORD:
 - morgan.moderator@example.test — member capabilities, report review, resolution, hiding/restoration, and audit history.
 - avery.admin@example.test — board administration and article creation, editing, publication, and archival through Manage articles.
 
-Getting started contains two fictional conversations: one solved and one
-unanswered. Reseeding preserves edits, credentials, and solution choices.
+Getting started, Product help, and Using CommonBeacon each contain three practical
+onboarding questions. Each question has five visible answers: one accepted
+explanation and four clearly labeled misconceptions with corrections (nine
+questions and 45 visible answers in total). Private moderation examples and the
+published/draft knowledge articles remain available for operator practice.
+Reseeding preserves later edits, credentials, selections, and moderation decisions.
+See the [onboarding walkthrough](docs/demo-walkthrough.md).
 
 ## Documentation
 

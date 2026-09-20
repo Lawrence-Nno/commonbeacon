@@ -200,6 +200,6 @@ class BoardIT {
         assertThat(jdbc.queryForObject("SELECT accepted_reply_id FROM question WHERE id=?", UUID.class, questionId)).isNull();
         assertThat(jdbc.queryForObject("SELECT body FROM reply WHERE id=?", String.class, replyId)).isEqualTo("Edited fictional answer");
         assertThat(jdbc.queryForObject("SELECT visibility FROM reply WHERE id=?", String.class, replyId)).isEqualTo("HIDDEN");
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM reply WHERE question_id=?", Integer.class, questionId)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM reply WHERE question_id=?", Integer.class, questionId)).isEqualTo(5);
     }
 }

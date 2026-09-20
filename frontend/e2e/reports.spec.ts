@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 
 test("members report archived questions and replies without publishing private reasons", async ({ browser }, testInfo) => {
-  test.setTimeout(150_000);
+  test.setTimeout(210_000);
   const origin = "http://127.0.0.1:4173";
   const member = await browser.newContext();
   const admin = await browser.newContext();
@@ -36,6 +36,13 @@ test("members report archived questions and replies without publishing private r
     const page = await member.newPage(); const adminPage = await admin.newPage();
     await login(page, "alex.member@example.test");
     await login(adminPage, "avery.admin@example.test");
+    const baseline = await (await adminPage.request.get(origin + "/api/v1/moderation/summary")).json();
+    async function overview(actor: Page, unanswered: number, open: number) {
+      await actor.goto(origin + "/moderation");
+      await expect(actor.getByRole("region", { name: "Operational summary" }).locator("dd")).toHaveText([
+        String(baseline.unansweredQuestions + unanswered), String(baseline.openReports + open), String(baseline.publishedArticles),
+      ]);
+    }
     const boardResponse = await mutation(adminPage, "/api/v1/boards", {
       name: "Report test", slug: "report-" + randomUUID(), description: "Fictional reporting test board.",
     });
@@ -92,7 +99,7 @@ test("members report archived questions and replies without publishing private r
     await adminPage.goto(origin + "/moderation");
     await expect(adminPage.getByText("Private fictional question concern")).toBeVisible();
     await adminPage.getByLabel("Report status").selectOption("RESOLVED");
-    await expect(adminPage.getByText("No reports with this status.")).toBeVisible();
+    await expect(adminPage.getByText("Private fictional question concern")).toHaveCount(0);
     const reviewPage = await moderator.newPage();
     await login(reviewPage, "morgan.moderator@example.test");
     await reviewPage.getByRole("link", { name: "Report review", exact: true }).click();
@@ -100,10 +107,10 @@ test("members report archived questions and replies without publishing private r
     await reviewPage.setViewportSize({ width: 390, height: 844 });
     await reviewPage.getByLabel("Report status").focus();
     await reviewPage.keyboard.press("Tab");
-    await expect(reviewPage.getByRole("link", { name: "Review question report" })).toBeFocused();
+    await expect(reviewPage.getByRole("link", { name: "Review question report" }).first()).toBeFocused();
     await reviewPage.screenshot({ path: testInfo.outputPath("moderation-mobile.png"), fullPage: true });
     expect(await reviewPage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    await reviewPage.getByRole("link", { name: "Review reply report" }).click();
+    await reviewPage.goto(origin + "/moderation/reports/" + reportedReply.id);
     await expect(reviewPage.getByRole("heading", { name: "Reported reply", exact: true })).toBeVisible();
     await expect(reviewPage.getByText("Private fictional reply concern")).toBeVisible();
     await expect(reviewPage.getByText("Board: Report test (archived)")).toBeVisible();
@@ -112,6 +119,11 @@ test("members report archived questions and replies without publishing private r
     await expect(reviewPage.getByText("Private fictional reply concern")).toBeVisible();
     await reviewPage.setViewportSize({ width: 1280, height: 900 });
     await reviewPage.screenshot({ path: testInfo.outputPath("moderation-detail-desktop.png"), fullPage: true });
+    const stale = await moderator.newPage();
+    await stale.goto(reviewPage.url());
+    await stale.getByLabel("Decision", { exact: true }).selectOption("HIDE");
+    await stale.getByLabel("Resolution note").fill("Keep this stale review note");
+    await overview(adminPage, 0, 2);
     await reviewPage.getByLabel("Decision", { exact: true }).selectOption("HIDE");
     await reviewPage.getByLabel("Resolution note").fill("Reviewed fictional unsafe reply");
     await reviewPage.setViewportSize({ width: 390, height: 844 });
@@ -123,6 +135,14 @@ test("members report archived questions and replies without publishing private r
     await expect(reviewPage.getByText("Resolved report", { exact: true })).toBeVisible();
     await expect(reviewPage.getByText("Reviewed fictional unsafe reply")).toBeVisible();
     expect((await publicPage.request.get(origin + `/api/v1/replies/${reply.id}`)).status()).toBe(404);
+    await stale.getByRole("button", { name: "Resolve report", exact: true }).click();
+    await expect(stale.getByText(/Your note is preserved/)).toBeVisible();
+    await expect(stale.getByLabel("Resolution note")).toHaveValue("Keep this stale review note");
+    await expect(stale.getByRole("button", { name: "Resolve report", exact: true })).toBeDisabled();
+    await stale.getByRole("button", { name: "Reload report context" }).click();
+    await expect(stale.getByText("Resolved report", { exact: true })).toBeVisible();
+    await stale.close();
+    await overview(adminPage, 1, 1);
     const updatedQuestion = await (await publicPage.request.get(origin + `/api/v1/questions/${question.id}`)).json();
     expect(updatedQuestion.acceptedReply).toBeNull();
     expect(updatedQuestion.solved).toBe(false);
@@ -151,16 +171,19 @@ test("members report archived questions and replies without publishing private r
     const restoredQuestion = await (await publicPage.request.get(origin + `/api/v1/questions/${question.id}`)).json();
     expect(restoredQuestion.acceptedReply).toBeNull();
     expect(restoredQuestion.solved).toBe(false);
+    await overview(adminPage, 1, 1);
     await reviewPage.reload();
     await expect(reviewPage.getByText("Restored by Morgan Vale")).toBeVisible();
     await reviewPage.setViewportSize({ width: 1280, height: 900 });
     await reviewPage.screenshot({ path: testInfo.outputPath("restoration-history-desktop.png"), fullPage: true });
     await reviewPage.goto(origin + "/moderation");
-    await reviewPage.getByRole("link", { name: "Review question report" }).click();
+    const reportedQuestion = queue.items.find((item: { targetId: string }) => item.targetId === question.id);
+    await reviewPage.goto(origin + "/moderation/reports/" + reportedQuestion.id);
     await reviewPage.getByLabel("Decision", { exact: true }).selectOption("HIDE");
     await reviewPage.getByLabel("Resolution note").fill("Review parent question visibility separately");
     await reviewPage.getByRole("button", { name: "Resolve report", exact: true }).click();
     await expect(reviewPage.getByText("Resolved report", { exact: true })).toBeVisible();
+    await overview(adminPage, 0, 0);
     await reviewPage.goto(origin + "/moderation/replies/" + reply.id);
     await expect(reviewPage.getByText(/hidden question keeps it private/)).toBeVisible();
     await expect(reviewPage.getByRole("button", { name: "Restore content", exact: true })).toHaveCount(0);
@@ -170,6 +193,7 @@ test("members report archived questions and replies without publishing private r
     await reviewPage.getByRole("button", { name: "Restore content", exact: true }).click();
     await expect(reviewPage.getByText(/No restoration is needed/)).toBeVisible();
     expect((await publicPage.request.get(origin + `/api/v1/replies/${reply.id}`)).status()).toBe(200);
+    await overview(adminPage, 1, 0);
     await reviewPage.goto(reviewUrl);
     await expect(reviewPage.getByText("Resolved report", { exact: true })).toBeVisible();
     await reviewPage.getByRole("button", { name: "Sign out", exact: true }).click();

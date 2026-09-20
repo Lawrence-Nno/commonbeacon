@@ -1,0 +1,119 @@
+[
+  {
+    "key": "first-steps",
+    "boardSlug": "getting-started",
+    "title": "Where should I start in CommonBeacon?",
+    "body": "I have just arrived. What can I read before signing in, and how do I join a conversation? This learning discussion includes one accepted explanation and four labeled misconceptions with corrections.",
+    "answer": "Start by browsing a board or the Knowledge library. Visitors can read visible questions, replies, accepted answers, and published guides, and can use Search. Register or sign in when you want to ask a question, reply, or report content. Open a relevant active board and choose Ask a question. The accepted answer identifies the reply selected by the question owner.",
+    "misconceptions": [
+      "Common misconception (incorrect): You must register before you can read any question.\n\nWhy this is wrong: Public questions and published guides can be read without an account; signing in is required for contributions.",
+      "Common misconception (incorrect): The Knowledge library is where every member posts a new question.\n\nWhy this is wrong: Questions belong in community boards. Administrators manage knowledge articles.",
+      "Common misconception (incorrect): An account gives you permission to edit any answer you find.\n\nWhy this is wrong: Members can edit their own replies, subject to visibility and board restrictions; another person's reply is not yours to edit.",
+      "Common misconception (incorrect): You should post the same question in every board to get attention.\n\nWhy this is wrong: Choose the most relevant board, search first, and write one clear question so the discussion stays together."
+    ]
+  },
+  {
+    "key": "helpful-question",
+    "boardSlug": "getting-started",
+    "title": "How do I write a question that is easy to answer?",
+    "body": "I need help with a feature. What should I include, and how do I submit the question? This learning discussion includes one accepted explanation and four labeled misconceptions with corrections.",
+    "answer": "Sign in, open an active board, and choose Ask a question. Use a specific title, then describe your goal, the steps you tried, what you expected, and what happened. Include relevant error text after removing passwords and personal details. Submit the form and check that the saved question appears. Content is plain text, so write clear sentences rather than relying on HTML formatting.",
+    "misconceptions": [
+      "Common misconception (incorrect): A title such as Help!!! gives responders all the context they need.\n\nWhy this is wrong: A specific title helps people decide whether they can answer and helps others find the discussion.",
+      "Common misconception (incorrect): Include your password so another member can reproduce the problem.\n\nWhy this is wrong: Never post credentials. Describe the steps and a sanitized error message instead.",
+      "Common misconception (incorrect): HTML tags will create formatted instructions and embedded controls.\n\nWhy this is wrong: Question and reply content is rendered as plain text; tags are displayed as text.",
+      "Common misconception (incorrect): If submission fails, keep clicking until several copies appear.\n\nWhy this is wrong: Read the error and check whether the question was saved before retrying. Keep your draft and resolve validation or connection problems."
+    ]
+  },
+  {
+    "key": "account-access",
+    "boardSlug": "getting-started",
+    "title": "How do I create an account and sign in again later?",
+    "body": "I want to ask my first question. What account information do I need, and what permissions will I have? This learning discussion includes one accepted explanation and four labeled misconceptions with corrections.",
+    "answer": "Choose Join the community and enter your display name, email address, and a password that meets the form requirements. After registration, sign in with that email and password. New registrations are members: you can contribute on active boards and report content, but you do not receive administrator or moderator privileges. If a session expires, sign in again; your saved contributions remain.",
+    "misconceptions": [
+      "Common misconception (incorrect): My display name is the credential I enter in the email field.\n\nWhy this is wrong: Sign in with the email address used at registration. Your display name identifies you to readers.",
+      "Common misconception (incorrect): Registering automatically makes me an administrator.\n\nWhy this is wrong: Public registration creates a member account; privileged roles are not selectable during registration.",
+      "Common misconception (incorrect): Clearing browser cookies permanently deletes my account.\n\nWhy this is wrong: Cookies hold session information. Clearing them can sign you out but does not delete your stored account.",
+      "Common misconception (incorrect): Creating a second account is required whenever a session expires.\n\nWhy this is wrong: Use the existing account's email and password to sign in again."
+    ]
+  },
+  {
+    "key": "review-question",
+    "boardSlug": "product-help",
+    "title": "How do I report a question or answer that needs review?",
+    "body": "I found misleading or inappropriate content. How do I tell the moderators without adding my concern to the public conversation? This learning discussion includes one accepted explanation and four labeled misconceptions with corrections.",
+    "answer": "Sign in and open the question. Choose Report question or Report reply for the specific content, explain the concern, and submit once. Report reasons are private to the review workflow. A report does not automatically hide content: a moderator or administrator reviews it and records a decision. A second open report from the same account on the same target is rejected. Visible content on an archived board can still be reported.",
+    "misconceptions": [
+      "Common misconception (incorrect): Submitting a report immediately deletes the reported content.\n\nWhy this is wrong: Reporting creates a review item. Visibility changes only when an authorized reviewer takes a moderation action.",
+      "Common misconception (incorrect): I should put the private report reason into a public reply.\n\nWhy this is wrong: Use the report control for a private concern. Public replies remain visible to readers.",
+      "Common misconception (incorrect): Repeated reports from my account will create a higher priority queue entry.\n\nWhy this is wrong: Only one open report per account and target is allowed. Describe the concern clearly in the first report.",
+      "Common misconception (incorrect): Archived boards cannot be reported because nobody can post there.\n\nWhy this is wrong: Archival closes ordinary contributions; visible questions and replies remain reportable."
+    ]
+  },
+  {
+    "key": "hidden-reply",
+    "boardSlug": "product-help",
+    "title": "Why did an accepted answer disappear, and what happens after restoration?",
+    "body": "A question used to show an accepted answer. Now that answer is unavailable. Does restoring it also restore its accepted status? This learning discussion includes one accepted explanation and four labeled misconceptions with corrections.",
+    "answer": "Moderators and administrators can hide reported content after review. Hiding an accepted reply clears the question's accepted-answer selection, so a visible question becomes unanswered. Restoring that reply makes it visible again when its parent is visible, but does not select it as the answer. The question owner must accept it again. If the question itself is hidden, its replies remain unavailable publicly even when a reply is individually visible.",
+    "misconceptions": [
+      "Common misconception (incorrect): A previously accepted answer can never be hidden.\n\nWhy this is wrong: Accepted status does not exempt a reply from moderation.",
+      "Common misconception (incorrect): Restoring a reply automatically makes it the accepted answer again.\n\nWhy this is wrong: Restoration changes visibility. The owner must make a new acceptance choice.",
+      "Common misconception (incorrect): A direct reply URL lets me read replies under a hidden question.\n\nWhy this is wrong: Public visibility respects the parent question. Direct links do not bypass moderation.",
+      "Common misconception (incorrect): An unanswered badge proves there are no replies.\n\nWhy this is wrong: Unanswered means there is no effective visible accepted reply. A question may have several unaccepted replies."
+    ]
+  },
+  {
+    "key": "accepted-answer",
+    "boardSlug": "product-help",
+    "title": "Who can accept an answer, and can I change my selection?",
+    "body": "Several replies look helpful. Who chooses the accepted answer, and what should I do if another reply is more accurate? This learning discussion includes one accepted explanation and four labeled misconceptions with corrections.",
+    "answer": "The question owner chooses a visible reply using Accept as solution. A question has at most one accepted answer. The owner can select another reply or clear the selection when ordinary changes are allowed. Read the explanation and verify that it solves the question; acceptance records the owner's choice, not an automatic fact check. If the page reports a conflict, reload the latest question before choosing again.",
+    "misconceptions": [
+      "Common misconception (incorrect): The first reply is automatically accepted when it is posted.\n\nWhy this is wrong: Posting and acceptance are separate actions; the question owner makes the selection.",
+      "Common misconception (incorrect): Every helpful reply can be accepted at the same time.\n\nWhy this is wrong: There is one accepted-answer selection per question, although several replies may be useful.",
+      "Common misconception (incorrect): Any signed-in member can accept an answer on someone else's question.\n\nWhy this is wrong: The acceptance controls belong to the question owner.",
+      "Common misconception (incorrect): An accepted badge guarantees every detail is correct forever.\n\nWhy this is wrong: The badge shows the owner's selection. Advice may become outdated and still needs context and review."
+    ]
+  },
+  {
+    "key": "saved-work",
+    "boardSlug": "using-commonbeacon",
+    "title": "Will my saved questions and answers survive signing out?",
+    "body": "I am switching computers or my session has expired. Will I lose the questions and replies I already submitted? This learning discussion includes one accepted explanation and four labeled misconceptions with corrections.",
+    "answer": "Saved questions, replies, and accepted-answer choices are stored by the application, not only in your browser session. Signing out or losing a session does not remove them. Sign in again to contribute or edit your own content where changes are allowed. Text you have not submitted is different: do not assume an unsaved form will survive a reload, navigation, or account change. Copy important draft text before leaving the page.",
+    "misconceptions": [
+      "Common misconception (incorrect): Signing out erases every question I posted.\n\nWhy this is wrong: Signing out ends the session; it does not delete saved contributions.",
+      "Common misconception (incorrect): An unsaved textarea is guaranteed to follow me to another device.\n\nWhy this is wrong: Unsaved drafts are not a cross-device storage feature. Save the contribution or keep your own copy.",
+      "Common misconception (incorrect): I need to post my question again after each login.\n\nWhy this is wrong: Find your existing saved question first. Reposting creates unnecessary duplicate discussions.",
+      "Common misconception (incorrect): A server restart always means all discussions have been reset.\n\nWhy this is wrong: Sessions may be lost on restart, but the normal persistent database setup retains saved discussions."
+    ]
+  },
+  {
+    "key": "search-guides",
+    "boardSlug": "using-commonbeacon",
+    "title": "How do I find existing answers and official guides?",
+    "body": "Before posting, I want to search the community and distinguish a knowledge article from a question. This learning discussion includes one accepted explanation and four labeled misconceptions with corrections.",
+    "answer": "Open Search and enter meaningful words from the topic. Search covers titles and bodies of visible questions and published articles, with title matches weighted more strongly. It does not search reply bodies separately. You can use a quoted phrase, OR, or a minus term to refine the query. Open the result to read its context. The Knowledge library contains published guides; administrator drafts and archived articles are not public results.",
+    "misconceptions": [
+      "Common misconception (incorrect): Search looks inside every reply and private moderation note.\n\nWhy this is wrong: The indexed public sources are question and published-article titles and bodies, not reply bodies or private reports.",
+      "Common misconception (incorrect): A missing result means a draft article is accessible if I guess its address.\n\nWhy this is wrong: Draft and archived articles are not publicly available through search or their public detail route.",
+      "Common misconception (incorrect): Search corrects every spelling mistake automatically.\n\nWhy this is wrong: There is no typo-tolerance feature. Check spelling and try clearer terms; English stemming can match related word forms.",
+      "Common misconception (incorrect): Typing only words such as the and and guarantees useful results.\n\nWhy this is wrong: English stop words may produce no searchable terms. Use specific topic words instead."
+    ]
+  },
+  {
+    "key": "archived-boards",
+    "boardSlug": "using-commonbeacon",
+    "title": "Why can I read a board but cannot add or edit a discussion?",
+    "body": "The questions are visible, but posting controls are unavailable. How can I tell whether the board is archived? This learning discussion includes one accepted explanation and four labeled misconceptions with corrections.",
+    "answer": "An archived board stays readable but is closed to ordinary changes, including new questions, replies, owner edits, and accepted-answer changes. Check the board's archived notice before retrying. Use an appropriate active board for a new discussion. Administrators manage board archival and reopening. Reporting visible content and authorized moderation remain available on archived boards.",
+    "misconceptions": [
+      "Common misconception (incorrect): An archived board is the same as a deleted board.\n\nWhy this is wrong: Archival preserves readable discussions; it closes ordinary contributions.",
+      "Common misconception (incorrect): Changing the URL lets a member post into an archived board.\n\nWhy this is wrong: The backend enforces archival restrictions as well as the user interface.",
+      "Common misconception (incorrect): Signing in as a different member reopens the board.\n\nWhy this is wrong: Reopening is an administrator action, not a session or account-switch workaround.",
+      "Common misconception (incorrect): The Report button must be broken if it works on an archived discussion.\n\nWhy this is wrong: Reporting and authorized moderation intentionally remain available for archived-board content."
+    ]
+  }
+]

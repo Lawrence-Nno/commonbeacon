@@ -41,6 +41,8 @@ public class DemoDataSeeder implements ApplicationRunner {
         board("getting-started", "Getting started", "Find your footing, share first steps, and learn the essentials.");
         board("product-help", "Product help", "A shared place for product questions and helpful experience.");
         conversations();
+        operations();
+        OnboardingData.seed(jdbc);
     }
 
     private void account(String email, String name, String role, String hash) {
@@ -85,5 +87,69 @@ public class DemoDataSeeder implements ApplicationRunner {
                 VALUES (?,?,?,?,TIMESTAMPTZ '2026-01-01 12:05:00+00',TIMESTAMPTZ '2026-01-01 12:05:00+00')
                 """, replyId, questionId, responder, answer);
         if (solved) jdbc.update("UPDATE question SET accepted_reply_id=? WHERE id=?", replyId, questionId);
+    }
+
+    private static UUID demoId(String key) {
+        return UUID.nameUUIDFromBytes(("commonbeacon-demo-" + key).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private void operations() {
+        UUID board = jdbc.queryForObject("SELECT id FROM board WHERE slug='product-help'", UUID.class);
+        UUID alex = jdbc.queryForObject("SELECT id FROM app_user WHERE email='alex.member@example.test'", UUID.class);
+        UUID sam = jdbc.queryForObject("SELECT id FROM app_user WHERE email='sam.member@example.test'", UUID.class);
+        UUID moderator = jdbc.queryForObject("SELECT id FROM app_user WHERE email='morgan.moderator@example.test'", UUID.class);
+        UUID admin = jdbc.queryForObject("SELECT id FROM app_user WHERE email='avery.admin@example.test'", UUID.class);
+        article("demo-writing-a-helpful-question", "Writing a helpful question", "PUBLISHED", admin,
+                "community guide: describe your goal, explain what you tried, and share the result. Keep passwords and personal details out of public questions.");
+        article("demo-review-checklist", "Community review checklist", "DRAFT", admin,
+                "administrator draft: review the context, explain the decision, and check public visibility after a moderation action.");
+        moderationExample("review-question", board, alex, sam, moderator, false);
+        moderationExample("hidden-reply", board, sam, alex, moderator, true);
+    }
+
+    private void article(String slug, String title, String status, UUID author, String body) {
+        jdbc.update("""
+                INSERT INTO knowledge_article(id,slug,title,body,status,author_id,created_at,updated_at,published_at)
+                VALUES (?,?,?,?,?,?,TIMESTAMPTZ '2026-01-02 12:00:00+00',TIMESTAMPTZ '2026-01-02 12:00:00+00',
+                    CASE WHEN ?='PUBLISHED' THEN TIMESTAMPTZ '2026-01-02 12:00:00+00' ELSE NULL END)
+                ON CONFLICT DO NOTHING
+                """, demoId("article-" + slug), slug, title, body, status, author, status);
+    }
+
+    private void moderationExample(String key, UUID board, UUID author, UUID responder, UUID moderator, boolean hiddenReply) {
+        UUID question = demoId("question-" + key), reply = demoId("reply-" + key);
+        int inserted = jdbc.update("""
+                INSERT INTO question(id,board_id,author_id,title,body,created_at,updated_at)
+                VALUES (?,?,?,?,?,TIMESTAMPTZ '2026-01-02 12:00:00+00',TIMESTAMPTZ '2026-01-02 12:00:00+00')
+                ON CONFLICT (id) DO NOTHING
+                """, question, board, author,
+                hiddenReply ? "How should I check advice before following it?" : "Can someone clarify the community posting guidelines?",
+                "demonstration question. Please explain the community guidance with a practical example.");
+        // The parent is the once-only marker for the whole example. Never replay moderation on restart.
+        if (inserted == 0) return;
+        if (!hiddenReply) {
+            jdbc.update("""
+                    INSERT INTO content_report(id,reporter_id,question_id,reason,created_at,updated_at)
+                    VALUES (?,?,?,'training report: please review whether this question needs clarification.',
+                        TIMESTAMPTZ '2026-01-02 12:05:00+00',TIMESTAMPTZ '2026-01-02 12:05:00+00')
+                    """, demoId("report-" + key), responder, question);
+            return;
+        }
+        jdbc.update("""
+                INSERT INTO reply(id,question_id,author_id,body,visibility,version,created_at,updated_at)
+                VALUES (?,?,?,'outdated advice retained privately for a moderation demonstration.','HIDDEN',1,
+                    TIMESTAMPTZ '2026-01-02 12:05:00+00',TIMESTAMPTZ '2026-01-02 12:15:00+00')
+                """, reply, question, responder);
+        jdbc.update("""
+                INSERT INTO content_report(id,reporter_id,reply_id,reason,status,version,created_at,updated_at,
+                    resolver_id,resolved_at,resolution_decision,resolution_note)
+                VALUES (?,?,?,'training report: this reply contains outdated guidance.','RESOLVED',1,
+                    TIMESTAMPTZ '2026-01-02 12:10:00+00',TIMESTAMPTZ '2026-01-02 12:15:00+00',?,
+                    TIMESTAMPTZ '2026-01-02 12:15:00+00','HIDE','review: hide outdated advice until it is checked.')
+                """, demoId("report-" + key), author, reply, moderator);
+        jdbc.update("""
+                INSERT INTO moderation_action(id,actor_id,reply_id,action,reason,created_at)
+                VALUES (?,?,?,'HIDE','review: hide outdated advice until it is checked.',TIMESTAMPTZ '2026-01-02 12:15:00+00')
+                """, demoId("action-" + key), moderator, reply);
     }
 }

@@ -60,12 +60,24 @@ The Stage 11 workflow runs the same command, uploads reports/traces/logs, and ha
 
 ## Development demo content
 
-Opt-in local seeding now creates two fictional questions and replies in Getting
-started: one solved and one awaiting acceptance. IDs derive from stable seed keys,
-and timestamps are fixed. Reseeding does not rewrite existing conversations,
-credentials, board settings, hidden states, or accepted-answer choices.
-Seeding remains disabled by default and excluded from the prod profile.
-See boards.md for enabling it. Rebuild/restart your local backend to see new seeds.
+Opt-in local seeding creates three onboarding boards with three lessons each.
+Every lesson has one accepted explanation and four labeled misconceptions with
+corrections: nine questions and 45 visible replies. The existing private report,
+hidden reply/history, and published/draft article examples remain. See the
+[onboarding walkthrough](demo-walkthrough.md) for roles, counts, and restart rules.
+Seeding remains off by default and excluded from the prod profile. The onboarding
+browser test verifies all lesson counts and selected answers through public APIs,
+checks that alternative answers are clearly labeled, and inspects mobile layout.
+
+The report browser journey uses its own target IDs and captures baseline counts;
+it tolerates pre-existing seeded reports. It covers member reporting, duplicates,
+stale moderation tabs, reply/parent hide and restoration, acceptance clearing,
+overview deltas, and logout/account changes. The article journey covers failed
+saves without lost drafts, publication/search/overview changes, live body updates,
+stale-tab reconciliation, archival disappearance, and long unbroken mobile content.
+Both retain role checks and keyboard/viewport assertions. The remaining journeys
+cover registration/session expiry, the original ask/reply/accept flow, unavailable
+backend states, search ordering/privacy, and account-scoped overview data.
 
 The older scripts/verify-compose.mjs check remains a separate, explicitly
 restart-enabled development-volume persistence check from Stage 9. It is not

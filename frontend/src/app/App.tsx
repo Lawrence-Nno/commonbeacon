@@ -127,8 +127,8 @@ function About() {
         </article>
       </div>
       <p className="availability-note">
-        CommonBeacon is in its early stages. Member accounts are open. Questions
-        are open. Replies and accepted solutions are coming next.
+        Browse questions and published guides, then join the community to ask,
+        reply, and report concerns. Question owners can select an accepted answer.
       </p>
       <Link className="text-link" to="/">
         ← Back to the community
