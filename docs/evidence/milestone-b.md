@@ -1063,5 +1063,73 @@ onboarding journey and all existing lifecycle/privacy tests. The test runner
 removed its disposable containers/network. Log:
 `%TEMP%/commonbeacon-onboarding-browser.log`. A final live database text check found
 zero occurrences of the unwanted wording across boards, questions, replies,
-articles, reports, and moderation history. This content expansion and the prior
-Stage 11 changes remain uncommitted; remote verification is pending a later push.
+articles, reports, and moderation history. This content expansion and Stage 11
+were subsequently pushed as `3789cde09ff7d09718ab64f117f39ff044832dcd`. All three jobs
+passed in [CI run 35531641700](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35531641700),
+including the real browser journey and the Stage 10 logout synchronization fix.
+
+## Stage 12 - migrations, persistent storage, and CI verification (2026-09-20)
+
+Added `MilestoneUpgradeIT` with two independently disposable PostgreSQL databases.
+The clean case starts the current application against an empty database and checks
+all nine migrations plus Hibernate schema validation. The upgrade case applies
+V1-V5, inserts member/moderator accounts, active/archived boards, visible/hidden
+questions/replies, versions, and accepted selections, then applies V6-V9. Exact
+JSON snapshots of original columns remain equal, including credentials, timestamps,
+visibility, and selection IDs. It checks generated search backfill, article vector
+generation, accepted-reply ownership, report target/duplicate constraints, article
+publication constraints, no-op repeated migration, Flyway validation, and startup
+of the current application with Hibernate validation. Applied migration files are
+unchanged. This establishes forward upgrade, not old-binary or reverse-migration
+compatibility; the limitation is documented in docs/compose.md.
+
+Full `scripts/verify.ps1` passed **122 backend tests (5 unit + 117 integration)**
+and **127 frontend tests**, ESLint, TypeScript, and production build. No failures
+or skips. Log: `%TEMP%/commonbeacon-b-stage12-verify.log`.
+
+Added standalone `compose.persistence.yaml` and
+`frontend/scripts/verify-persistence.mjs`, exposed as `npm run test:persistence`
+and `npm run test:failure-cleanup`. They use localhost:4175, explicit `.env.example`,
+a guarded `commonbeacon-persistence-*` project, and only that project's named
+volume. Existing projects are refused before startup/cleanup. The runner creates
+records through real login/CSRF APIs via Nginx and compares row fingerprints across
+all seven domain tables. The test volume is preserved during ordinary down/up and
+removed only in final cleanup. No development credentials or volume are used.
+
+CI now runs both persistence checks after the browser suite, captures runner and
+remaining-container logs, attempts cleanup for both projects even if one cleanup
+fails, and uploads evidence with the existing seven-day retention. Readiness and
+job timeouts remain bounded. Maven's existing IT discovery includes the new
+migration tests; frontend/browser commands continue discovering their suites.
+Stage 12's new workflow steps have not run remotely because this stage is not yet
+committed. The successful linked run above is specifically the Stage 11/onboarding
+revision, not a claim of remote verification for these uncommitted additions.
+
+The persistence runner passed backend restart, database restart, and normal
+Compose down/up. Exact fingerprints of all stored rows remained equal; OPEN and
+RESOLVED reports, the hide audit, cleared acceptance/hidden reply, all three
+article states, summary counts, and the one eligible full-text result survived.
+The old session returned 401 after backend restart and down/up; fresh login
+restored authorized access. Final cleanup removed the disposable named volume.
+Log: `%TEMP%/commonbeacon-b-stage12-persistence.log`.
+
+The failure-cleanup command then started a fresh project, created durable fixtures,
+and deliberately threw an error. The child returned exit 1, its finally block
+removed containers/network/volume, and independent project-label assertions found
+no leftovers. The parent verification command exited 0, explicitly recognizing
+that expected failure; it does not disguise an unexpected test failure. Log:
+`%TEMP%/commonbeacon-b-stage12-cleanup.log`. Container logs are retained under
+ignored `frontend/test-results/persistence-compose.log` and
+`frontend/test-results/persistence-failure-compose.log`.
+
+The full isolated browser suite passed **11 tests (2.6m)**, including onboarding,
+original community flows, moderation/article lifecycle, search, and account/cache
+isolation. Log: `%TEMP%/commonbeacon-b-stage12-browser.log`. Both isolated projects
+have no remaining containers, networks, or volumes according to Docker label
+queries. The development backend, database, and frontend remain healthy, still
+using `commonbeacon_postgres_data`; its three boards each retain three onboarding
+questions. Stage 12 did not restart or alter the development stack.
+
+Updated README, Compose/browser verification docs, this evidence, and ignored
+plans. Stage 12 is complete locally and remains uncommitted; its new CI steps
+await a later push. Stage 13 documentation and Milestone B handoff is next.

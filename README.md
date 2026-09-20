@@ -68,6 +68,10 @@ checking, tests, and build. test:smoke builds both container images and runs the
 real browser journey against an isolated, temporary database. It never uses .env
 or the development volume. No host backend is needed.
 
+For restart and storage checks, run `npm run test:persistence` and
+`npm run test:failure-cleanup` from `frontend`. These use a separate disposable
+volume and localhost port 4175; see [persistence verification](docs/compose.md#repeatable-persistence-check).
+
 ## Demo accounts
 
 With opt-in demo seeding, all four initially use DEMO_PASSWORD:

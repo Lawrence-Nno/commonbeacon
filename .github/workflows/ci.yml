@@ -57,6 +57,7 @@ jobs:
     timeout-minutes: 25
     env:
       COMMONBEACON_E2E_PROJECT: commonbeacon-e2e-ci-${{ github.run_id }}-${{ github.run_attempt }}
+      COMMONBEACON_PERSISTENCE_PROJECT: commonbeacon-persistence-ci-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -78,9 +79,23 @@ jobs:
         run: |
           mkdir -p frontend/test-results
           docker compose --project-name "$COMMONBEACON_E2E_PROJECT" --env-file .env.example -f compose.e2e.yaml logs --no-color > frontend/test-results/ci-compose.log 2>&1
+      - name: Verify isolated persistent storage and failure cleanup
+        working-directory: frontend
+        run: |
+          npm run test:persistence
+          npm run test:failure-cleanup
+      - name: Collect remaining persistence logs
+        if: always()
+        run: |
+          mkdir -p frontend/test-results
+          docker compose --project-name "$COMMONBEACON_PERSISTENCE_PROJECT" --env-file .env.example -f compose.persistence.yaml logs --no-color > frontend/test-results/ci-persistence-compose.log 2>&1
       - name: Cleanup isolated stack even after test failure
         if: always()
-        run: docker compose --project-name "$COMMONBEACON_E2E_PROJECT" --env-file .env.example -f compose.e2e.yaml down --remove-orphans
+        run: |
+          status=0
+          docker compose --project-name "$COMMONBEACON_E2E_PROJECT" --env-file .env.example -f compose.e2e.yaml down --remove-orphans || status=$?
+          docker compose --project-name "$COMMONBEACON_PERSISTENCE_PROJECT" --env-file .env.example -f compose.persistence.yaml down --volumes --remove-orphans || status=$?
+          exit "$status"
       - name: Upload browser evidence
         if: always()
         uses: actions/upload-artifact@v4

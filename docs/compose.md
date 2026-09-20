@@ -91,20 +91,48 @@ The frontend health check tests Nginx; /api/health checks the application/databa
 
 ## Repeatable persistence check
 
-With demo seeding enabled and the stack running:
+Use a disposable stack; no running development backend or local credentials are needed:
 
 ```powershell
 . ./scripts/use-dev-tools.ps1
-. ./scripts/use-local-database.ps1
 cd frontend
-node scripts/verify-compose.mjs --allow-restart
+npm run test:persistence
+npm run test:failure-cleanup
 ```
 
-Requires installed frontend dependencies and Chrome. This creates fictional
-records, restarts the database/backend, then performs an ordinary down/up without
-deleting volumes. It checks real browser login, cookies, CSRF rejection, public
-deep links, accepted-answer persistence, and session expiry. It leaves the stack
-running. COMPOSE_ORIGIN can override the default URL.
+Requires Docker and installed frontend dependencies; port 4175 must be free.
+The standalone `compose.persistence.yaml` uses a project-scoped named volume and
+`.env.example`, never the development `.env` or volume. The runner creates an OPEN
+report, a RESOLVED/HIDE report with audit history, a hidden formerly accepted reply,
+and DRAFT/PUBLISHED/ARCHIVED articles using real session/CSRF APIs through Nginx.
+It compares fingerprints of every stored row and verifies summary, visibility,
+article states, and full-text results after backend restart, database restart,
+and ordinary Compose down/up. Backend restart must expire the old session.
+
+Only final cleanup removes the runner's disposable volume. The project prefix is
+validated, existing projects are rejected, readiness is bounded, and cleanup runs
+on failure too. The failure-cleanup command deliberately fails after creating
+durable records, requires a nonzero child exit, and verifies no test containers,
+network, or volume remain. Logs are saved under ignored `frontend/test-results`.
+Optional `COMMONBEACON_PERSISTENCE_PROJECT` must start with
+`commonbeacon-persistence-`; CI uses an exact run/attempt name.
+
+The legacy `node scripts/verify-compose.mjs --allow-restart` command remains an
+explicit development-volume check. It creates records in your development data
+and restarts your app. Use the isolated commands above for routine verification.
+
+## Schema compatibility
+
+`MilestoneUpgradeIT` verifies both an empty database and V1-V5 fixtures upgraded
+through V9. It preserves users, credentials, board archival, question/reply bodies,
+versions, timestamps, hidden states, and accepted selections; checks generated
+search vectors and representative constraints; and starts the current application
+with Hibernate `ddl-auto=validate`. Applied migrations are unchanged.
+
+This verifies forward upgrade to the current application. It does not establish
+that a Milestone A binary can run against V9, nor provide reverse migrations or
+an application rollback guarantee. A database backup/restore procedure is separate
+from these tests; do not attempt rollback by editing Flyway history or applied SQL.
 
 ## Verified results (2026-09-16)
 

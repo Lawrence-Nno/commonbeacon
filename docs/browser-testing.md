@@ -79,9 +79,14 @@ Both retain role checks and keyboard/viewport assertions. The remaining journeys
 cover registration/session expiry, the original ask/reply/accept flow, unavailable
 backend states, search ordering/privacy, and account-scoped overview data.
 
-The older scripts/verify-compose.mjs check remains a separate, explicitly
-restart-enabled development-volume persistence check from Stage 9. It is not
-invoked by npm run test:smoke.
+Milestone B Stage 12 adds `npm run test:persistence` and
+`npm run test:failure-cleanup`, using a separate disposable named volume on port
+4175. They complement the browser stack's tmpfs database by checking restarts,
+normal down/up, expired sessions, data preservation, and intentional failure
+cleanup. See [persistence verification](compose.md#repeatable-persistence-check).
+CI runs both after the full browser suite and retains their logs in the browser
+artifact. Its always-run cleanup attempts both test projects even if one cleanup
+fails. The legacy development-volume check is not invoked by these commands.
 
 ## Verification (2026-09-16)
 
