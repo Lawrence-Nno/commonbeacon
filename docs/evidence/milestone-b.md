@@ -4,10 +4,10 @@
 
 Stage 1 is complete: baseline verified and implementation contracts finalized on
 2026-09-19. Stage 2 report submission is committed/pushed as e846e13 and passed
-remote CI. Stage 4 is pushed as fa2bd90 and passed remote CI. Stage 5 restoration,
-private history, and concurrency coverage are implemented and locally verified,
-including the full container/browser workflow. Stages 6-13 remain planned, including articles,
-search, and summary.
+remote CI. Stage 5 is pushed as a35159d and passed remote CI. Stage 6 article APIs
+are implemented and passed full local backend/frontend verification and the
+container/browser regression suite.
+Stage 7 article screens and Stages 8-13 search, summary, and later work remain planned.
 
 Baseline revision: `2d33c96de62b6feda06a4b32366e300844f7ff4a`.
 Verification used the existing workspace with documentation changes, not a new
@@ -533,5 +533,94 @@ Startup log: `%TEMP%/commonbeacon-b-stage5-startup.log`.
 
 README, moderation documentation, this evidence record, and ignored plans now
 record Stage 5. Unrelated interview-preparation edits remain untouched.
-Stage 5 remains uncommitted and has not run remotely. Stage 6 knowledge-article
-implementation is next; search and operational counts remain later work.
+At that handoff Stage 5 was uncommitted and had not run remotely. Its subsequent
+commit/push and Stage 6 implementation are recorded below.
+
+
+## Stage 5 commit/push
+
+Committed and pushed `a35159d011dc54884a620fc49186e060b57906ca`, excluding unrelated
+interview-preparation documentation changes. All jobs passed in
+[run 35465953871](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35465953871).
+The local implementation plans remain ignored.
+
+## Stage 6 implementation: 2026-09-19
+
+Added V8 knowledge_article with UUID identity, globally unique slug, immutable
+application slug/author mappings, text/status/publication checks, author FK,
+nonnegative version, microsecond timestamps, and indexes for public and filtered
+administrator listing order. Earlier migrations are unchanged.
+
+Added administrator list/detail/create/edit/publish/archive APIs and public
+published-only list/detail APIs. Creation derives original authorship from the
+session and starts at DRAFT/version 0 with no publication time. Publishing sets
+publishedAt once; live published edits preserve it and become public immediately.
+Archival preserves publication history and is terminal. Existing writes lock a
+fresh article row and check reviewed version before state. Known slug-constraint
+races map to ARTICLE_SLUG_CONFLICT; other storage details stay private.
+
+Public and administrator DTOs are separate. Summary SQL excludes article bodies
+and joins author names without per-row lazy lookups. Count/items share a
+REPEATABLE_READ snapshot. Public records omit status, version, and createdAt;
+draft/archived slugs return the same ARTICLE_NOT_FOUND as unknown slugs. New DTOs
+reject forged/unknown metadata, apply trimmed UTF-16 text bounds, and require
+versions on existing writes. Administrator HTTP and service methods are protected,
+all mutations require CSRF, and administrator responses are no-store. Existing
+security changed only to permit the two public GET article route patterns.
+
+Added 11 ArticleIT cases with real HTTP sessions and PostgreSQL:
+
+- Complete draft/edit/publish/live-edit/archive flow, exact DTO shapes, original
+  author preservation across two administrators, immutable slug, publication-time
+  preservation, microsecond precision, and literal markup remaining JSON text.
+- Administrator versus moderator/member/visitor access at HTTP and service
+  boundaries, CSRF rejection, private no-store responses, and public role parity.
+- Terminal archival, repeated transition conflicts, and stale-version precedence.
+- Trimmed input, slug syntax/length, missing/null fields, forged metadata, immutable
+  slug input, text/version validation, UTF-16 boundary parity with PostgreSQL,
+  database status/publication/FK/required-text/version checks, and global uniqueness.
+- Public/private list predicates, exact totals, timestamp/UUID tie ordering,
+  administrator status filters, bounded/invalid pages, unknown query keys,
+  missing article IDs/slugs, and narrow list DTOs without body text.
+- Concurrent slug creation yielding one row/201 and one controlled 409.
+- Observed PostgreSQL article-lock waits for edit versus publish/archive in both
+  orders, publish versus archive in both orders, and competing edits: the waiting
+  stale writer gets 409 and cannot overwrite the winning state or content.
+- A public list snapshot remains internally consistent while another transaction
+  archives an article between count and item queries; subsequent public reads
+  exclude it.
+
+The initial verification run passed ten article cases but failed the direct-service
+permission test because its second role reused a SecurityContext removed by the
+first role's cleanup. Moved context acquisition inside the role loop; the corrected
+case passed on rerun. This was a test-fixture correction, not an authorization
+implementation change. The configured `C:/Users/USER/.Codex/issue-rca.md` remains
+absent. No frontend implementation is part of Stage 6; article screens and their
+rendering/interaction tests remain Stage 7.
+
+README, docs/knowledge.md, and docs/api.md now describe the implemented APIs and
+provide an administrator session/CSRF lifecycle walkthrough. Final
+`./scripts/verify.ps1` exited 0: **5 unit + 98 integration tests (103 backend total),
+85 frontend tests**, lint, TypeScript checking, and production build passed.
+Log: `%TEMP%/commonbeacon-b-stage6-verify-final.log`.
+The unchanged full isolated `npm run test:smoke` suite exited 0: **7 passed (1.4m)**
+using `commonbeacon-e2e-b-stage6-20260919` and disposable PostgreSQL tmpfs. Both
+production images build with V8, and existing authentication, community, moderation,
+and outage journeys pass. This is regression evidence, not a claim of article
+browser screens or rendering coverage. Article behavior is covered by the new
+HTTP/PostgreSQL integration cases; article UI is Stage 7.
+Log: `%TEMP%/commonbeacon-b-stage6-browser.log`.
+
+The disposable containers and network were removed, confirmed by project-label
+queries returning no leftovers. Rebuilt the development stack with
+`docker compose up -d --build --wait --wait-timeout 180`; all three services are
+healthy. Backend logs confirm one new migration to V8 on the preserved development
+database volume. Anonymous GET `/api/v1/articles` returns 200 with an empty page
+(no article demo data is introduced at this stage), `/api/v1/admin/articles`
+returns 401, and an unknown public article slug returns 404 at port 8081.
+Log: `%TEMP%/commonbeacon-b-stage6-startup.log`.
+
+Ignored plans mark Stage 6 complete locally and identify Stage 7 article
+administration/public pages as next. Unrelated interview-preparation edits are
+preserved; no .env credentials or development content were changed.
+Stage 6 remains uncommitted and has not run remotely.

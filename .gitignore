@@ -10,6 +10,9 @@
 /MILESTONE_A_PLAN.md
 /MILESTONE_B_PLAN.md
 
+# Local interview preparation
+/docs/interview-preparation/
+
 # Java builds
 target/
 *.class

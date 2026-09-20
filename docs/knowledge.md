@@ -1,7 +1,8 @@
 # Milestone B knowledge and search contracts
 
-Status: finalized in Stage 1 on 2026-09-19. Article APIs/UI are planned for
-Stages 6–7, search for Stages 8–9; no endpoint below is added by this document.
+Status: Stage 6 article lifecycle and public read APIs are implemented locally on
+2026-09-19. Article UI remains Stage 7; search remains Stages 8-9. See
+[Milestone B evidence](evidence/milestone-b.md) for verification and commit status.
 The detailed search implementation notes will become `docs/search.md` in Stage 8.
 
 ## Shared conventions
@@ -83,12 +84,12 @@ conflict; generic database details remain private.
 
 ## Persistence and acceptance cases
 
-Add a new Flyway migration after existing and earlier Milestone B migrations;
-verify the next unused version at implementation time. Store UUID ID, unique slug,
-title, body, status check, author FK, created/updated timestamps, nullable
+V8 adds knowledge_article after the V7 moderation-action migration. It stores
+UUID ID, unique slug, title, body, status check, author FK, created/updated timestamps, nullable
 published timestamp, and `@Version`. Enforce that DRAFT has no published timestamp
-and PUBLISHED has one; ARCHIVED permits either based on its history. Never modify
-V1–V5. Add listing indexes based on actual queries.
+and PUBLISHED has one; ARCHIVED permits either based on its history. V1-V7 are
+unchanged. Listing indexes cover public published-time order,
+administrator update-time order, and status-filtered update-time order.
 
 Tests must cover administrator versus moderator/member/visitor permissions; CSRF;
 forged metadata; trimmed validation and malformed/duplicate slugs; concurrent slug
@@ -155,3 +156,45 @@ session, enum transition rules, transactional version checks, and public query
 predicates. Compare JPA entity queries with typed native-SQL projections for mixed
 search results. Rehearse publication and stale-edit paths in source when they exist;
 these contracts are implementation targets, not evidence of personal proficiency.
+
+
+## Stage 6 implementation notes and API walkthrough
+
+The article entity implements DRAFT/PUBLISHED/ARCHIVED transitions with microsecond
+UTC timestamps and optimistic versions. Administrator mutations acquire a fresh
+pessimistic article-row lock, compare expectedVersion before checking state, and
+flush before returning the updated DTO/version. These transactions do not acquire
+board, question, reply, or report locks. Database uniqueness is the final slug-race
+protection; only its known constraint maps to ARTICLE_SLUG_CONFLICT.
+
+Original author and slug have no mutation path and are non-updatable JPA columns.
+Creation resolves the author from the authenticated administrator. A later admin's
+edit preserves that original author. Archival is terminal; no delete or arbitrary
+status PATCH endpoint exists. A repeated publish/archive conflicts rather than
+silently succeeding. This implementation updates updatedAt on each successful edit.
+
+List queries select summary columns without body and join author display names in
+the same query. Both count/items run in one REPEATABLE_READ snapshot. Public detail
+loads an explicit author projection from a PUBLISHED-only entity query; public DTOs
+omit status, version, and createdAt. Administrator responses are no-store.
+Offset pages may still shift between separate requests.
+
+Using the session and fresh CSRF flow in [the API reference](api.md):
+
+1. POST `/api/v1/admin/articles` with
+   `{"slug":"first-steps","title":"Your first steps","body":"Follow these fictional setup instructions."}`.
+   Expect 201 with Location, DRAFT, version 0, and null publishedAt.
+2. GET `/api/v1/articles/first-steps` returns 404 while it is a draft.
+3. POST `/api/v1/admin/articles/{id}/publish` with `{"expectedVersion":0}`.
+   Expect PUBLISHED, version 1, and a publication timestamp.
+4. GET `/api/v1/articles/first-steps` now returns the public article.
+5. PATCH `/api/v1/admin/articles/{id}` with
+   `{"title":"Updated first steps","body":"These updated instructions are public immediately.","expectedVersion":1}`.
+   Expect version 2 with the original slug, author, and publishedAt preserved.
+6. POST `/api/v1/admin/articles/{id}/archive` with `{"expectedVersion":2}`.
+   Expect ARCHIVED/version 3; public detail returns 404 and public totals exclude it.
+
+Replace example versions with the version actually reviewed. A lost response or
+409 requires a reload before deciding whether to submit again. These are API
+workflows; no `/knowledge` or article editor screen is added until Stage 7. JSON
+bodies are plain text, including literal markup; Stage 7 must render them as text.

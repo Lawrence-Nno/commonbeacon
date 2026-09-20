@@ -40,6 +40,7 @@ public class SecurityConfiguration {
     @Bean SecurityFilterChain security(HttpSecurity http, IdentityService identity,
             ApiProblems problems, ObjectMapper mapper, LoginRateLimiter limiter) throws Exception {
         http.authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.GET, "/api/v1/articles", "/api/v1/articles/*").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/questions/*/replies", "/api/v1/replies/*").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/boards/*/questions", "/api/v1/questions/*").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/boards", "/api/v1/boards/*").permitAll()

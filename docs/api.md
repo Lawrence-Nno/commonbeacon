@@ -89,4 +89,38 @@ retain drafts on recoverable errors.
 
 Archived conversations remain readable. Hidden parents/replies are excluded from
 public endpoints. Hidden accepted content is suppressed defensively on reads;
-future moderation must atomically clear acceptance when hiding.
+moderation atomically clears acceptance when hiding an accepted reply.
+
+
+## Knowledge articles (Stage 6 API)
+
+Public reads expose PUBLISHED articles only:
+
+- GET `/api/v1/articles?page=0&size=20`: published-time descending, then ID descending.
+- GET `/api/v1/articles/{slug}`: detail or the same 404 for unknown/draft/archived slugs.
+
+Only administrators can use these no-store routes:
+
+- GET `/api/v1/admin/articles?page=0&size=20&status=DRAFT`: omit status for all;
+  otherwise use DRAFT, PUBLISHED, or ARCHIVED. Updated-time descending, then ID.
+- GET `/api/v1/admin/articles/{id}`: detail at any status.
+- POST `/api/v1/admin/articles` with
+  `{"slug":"first-steps","title":"Your first steps","body":"Follow these fictional setup instructions."}`.
+  Returns 201, Location, DRAFT, and version 0.
+- PATCH `/api/v1/admin/articles/{id}` with
+  `{"title":"Updated first steps","body":"Updated instructions for the article.","expectedVersion":0}`.
+  Both text fields are required. Published edits become public immediately.
+- POST `/api/v1/admin/articles/{id}/publish` or `/archive` with `{"expectedVersion":0}`.
+  Use the version actually reviewed, not the example value.
+
+Slugs are lowercase, globally unique, and immutable. Original authorship is
+preserved. Drafts can publish or archive; published articles can edit or archive;
+archived articles are terminal/read-only. Text is trimmed and bounded. Unknown
+JSON fields fail with 400. Stale versions return 409 STALE_EDIT; slug duplicates
+return ARTICLE_SLUG_CONFLICT; invalid/repeated transitions return
+ARTICLE_STATE_CONFLICT. Page defaults are 0/20, maximum size 100; unknown list
+parameters and invalid status/page values fail with 400.
+
+See [the knowledge contract](knowledge.md) for exact public/admin DTOs, limits,
+publication timestamp behavior, and a complete session-based walkthrough.
+Article screens are Stage 7 work.
