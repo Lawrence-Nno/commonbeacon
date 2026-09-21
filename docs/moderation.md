@@ -3,7 +3,7 @@
 Member reporting, private review, resolution, restoration, audit history, and the
 operational summary are implemented. See the [OpenAPI contract](openapi.json),
 [operator walkthrough](operator-walkthrough.md), and
-[verification evidence](evidence/milestone-b.md).
+[verification evidence](verification.md).
 
 ## Shared conventions and permissions
 
@@ -116,7 +116,7 @@ JDBC `ModerationReadRepository` returning explicit DTO records. Each service cal
 is read-only at REPEATABLE_READ isolation: the list/count and report/context queries
 share one PostgreSQL snapshot. Queries use bound parameters and a fixed sort order;
 only requested target context is loaded. No public query or visibility predicate
-was relaxed, and no new migration was needed beyond Stage 2's V6 index.
+is relaxed. Report queue queries use the V6 report indexes.
 
 The API and service both require moderator/administrator roles; success responses
 are no-store. Frontend query keys include the actor ID, and request functions consume
@@ -154,7 +154,7 @@ Action pages order `createdAt DESC, id DESC`; items contain
 or `RESTORE`. Display report resolutions through report history, rather than
 pretending dismissal or acknowledgement changed content visibility.
 
-## Resolution and restoration: Stages 4–5
+## Resolution and restoration
 
 `POST /moderation/reports/{id}/resolve` accepts:
 
@@ -238,7 +238,7 @@ Reuse `ProblemDetail` with `code`, `requestId`, optional `fieldErrors`, and no S
 or stack traces. `400 VALIDATION_FAILED` covers field bounds; `INVALID_REQUEST`
 covers malformed values, unknown fields, and invalid target shape;
 `INVALID_PAGE`/`INVALID_STATUS` cover list input. Authentication/CSRF/forbidden
-codes remain those from Milestone A. Translate known report uniqueness violations
+codes use the shared authentication error contract. Translate known report uniqueness violations
 to `REPORT_ALREADY_OPEN`, keeping generic `DATA_CONFLICT` as a safe fallback.
 
 Required PostgreSQL/HTTP cases: exactly-one target and real FKs; concurrent duplicate
@@ -323,7 +323,7 @@ They cover both lock orders for accept versus reply/parent hide, author edit or
 reply creation versus hide, restoration versus another hide, and board archival
 versus hide/restore. Two reports targeting one reply produce one hide followed
 by an explicit acknowledgement after reload. Injected audit failure proves
-restoration rollback; Stage 4 retains the accepted-reply hide rollback test.
+restoration rollback; resolution tests also verify accepted-reply hide rollback.
 
 ## Operational overview
 
@@ -361,7 +361,7 @@ it; changes in another session are not pushed automatically.
 
 The rollback-only [measurement script](../scripts/measure-operational-summary.sql)
 uses 10,000 questions, 10,000 replies, 6,000 reports, and 3,000 articles. The
-[captured PostgreSQL plan](evidence/summary-stage10-plan.txt) returned exact counts
+[captured PostgreSQL plan](evidence/operational-summary-query-plan.txt) returned exact counts
 6,000/2,000/1,000 in 5.826 ms, using a hash anti-join and sequential scans. These
 temporary, reduced-column fixtures are diagnostic rather than a production latency
 benchmark. No new index or schema migration is justified by this measurement;

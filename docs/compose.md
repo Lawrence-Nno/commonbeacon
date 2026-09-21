@@ -130,17 +130,11 @@ search vectors and representative constraints; and starts the current applicatio
 with Hibernate `ddl-auto=validate`. Applied migrations are unchanged.
 
 This verifies forward upgrade to the current application. It does not establish
-that a Milestone A binary can run against V9, nor provide reverse migrations or
+that an older binary can run against V9, nor provide reverse migrations or
 an application rollback guarantee. A database backup/restore procedure is separate
 from these tests; do not attempt rollback by editing Flyway history or applied SQL.
 
-## Verified results (2026-09-16)
+## Verification
 
-- Default Compose built both images from source and started all three services healthy.
-- Only localhost:8081 was published; optional host override configuration validated.
-- Runtime Java was Temurin 21.0.12+8; PostgreSQL PGDATA was /var/lib/postgresql/18/docker.
-- Nginx configuration validation passed.
-- scripts/verify.ps1 passed: 5 backend unit tests, 53 integration tests, 49 frontend tests, lint, type checking, and production build.
-- The dedicated Chrome Compose check passed login, HttpOnly/SameSite cookies, CSRF rejection, direct question URLs and reload, selected-answer persistence through database/backend restart and ordinary down/up, and session expiry on backend restart.
-- The 390px mobile screenshot was inspected and overflow check passed.
-- Stack remains running. This is local verification; Stage 9 was pushed as a015a30. Stage 11 adds container/browser CI; see [current evidence](evidence/milestone-a.md).
+See [verification](verification.md) for repeatable commands, coverage, recorded
+results, and current limitations.

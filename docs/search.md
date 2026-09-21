@@ -1,9 +1,9 @@
 # Public search
 
 `GET /api/v1/search` and `/search` now search titles and bodies of visible questions
-and published articles with PostgreSQL English full-text matching. Stage 9 replaces
-the earlier literal-title implementation while preserving the bounded response shape and
-public visibility rules. English stemming, phrase/OR/exclusion syntax, and relevance
+and published articles with PostgreSQL English full-text matching and bounded
+responses governed by public visibility rules. English stemming, phrase/OR/exclusion
+syntax, and relevance
 ranking are supported. There is no typo correction, separate reply search, HTML
 highlighting, or real-time push to other browsers.
 
@@ -20,7 +20,7 @@ queries have no searchable tokens and return empty results, not a broad query.
 The parser is explicitly `websearch_to_tsquery('english', q)` with q bound through
 JDBC. Unquoted words combine with AND; double quotes request a phrase; OR combines
 alternatives; a leading minus excludes a term. Other punctuation is processed by
-PostgreSQL's text parser, rather than Stage 8's literal substring rules. For example,
+PostgreSQL's text parser, rather than literal substring rules. For example,
 `running` can match `run`, `"setup guide"` requests an ordered phrase, and
 `setup -printer` excludes printer matches. Wildcard/prefix and raw tsquery syntax
 are not supported. A negative-only query can match many eligible documents and
@@ -81,7 +81,7 @@ state. Pages across separate requests may shift as content changes.
 Visible questions on archived boards remain eligible. Hidden questions, draft and
 archived articles, replies, report reasons, resolution notes, and audit records
 contribute no public hits, snippets, or totals. Bodies now participate in matching;
-this changes Stage 8 behavior but does not expand public eligibility.
+only eligible public content participates.
 
 `/search?q=...&page=...` supports direct loading, refresh, and back/forward history.
 Submitting a new query resets page; the same query refreshes page zero. Blank,
@@ -110,7 +110,7 @@ The browser journey retains public paging and moderation/publication checks and
 adds a body-only article, cross-page relevance ordering, phrase matching, immediate
 live-body edits, stemming, and stop-word results. Component tests retain URL/history,
 validation, safe decoding, plain text, cancellation, and late-response coverage.
-See [milestone evidence](evidence/milestone-b.md) for actual test counts and status.
+See [verification record](verification.md) for actual test counts and status.
 
 `scripts/measure-full-text-search.sql` creates 20,000 article and 20,000 question
 fixtures in temporary tables with the actual generated-vector expressions and
@@ -124,10 +124,11 @@ rolling back. Application data is untouched. Measured on local PostgreSQL 18.6 o
   planner chose sequential scans and a 42 kB top-N heapsort. Broad ranking remains
   substantially more work; forcing index scans is not justified by this evidence.
 
-These single local observations are not production latency targets. Stage 8 used
-4,000 index-free fixtures, so its times are not a controlled before/after speed
-comparison. The observed selective plans support retaining the partial GIN indexes.
-Full [captured plans](evidence/search-stage9-plans.txt) include query labels, rows,
+These single local observations are not production latency targets. Earlier
+title-only measurements used a different dataset and do not establish a controlled
+before/after speed comparison. The observed selective plans support retaining the
+partial GIN indexes.
+Full [captured plans](evidence/search-query-plans.txt) include query labels, rows,
 buffer activity, and timings; the repeatable script records the fixture definitions.
 Run with:
 
@@ -135,7 +136,3 @@ Run with:
 Get-Content -Raw scripts/measure-full-text-search.sql |
   docker compose exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1'
 ```
-
-The historical title baseline remains reproducible with
-`scripts/measure-title-search.sql` and the Stage 8 evidence record. Current matching
-semantics are the Stage 9 semantics above.

@@ -51,7 +51,7 @@ Docker Desktop must be running in Linux mode. Tests need neither the development
 .\backend\mvnw.cmd -f backend/pom.xml --batch-mode --no-transfer-progress verify
 ```
 
-Surefire owns unit-test discovery. Failsafe runs `*IT` integration tests during `verify` and fails if it finds none. Unit tests and PostgreSQL integration tests are separate suites; current counts are recorded in [Milestone B evidence](evidence/milestone-b.md).
+Surefire owns unit-test discovery. Failsafe runs `*IT` integration tests during `verify` and fails if it finds none. Unit tests and PostgreSQL integration tests are separate suites; current counts are recorded in [Verification](verification.md).
 
 The integration suite starts its own PostgreSQL container with generated test connection details, applies Flyway, and exercises the real HTTP health endpoint and JPA mapping. It checks migration repeatability, unique normalized emails, invalid roles, and blank hashes. Docker absence is a test failure, not an automatic skip.
 
@@ -71,19 +71,10 @@ Reports are under `backend/target/failsafe-reports/`. Successful verification al
 
 Spring creates and connects configured components through dependency injection. Configuration supplies environment-specific connection details. Flyway runs before JPA initialization, so schema validation checks the migrated schema. Transactional registration and session identity are implemented; see [authentication](authentication.md).
 
-## Historical verification (initial database setup)
+## Verification
 
-Verified on 2026-09-15:
-
-- Maven `verify`: BUILD SUCCESS; 7 integration tests, 0 failures, 0 errors, 0 skipped.
-- Packaged application started against the Compose database and returned HTTP 200 with status UP.
-- Backend restart reported no migration necessary; exactly one successful V1 history entry remained.
-- A temporary sample user row survived a database-container restart and was removed afterwards; app_user contains zero rows after cleanup.
-- Backend health returned UP after the database restart.
-- Docker inspection confirmed a named volume mounted at /var/lib/postgresql.
-- `.env`, local planning documents, and generated logs remain ignored by Git.
-
-Testcontainers uses the digest-only form of the same image reference because its image parser rejected the combined tag/digest form. The build emits a non-failing Mockito agent warning on Java 21; all tests execute successfully.
+See [verification](verification.md) for repeatable commands, coverage, recorded
+results, and current limitations.
 
 ## Official references
 

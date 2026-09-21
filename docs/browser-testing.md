@@ -1,4 +1,4 @@
-# Isolated browser verification (Stage 10)
+# Isolated browser verification
 
 ## Run
 
@@ -56,7 +56,7 @@ backend retry states. Screenshots, failure traces, and backend-compose.log are i
 ignored frontend/test-results.
 
 scripts/verify.ps1 runs the separate Java and frontend regression suites.
-The Stage 11 workflow runs the same command, uploads reports/traces/logs, and has an always-run cleanup step. The runner accepts only commonbeacon-e2e-* names for its optional CI project override.
+The CI workflow runs the same browser command, uploads reports/traces/logs, and has an always-run cleanup step. The runner accepts only commonbeacon-e2e-* names for its optional CI project override.
 
 ## Development demo content
 
@@ -79,7 +79,7 @@ Both retain role checks and keyboard/viewport assertions. The remaining journeys
 cover registration/session expiry, the original ask/reply/accept flow, unavailable
 backend states, search ordering/privacy, and account-scoped overview data.
 
-Milestone B Stage 12 adds `npm run test:persistence` and
+Run `npm run test:persistence` and
 `npm run test:failure-cleanup`, using a separate disposable named volume on port
 4175. They complement the browser stack's tmpfs database by checking restarts,
 normal down/up, expired sessions, data preservation, and intentional failure
@@ -88,12 +88,7 @@ CI runs both after the full browser suite and retains their logs in the browser
 artifact. Its always-run cleanup attempts both test projects even if one cleanup
 fails. The legacy development-volume check is not invoked by these commands.
 
-## Verification (2026-09-16)
+## Recorded results
 
-- scripts/verify.ps1 passed: 5 backend unit tests, 54 PostgreSQL/HTTP integration tests, 49 frontend tests, lint, type checking, and production build.
-- All 6 Playwright tests passed against the isolated stack (25.3 seconds for the browser suite).
-- Runtime inspection confirmed PostgreSQL tmpfs at /var/lib/postgresql and no mounted volumes.
-- Generated test containers/network were removed automatically; the development stack remained healthy.
-- Mobile question and outage screenshots were inspected; long-content overflow and visible keyboard-focus assertions passed.
-- Refreshed the development backend and confirmed both seeded conversations and their solved/unanswered states through the public API.
-- Stage 10 was pushed as 97bab88. See [Stage 11 fresh-copy evidence](evidence/milestone-a.md); its new workflow requires a push before remote execution can be verified.
+See [verification](verification.md) for repeatable commands, coverage, recorded
+results, and current limitations.

@@ -137,8 +137,7 @@ questions remain eligible. Weighted English vectors cover titles (A) and bodies
 (B). Replies and private moderation data are not sources.
 
 `websearch_to_tsquery` accepts words, quoted phrases, OR, and minus exclusions.
-English stemming applies; punctuation no longer follows Stage 8 literal substring
-semantics. Missing/blank/tokenless/stop-word-only queries return no results. Trimmed
+English stemming applies; punctuation follows PostgreSQL query parsing. Missing/blank/tokenless/stop-word-only queries return no results. Trimmed
 q is bounded to 200 UTF-16 units; excess length returns 400 VALIDATION_FAILED with
 fieldErrors.q. Query text is parameter-bound, never interpolated as SQL.
 
@@ -178,7 +177,7 @@ python -m venv "$env:TEMP/commonbeacon-openapi-tools"
 ```
 
 Schema validation checks structure, not authorization or transactions. See the
-[operator walkthrough](operator-walkthrough.md) and [verification evidence](evidence/milestone-b.md)
+[operator walkthrough](operator-walkthrough.md) and [verification evidence](verification.md)
 for live-response and lifecycle checks. Server text bounds count UTF-16 units;
 JSON Schema string lengths count Unicode code points, so clients must also honor
 the documented server limits. ProblemDetail `type`/`instance` may be omitted,

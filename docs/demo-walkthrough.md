@@ -49,14 +49,11 @@ Restoring the hidden reply alone leaves it unaccepted. For article verification,
 Avery to edit/publish the draft, search its body, change its published text, and
 archive it. Check public visibility and overview counts after each change.
 
-## Existing development data and restarts
+## Existing data and restarts
 
-The original untouched Compose verification board is renamed **Using CommonBeacon**
-and its persistence question/reply become the saved-work lesson, preserving their
-IDs. Known original demo questions are expanded; a question/reply already edited
-before this upgrade is left alone rather than overwritten. Other user boards and
-content are not renamed or deleted. The one-time wording cleanup targets original
-seed strings and IDs only.
+Seeding preserves edited content and existing account credentials. Compatibility
+handling for earlier bundled examples is restricted to known original records;
+arbitrary user boards and conversations are not renamed or deleted.
 
 The last misconception reply's deterministic ID marks a completed lesson bundle.
 All startup changes share one transaction. On subsequent runs, lesson titles,
@@ -65,8 +62,8 @@ Article archival, resolved reports, restorations, and account credentials are
 also preserved. This is not a reset command. Manually deleting seed records can
 allow them to be recreated on a later enabled startup.
 
-The removed random Browser board and Question smoke records are never recreated
-by this seeder. Browser verification runs on its own disposable PostgreSQL stack.
+Browser verification runs on its own disposable PostgreSQL stack and does not
+add test conversations to the development database.
 `DemoOperationsIT` checks exact lesson counts, accepted reply content, legacy
 conversion, and preservation on repeated runs; `onboarding.spec.ts` checks all
 nine lessons through the public API and representative mobile pages.

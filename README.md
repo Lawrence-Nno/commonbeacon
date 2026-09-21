@@ -96,8 +96,8 @@ See the [onboarding walkthrough](docs/demo-walkthrough.md) and
 - [Isolated browser tests](docs/browser-testing.md)
 - [REST API examples](docs/api.md) and [OpenAPI contract](docs/openapi.json)
 - [Architecture decisions](docs/architecture.md)
-- [Milestone evidence, demo script, and limitations](docs/evidence/milestone-a.md)
-- [Reporting and moderator review](docs/moderation.md), [Milestone B evidence](docs/evidence/milestone-b.md)
+- [Testing, verification results, and limitations](docs/verification.md)
+- [Reporting and moderator review](docs/moderation.md)
 - [Knowledge-article screens, APIs, and search contracts](docs/knowledge.md)
 - [Weighted full-text search, visibility, and query plans](docs/search.md)
 - [Authentication](docs/authentication.md), [boards](docs/boards.md),
@@ -113,8 +113,8 @@ backend/ contains the Java application, Flyway migrations, and integration tests
 frontend/ contains the client and browser tests. scripts/ contains host helpers.
 .github/workflows/ci.yml defines backend, frontend, and container/browser jobs.
 
-Local planning documents, .env, build output, and test artifacts are ignored.
-Never force-add credentials or planning documents. Demo accounts and content are optional sample data.
+Local `.env` files, build output, and test artifacts are ignored.
+Keep credentials out of version control. Demo accounts and content are optional sample data.
 
 ## Deployment scope
 

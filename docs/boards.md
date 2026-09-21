@@ -1,13 +1,10 @@
-# Stage 5: public boards and administration
-
-> Stage 10 update: npm run test:smoke now creates and cleans up an isolated test stack. Earlier verification notes below describe the historical development-database runs. Follow [current browser testing instructions](browser-testing.md); no development credentials or running host backend are required.
-
+# Public boards and administration
 
 ## Use the feature
 
 Start the app with the commands in [frontend setup](frontend-setup.md). The home
 page lists every board, including archived boards. Open a card to visit
-/boards/{id}; direct links and refresh work. Stage 6 adds paginated questions, creation, and owner editing; see [questions](questions.md).
+/boards/{id}; direct links and refresh work. Boards support paginated questions, creation, and owner editing; see [questions](questions.md).
 Empty boards show an invitation to ask the first question. Question threads support replies and accepted answers.
 
 Sign in as an administrator and choose **Manage boards** (/admin/boards).
@@ -45,15 +42,16 @@ The sample accounts all initially use the configured DEMO_PASSWORD:
 - morgan.moderator@example.test — Morgan Vale, MODERATOR.
 - avery.admin@example.test — Avery Stone, ADMINISTRATOR.
 
-Seed boards are **Getting started** (getting-started) and **Product help** (product-help).
+Seed boards are **Getting started** (`getting-started`), **Product help**
+(`product-help`), and **Using CommonBeacon** (`using-commonbeacon`). See the
+[onboarding walkthrough](demo-walkthrough.md) for their nine questions and 45 visible answers.
 The seeder runs in one transaction and inserts only missing emails/slugs.
 Repeated startup does not duplicate them, reset passwords, replace roles, unarchive
 boards, or overwrite edited metadata. Existing accounts with those addresses are
 preserved as they are; the seeder never promotes an existing registered account.
 Changing DEMO_PASSWORD later affects only accounts created after that change.
 
-This workspace has local demo seeding enabled and a generated password in .env.
-That local value and all planning documents remain excluded from Git.
+Keep your local `.env` and credentials out of version control.
 
 ## REST contract
 
@@ -116,11 +114,7 @@ Implementation responsibilities:
 Archived boards reject ordinary question/reply creation, owner editing, and
 accepted-answer changes; reporting and moderation remain available. Board listing remains unpaginated.
 
-## Verified results — 2026-09-16
+## Verification
 
-scripts/verify.ps1 completed with exit 0: 5 backend unit tests, 24 integration tests,
-27 frontend tests, lint, TypeScript checking, and production build passed.
-All 5 Chrome tests passed. Administrator desktop and archived-board mobile
-screenshots were inspected; the mobile overflow check passed.
-
-Stage 5 was committed and pushed as 4fa6d34. These are its local verification results.
+See [verification](verification.md) for repeatable commands, coverage, recorded
+results, and current limitations.

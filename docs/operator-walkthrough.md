@@ -75,4 +75,4 @@ reply search. Visibility history is append-only through the application, not a
 tamper-proof database log. Sessions and login limits are single-instance, and
 board locks serialize writes on one board. Local HTTP Compose is not a completed
 public-hosting configuration. See [architecture](architecture.md) and
-[verification evidence](evidence/milestone-b.md) for measured behavior and limits.
+[verification evidence](verification.md) for measured behavior and limits.

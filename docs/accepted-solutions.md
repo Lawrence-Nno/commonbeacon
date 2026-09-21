@@ -1,4 +1,4 @@
-# Accepted solutions (Stage 8)
+# Accepted solutions
 
 Only the question author can select, replace, or clear a solution. Owning the
 reply or having a moderator/administrator role does not grant this permission.
@@ -32,9 +32,6 @@ Flyway V5 adds nullable `question.accepted_reply_id`, a unique constraint on
 a reply belonging to another question. The single nullable reference permits at
 most one selected reply. There is no separate persisted solved flag.
 
-> Stage 10 update: npm run test:smoke now creates and cleans up an isolated test stack. Earlier verification notes below describe the historical development-database runs. Follow [current browser testing instructions](browser-testing.md); no development credentials or running host backend are required.
-
-
 Public solved status additionally requires the referenced reply to be visible. If a reply is hidden without clearing its reference (for example by a direct database write), question details suppress its body and author, and board badges, counts, and filters treat the question as unanswered. Reads do not mutate the stored reference. Moderation clears an accepted reference atomically when hiding a reply. List queries fetch accepted replies alongside authors to avoid per-question visibility lookups.
 
 These protections solve different problems:
@@ -47,7 +44,7 @@ These protections solve different problems:
   The board lock coordinates archival; the question lock precedes any reply
   lock. A scalar board lookup avoids loading an outdated managed question before
   locking it. Reply hiding follows this same order and clears an
-  accepted selection atomically. The accept-versus-hide test belongs to Milestone B.
+  accepted selection atomically. PostgreSQL integration tests cover both accept-versus-hide lock orders.
 - **Expected versions** reject a stale user's intent after waiting for a lock.
   JPA `@Version` also protects against other versioned question writers.
 
@@ -68,28 +65,7 @@ automatic retries of a mutation whose outcome may be uncertain. Successful chang
 update question detail and invalidate board-list caches. The board filter lives
 in the URL, resets to page zero when changed, and persists between pages.
 
-## Verification on 2026-09-16
+## Verification
 
-- Maven `verify`: 5 unit tests and 53 PostgreSQL/HTTP integration tests passed.
-- Frontend lint, typecheck, all 49 tests, and production build passed.
-- All 6 Chrome smoke tests passed against the real local backend. The expanded
-  question journey covers selecting another member's answer, accepting one's own
-  reply as a replacement, clearing, filter results, unauthorized selection,
-  archived controls, and persistence after reload.
-- The 390px mobile screenshot was inspected; no horizontal overflow.
-- Ten new integration tests cover ownership across roles, CSRF/validation,
-  hidden/archive restrictions, direct SQL cross-question rejection, concurrent
-  selection and replacement-versus-clear conflicts, and filtered counts/pages. Additional regressions cover hidden accepted replies across public detail/list/filter responses, acceptance versus question editing, and acceptance waiting behind archival.
-- Eight added frontend tests cover selection and clearing, version submission,
-  pending controls, explicit conflict recovery, unavailable controls, independent
-  accepted-answer display, response consistency, and filter pagination.
-
-Current verification commands: select tools with `scripts/use-dev-tools.ps1`, then
-run `scripts/verify.ps1`. From frontend, `npm run test:smoke` builds its own isolated
-Compose stack and disposable database with Docker and Chrome; no host backend or
-local datasource helper is required. See [browser verification](browser-testing.md).
-
-The results above are the original Stage 8 observations. Current revisions, CI,
-and isolated migration/restart checks are recorded in
-[Milestone B evidence](evidence/milestone-b.md). Sessions remain in memory; backend
-restart signs existing users out without deleting conversations.
+See [verification](verification.md) for repeatable commands, coverage, recorded
+results, and current limitations.

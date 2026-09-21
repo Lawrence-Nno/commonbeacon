@@ -1,7 +1,4 @@
-# Stage 6: questions and owner editing
-
-> Stage 10 update: npm run test:smoke now creates and cleans up an isolated test stack. Earlier verification notes below describe the historical development-database runs. Follow [current browser testing instructions](browser-testing.md); no development credentials or running host backend are required.
-
+# Questions and owner editing
 
 ## Use the feature
 
@@ -110,10 +107,7 @@ two-tab stale edits and desktop/mobile checks. Its disposable stack does not rea
 `.env` or change development data. See [browser verification](browser-testing.md),
 [replies](replies.md), and [accepted solutions](accepted-solutions.md).
 
-## Verified results — 2026-09-16
+## Verification
 
-scripts/verify.ps1 passed: 5 backend unit tests and 34 integration tests, with no
-failures/errors/skips; 36 frontend tests; lint; TypeScript checking; production build.
-All 6 Chrome smoke tests passed. Desktop and mobile question screenshots were
-inspected, and the mobile overflow check passed. Stage 6 was committed and pushed as 19ce858;
-remote CI status is not recorded here.
+See [verification](verification.md) for repeatable commands, coverage, recorded
+results, and current limitations.

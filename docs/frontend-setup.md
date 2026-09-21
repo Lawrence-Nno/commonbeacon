@@ -86,19 +86,12 @@ All direct package versions are exact. package-lock.json records the full resolv
 - Frontend: pinned Node and npm, npm ci, lint, type checking, component/client tests, and production build.
 - Containers/browser: image builds, browser workflows, persistent-storage checks, injected-failure cleanup, and retained failure artifacts.
 
-The jobs use read-only repository permissions. Container verification includes report uploads and always-run cleanup. See [Milestone B evidence](evidence/milestone-b.md) for exact remote-versus-local status.
+The jobs use read-only repository permissions. Container verification includes report uploads and always-run cleanup. See [Verification](verification.md) for exact remote-versus-local status.
 
-## Verification evidence
+## Verification
 
-On 2026-09-15:
-
-- Frontend lint, TypeScript checking, 15 component/client tests, and production build passed.
-- Three Google Chrome smoke tests passed, using a real backend and an intentionally unavailable upstream.
-- Desktop (1440px) and mobile (390px) screenshots were inspected.
-- Isolated temporary command fixtures verified early exit on backend and frontend failures and success when a command emits stderr warnings but exits 0.
-- Combined scripts/verify.ps1 completed with exit 0: 7 backend integration tests, 15 frontend tests, lint, type checking, and build all passed.
-
-The evidence above records Stage 3. See [authentication](authentication.md) for Stage 4 behavior and verification. See [questions](questions.md) and [replies](replies.md) for discussion features and current verification results.
+See [verification](verification.md) for repeatable commands, coverage, recorded
+results, and current limitations.
 
 ## References
 

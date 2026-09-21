@@ -1,6 +1,4 @@
-> Current browser command: npm run test:smoke starts an isolated container stack automatically; no host backend or development credentials are required. See [browser testing](browser-testing.md).
-
-# Stage 4: registration and secure sessions
+# Registration and secure sessions
 
 ## Try it locally
 
@@ -8,7 +6,7 @@ Start PostgreSQL, the backend, and Vite using [frontend setup](frontend-setup.md
 Open http://127.0.0.1:5173/register, create a sample member, then sign in.
 Reload to verify the session survives browser navigation; use **Sign out** to invalidate it.
 
-Registration does not sign the user in automatically. Stage 5 adds opt-in local administrator and other demo
+Registration does not sign the user in automatically. Optional local seeding provides administrator and other demo
 accounts; see [boards and demo setup](boards.md).
 
 ## API contract
@@ -54,8 +52,7 @@ details are included in these bodies.
   HTTPS deployment uses SPRING_PROFILES_ACTIVE=prod, which enforces Secure.
 - Sessions are in application memory; backend restart signs users out.
 - /api/v1/admin/** requires ADMINISTRATOR; /api/v1/moderation/** requires MODERATOR
-  or ADMINISTRATOR. These reserve authorization rules; product endpoints arrive
-  in their respective stages.
+  or ADMINISTRATOR. Services enforce these role boundaries as well as HTTP routing.
 - IdentityService.requireOwner compares the authenticated user ID with the owner.
   Administrators/moderators have no implicit ownership bypass.
 - The browser checks /me on load, window focus, and every minute while visible.
@@ -108,12 +105,7 @@ the password hash, while UserSummary intentionally omits it. **Transactions** ke
 registration persistence atomic; a database uniqueness constraint remains decisive
 when two requests arrive at once.
 
-## Verified results — 2026-09-16
+## Recorded results
 
-- Combined scripts/verify.ps1: exit 0.
-- Backend: 2 unit tests and 17 integration tests; no failures, errors, or skips.
-  This includes a real HTTP production-profile Secure-cookie test.
-- Frontend: 21 tests, ESLint, TypeScript checks, and production build passed.
-- Chrome: all 4 smoke tests passed against the rebuilt backend with the local profile.
-- Desktop registration and mobile login screenshots inspected; mobile width check passed.
-- Stage 4 was committed and pushed as 13b7692. The results above are local verification.
+See [verification](verification.md) for repeatable commands, coverage, recorded
+results, and current limitations.

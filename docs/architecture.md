@@ -106,5 +106,5 @@ Nginx serves the client and proxies `/api`; Docker service names are internal.
 Ordinary shutdown retains the PostgreSQL named volume. Browser tests use an isolated
 tmpfs database; persistence checks use a separate disposable named volume. Unit,
 real PostgreSQL integration, browser, migration, and restart checks verify different
-boundaries. [Milestone B evidence](evidence/milestone-b.md) records exact revisions,
+boundaries. [Verification](verification.md) records exact revisions,
 counts, CI status, and remaining operational limits.

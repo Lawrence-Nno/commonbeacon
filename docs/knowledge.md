@@ -3,7 +3,7 @@
 Administrators manage article drafts, publication, live edits, and archival.
 Public readers browse published guidance at `/knowledge` and `/knowledge/:slug`.
 See [OpenAPI](openapi.json), [search](search.md), and
-[verification evidence](evidence/milestone-b.md).
+[verification evidence](verification.md).
 
 ## Shared conventions
 

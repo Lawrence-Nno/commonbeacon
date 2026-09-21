@@ -1,7 +1,4 @@
-# Replies (Stage 7)
-
-> Stage 10 update: npm run test:smoke now creates and cleans up an isolated test stack. Earlier verification notes below describe the historical development-database runs. Follow [current browser testing instructions](browser-testing.md); no development credentials or running host backend are required.
-
+# Replies
 
 ## Behavior
 
@@ -62,24 +59,7 @@ A stale edit offers "Reload latest and discard draft"; the edit version changes
 only after reloading both the reply and its parent successfully. Account/thread
 changes discard private drafts. Archived drafts remain visible with saving disabled.
 
-## Verification (2026-09-16)
+## Verification
 
-scripts/verify.ps1 passed: 5 backend unit tests, 43 PostgreSQL/HTTP integration
-tests, 41 frontend tests, lint, type checking, and production build.
-
-Nine ReplyIT tests cover second-member replies, forged author rejection, owner-only
-editing, hidden parents/replies, archive restrictions, validation, CSRF, pagination
-and tie ordering, concurrent edits, writes waiting behind archival, and the
-question foreign key. Frontend tests exercise draft preservation, pending saves,
-explicit conflict reload, archived drafts, and malformed responses.
-
-All six Chrome smoke tests passed. The question smoke test now also creates a
-second-member reply, reloads it, rejects a forged edit, edits from two tabs,
-recovers a conflict, verifies public literal-text rendering, and checks archived
-reply controls. The 390px mobile screenshot was inspected and overflow checks pass.
-
-Run `npm run test:smoke` from frontend with Docker and Chrome. The runner creates
-and removes its own isolated stack and never uses the development database.
-See [browser verification](browser-testing.md) for commands and artifacts.
-
-Stage 6 was committed and pushed as 19ce858. Stage 7 was committed and pushed as 4b08546. Remote CI status is not recorded here.
+See [verification](verification.md) for repeatable commands, coverage, recorded
+results, and current limitations.
