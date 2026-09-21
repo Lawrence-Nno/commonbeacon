@@ -117,9 +117,11 @@ Use the actual files alongside [architecture notes](../architecture.md):
 
 Java paths above are relative to backend/src/main/java/com/lawrencenno/commonbeacon,
 except migrations (backend/src/main/resources) and tests (backend/src/test/java).
-Personal interview fluency requires rehearsing this walkthrough; tests do not prove it.
 
-## Known limitations and next work
+## Limitations recorded at Milestone A completion
+
+This section records the original scope. Moderation, knowledge articles, and search
+are now implemented; see [current Milestone B evidence](milestone-b.md).
 
 - Local HTTP deployment only; Internet deployment needs TLS, proxy trust, and
   operational hardening.

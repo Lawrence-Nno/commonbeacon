@@ -57,12 +57,11 @@ timestamps. Offset pagination can shift page boundaries when new questions are
 inserted between requests. A page beyond the current end returns an empty items
 array with the real totals.
 
-## Persistence, transactions, and Java learning
+## Persistence and transactions
 
 V3 creates question with board/author foreign keys, visibility checks, trimmed
 text bounds, timestamps, and a version column. The board/createdAt/id index
-supports the listing order. V1 and V2 remain unchanged. Accepted replies arrive
-in Stage 8 after the reply table exists.
+supports the listing order. V1 and V2 remain unchanged. V5 adds the accepted-reply constraint after the V4 reply table.
 
 The JPA entity represents stored data. Request records validate input; response
 records define safe API fields. Mapping happens inside service transactions with
@@ -82,14 +81,10 @@ PostgreSQL value read after reload.
 Question creation/editing and board metadata/archive changes acquire a database
 write lock on the board until commit. That makes the archive check and write one
 ordered operation: a request waiting behind archival rechecks the closed board.
-This simple policy serializes writes within a board and is appropriate for the
-current learning application. Future reply/moderation operations must retain a
-consistent locking order; question/reply row locks, when added, must still acquire
-the question before its replies.
-
-Hidden-question filtering is implemented in public queries and counts now.
-There is no user-facing hide/restore feature yet. Later moderation writes must
-increment version so concurrent edits cannot overwrite visibility changes.
+This policy serializes writes within a board, trading throughput for coordinated
+archive and visibility checks. Thread operations acquire board, question, then reply
+locks. Moderation follows the same order and advances affected versions; see
+[moderation](moderation.md). Hidden questions are excluded from public reads and counts.
 
 ## Verification
 
@@ -109,13 +104,11 @@ Frontend tests cover literal text rendering, owner controls, draft preservation,
 explicit stale reload using the new version, field errors, pagination, malformed
 responses, and archived/missing states.
 
-The Chrome smoke suite requires the running backend, local demo seeding, Chrome,
-and DEMO_PASSWORD loaded with scripts/use-local-database.ps1. In frontend run
-npm run test:smoke. It uses separate owner, other-member, administrator, and
-anonymous contexts, including a two-tab stale edit and desktop/mobile screenshots.
-It leaves unique fictional boards/questions/accounts in the development database;
-it does not delete application data. Full isolated browser fixtures belong to
-Stage 10. Replies are implemented in [Stage 7](replies.md). Accepted solutions and solved/unanswered filtering are implemented in [Stage 8](accepted-solutions.md).
+Run `npm run test:smoke` from frontend with Docker and Chrome. The isolated runner
+uses separate owner, other-member, administrator, and visitor contexts, including
+two-tab stale edits and desktop/mobile checks. Its disposable stack does not read
+`.env` or change development data. See [browser verification](browser-testing.md),
+[replies](replies.md), and [accepted solutions](accepted-solutions.md).
 
 ## Verified results — 2026-09-16
 

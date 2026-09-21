@@ -2,21 +2,19 @@
 
 ## Status
 
-Stage 1 is complete: baseline verified and implementation contracts finalized on
-2026-09-19. Stage 2 report submission is committed/pushed as e846e13 and passed
-remote CI. Stage 5 is pushed as a35159d and passed remote CI. Stage 6 article APIs
-are pushed as b0db30b and passed remote CI run 35505191732. Stage 7 article screens
-are pushed as 7c1d654 and passed remote CI run 35517586020. Stage 8 is pushed as
-08c45b1 and passed remote CI run 35522390347. Stage 9 weighted full-text search is
-complete locally on 2026-09-20: 112 backend tests, 114 frontend tests, lint/type
-checking/build, and nine browser tests passed. Stage 9 is uncommitted and has not
-run remotely. Stages 10-13 remain planned.
+Milestone B Stages 1-13 are implemented and locally verified. Stage 12 is pushed
+as `fb5f585627d63790e8d850327f8f220cab9e413d`; all three jobs passed in
+[CI run 35533157796](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35533157796),
+including persistence and failure cleanup. Stage 13 documentation and the OpenAPI
+contract are locally verified on 2026-09-21 and remain uncommitted; no remote CI
+result is claimed for these working-tree additions. The final Stage 13 record is
+at the end of this document. Earlier entries retain their historical observations.
 
 Baseline revision: `2d33c96de62b6feda06a4b32366e300844f7ff4a`.
 Verification used the existing workspace with documentation changes, not a new
 clean checkout. No backend/frontend source, dependency, migration, or verification
 script changed during Stage 1. Pre-existing README, architecture, evidence-link,
-and interview-preparation edits were preserved. These paragraphs record the Stage 1
+and local-only documentation edits were preserved. These paragraphs record the Stage 1
 baseline; its later commit/push and Stage 2 work are recorded below.
 
 ## Stage 1 contracts and inspection
@@ -149,8 +147,7 @@ No Milestone B feature tests existed at that handoff because Stage 1 established
 No new clean-install, upgrade, persistence-restart, search performance, or
 accept-versus-hide experiment was performed here; those belong to later stages.
 The baseline's in-memory sessions, single-instance throttling, and board-level
-write serialization remain unchanged. Java discussion prompts were documented;
-personal rehearsal is not certified by test results.
+write serialization remain unchanged. These results establish the tested behavior at that revision.
 
 At the Stage 1 handoff, the next action was Stage 2. Its implementation follows.
 
@@ -158,7 +155,7 @@ At the Stage 1 handoff, the next action was Stage 2. Its implementation follows.
 
 - Committed/pushed the ignore rule, moderation/knowledge contracts, Stage 1 evidence,
   and only the Stage 1 Milestone A evidence corrections as `d90ab67`. Unrelated
-  interview-preparation changes, including the evidence-page link, stayed unstaged.
+  local-only documentation changes, including the evidence-page link, stayed unstaged.
 - [Run 35454701087](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35454701087)
   passed backend and frontend jobs but failed the existing question browser journey
   while waiting for a login form after closing the previous page.
@@ -272,7 +269,7 @@ commit/push and Stage 3 implementation are recorded below.
 ## Stage 2 commit/push
 
 Committed and pushed Stage 2 as `e846e13e21d16397a22730d1cc8ebb97dda07919`, excluding
-unrelated README/architecture/interview-preparation edits. The planning documents
+unrelated README/architecture/local-only documentation edits. The planning documents
 remain ignored. [Run 35456325210](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35456325210)
 completed successfully for this revision.
 
@@ -352,7 +349,7 @@ The subsequent commit/push and Stage 4 implementation are recorded below.
 ## Stage 3 commit/push
 
 Committed and pushed `2aac71665191b09103d9941993a08eaf4c03af24`, preserving the
-unrelated interview-preparation documentation changes. All three jobs passed in
+unrelated local-only documentation changes. All three jobs passed in
 [run 35457992302](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35457992302).
 The local implementation plans remain ignored.
 
@@ -435,7 +432,7 @@ healthy, V7 upgraded the existing database, and its volume was preserved.
 queue access returns 401. Log: `%TEMP%/commonbeacon-b-stage4-startup.log`.
 
 README, moderation behavior, this evidence record, and the ignored implementation
-plans now record Stage 4. Unrelated interview-preparation edits are preserved.
+plans now record Stage 4. Unrelated local-only documentation edits are preserved.
 At that handoff Stage 4 was uncommitted and had not run remotely. Its subsequent
 commit/push and Stage 5 implementation are recorded below.
 
@@ -443,7 +440,7 @@ commit/push and Stage 5 implementation are recorded below.
 ## Stage 4 commit/push
 
 Committed and pushed `fa2bd90313960790f56c724f883551a3c507178f`, preserving unrelated
-interview-preparation documentation edits. All jobs passed in
+local-only documentation edits. All jobs passed in
 [run 35459273829](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35459273829).
 The local implementation plans remain ignored.
 
@@ -535,7 +532,7 @@ privileged content-history URL returns 401.
 Startup log: `%TEMP%/commonbeacon-b-stage5-startup.log`.
 
 README, moderation documentation, this evidence record, and ignored plans now
-record Stage 5. Unrelated interview-preparation edits remain untouched.
+record Stage 5. Unrelated local-only documentation edits remain untouched.
 At that handoff Stage 5 was uncommitted and had not run remotely. Its subsequent
 commit/push and Stage 6 implementation are recorded below.
 
@@ -543,7 +540,7 @@ commit/push and Stage 6 implementation are recorded below.
 ## Stage 5 commit/push
 
 Committed and pushed `a35159d011dc54884a620fc49186e060b57906ca`, excluding unrelated
-interview-preparation documentation changes. All jobs passed in
+local-only documentation changes. All jobs passed in
 [run 35465953871](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35465953871).
 The local implementation plans remain ignored.
 
@@ -624,7 +621,7 @@ returns 401, and an unknown public article slug returns 404 at port 8081.
 Log: `%TEMP%/commonbeacon-b-stage6-startup.log`.
 
 Ignored plans mark Stage 6 complete locally and identify Stage 7 article
-administration/public pages as next. Unrelated interview-preparation edits are
+administration/public pages as next. Unrelated local-only documentation edits are
 preserved; no .env credentials or development content were changed.
 At that handoff Stage 6 was uncommitted and had not run remotely. Its subsequent
 commit/push is recorded below.
@@ -633,8 +630,8 @@ commit/push is recorded below.
 
 Committed and pushed `b0db30be8cecf5ce08155db79d12650d43eec43e`. All jobs passed in
 [run 35505191732](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35505191732),
-inspected on 2026-09-20. Local plans and docs/interview-preparation remain ignored;
-interview preparation has no tracked files.
+inspected on 2026-09-20. Local plans and private reference documents remain ignored;
+private reference material has no tracked files.
 
 ## Stage 7 implementation: 2026-09-20
 
@@ -708,7 +705,7 @@ records were inserted into the development database. Startup log:
 `%TEMP%/commonbeacon-b-stage7-startup.log`.
 
 README, article/API documentation, this evidence, and ignored local plans record
-Stage 7. Existing interview-preparation documentation edits remain preserved.
+Stage 7. Existing local-only documentation edits remain preserved.
 At that handoff Stage 7 was uncommitted and had not run remotely. Its subsequent
 commit/push and Stage 8 title-search implementation are recorded below.
 
@@ -717,8 +714,8 @@ commit/push and Stage 8 title-search implementation are recorded below.
 Committed and pushed `7c1d654cdf7c1d6da183522ce5b1d3a4ff59e139`. All jobs passed in
 [run 35517586020](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35517586020),
 inspected on 2026-09-20. The commit includes Stage 7 code/tests/documentation and
-excludes the unrelated interview-preparation links in README, architecture, and
-Milestone A evidence. Local plans and interview-preparation files remain ignored.
+excludes the unrelated local-only documentation links in README, architecture, and
+Milestone A evidence. Local plans and local-only documentation files remain ignored.
 
 ## Stage 8 implementation: 2026-09-20
 
@@ -814,8 +811,8 @@ The disposable containers/network were removed and project-label queries confirm
 no leftovers.
 
 README, REST/knowledge/search documentation, this evidence, and ignored plans now
-record Stage 8. Existing unrelated interview-preparation documentation changes are
-preserved, and the interview-preparation folder remains ignored. At that handoff Stage 8 was uncommitted and had not run remotely. Its subsequent
+record Stage 8. Existing unrelated local-only documentation changes are
+preserved, and the local-only documentation folder remains ignored. At that handoff Stage 8 was uncommitted and had not run remotely. Its subsequent
 commit/push and Stage 9 implementation are recorded below.
 
 
@@ -823,8 +820,8 @@ commit/push and Stage 9 implementation are recorded below.
 
 Committed and pushed `08c45b1e8db674190fdd86451d91bbcf2d08ba4e`. All jobs passed in
 [run 35522390347](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35522390347),
-inspected on 2026-09-20. The Stage 8 commit excludes unrelated interview-preparation
-links; local plans and interview-preparation files remain ignored.
+inspected on 2026-09-20. The Stage 8 commit excludes unrelated local-only documentation
+links; local plans and local-only documentation files remain ignored.
 
 ## Stage 9 implementation: 2026-09-20
 
@@ -891,7 +888,7 @@ demo content was inserted. Log: `%TEMP%/commonbeacon-b-stage9-startup.log`.
 README, REST/knowledge/search documentation, this evidence, and ignored plans now
 record Stage 9. Documentation covers generated-column tradeoffs, English parser
 semantics, ranking limits, prefix snippets, no typo tolerance/reply search, and
-cross-request page shifts. Unrelated interview-preparation edits are preserved.
+cross-request page shifts. Unrelated local-only documentation edits are preserved.
 Stage 9 was subsequently committed/pushed as `8aa605b` (weighted PostgreSQL
 full-text search). All jobs passed in [CI run 35523110150](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35523110150).
 
@@ -953,7 +950,7 @@ access returns 401, and Flyway remains at V9. No demo rows were added to develop
 data. Log: `%TEMP%/commonbeacon-b-stage10-startup.log`.
 
 README, moderation/API documentation, this evidence, the captured plan, and ignored
-local plans now record Stage 10. Interview-preparation files remain ignored and
+local plans now record Stage 10. Private reference files remain ignored and
 pre-existing unrelated documentation edits are preserved. Stage 10 was subsequently
 pushed as `5d12e61`. [CI run 35524230843](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35524230843)
 failed in the overview browser test: it navigated immediately after clicking Sign
@@ -1019,7 +1016,7 @@ absent. The public knowledge list contains the new published guide. Startup log:
 Added the fictional demo walkthrough and updated README, browser verification docs,
 this evidence, and ignored local plans. Stage 11 remains uncommitted and has not
 run remotely; the Stage 10 CI logout fix awaits the next push. Existing unrelated
-interview links remain preserved and personal preparation files remain ignored.
+private reference links remain preserved and personal preparation files remain ignored.
 Next: Stage 12 migration-upgrade, persistence/restart, container, and CI verification.
 
 ### Requested onboarding-content expansion (2026-09-20)
@@ -1101,9 +1098,8 @@ remaining-container logs, attempts cleanup for both projects even if one cleanup
 fails, and uploads evidence with the existing seven-day retention. Readiness and
 job timeouts remain bounded. Maven's existing IT discovery includes the new
 migration tests; frontend/browser commands continue discovering their suites.
-Stage 12's new workflow steps have not run remotely because this stage is not yet
-committed. The successful linked run above is specifically the Stage 11/onboarding
-revision, not a claim of remote verification for these uncommitted additions.
+At the original Stage 12 handoff, the new workflow steps were locally verified.
+They subsequently passed remotely for `fb5f585` in CI run 35533157796.
 
 The persistence runner passed backend restart, database restart, and normal
 Compose down/up. Exact fingerprints of all stored rows remained equal; OPEN and
@@ -1131,5 +1127,131 @@ using `commonbeacon_postgres_data`; its three boards each retain three onboardin
 questions. Stage 12 did not restart or alter the development stack.
 
 Updated README, Compose/browser verification docs, this evidence, and ignored
-plans. Stage 12 is complete locally and remains uncommitted; its new CI steps
-await a later push. Stage 13 documentation and Milestone B handoff is next.
+plans. Stage 12 was subsequently committed/pushed as `fb5f585`; all three CI jobs
+passed. Stage 13 documentation and handoff results follow.
+
+
+## Stage 13 - API contract, product documentation, and handoff (2026-09-21)
+
+Base revision: `fb5f585627d63790e8d850327f8f220cab9e413d` (Stage 12, pushed).
+Stage 13 consists of working-tree documentation and an `.env.example` comment;
+application source, migrations, dependency locks, and CI configuration are unchanged.
+It remains uncommitted and has no independent remote CI result.
+
+### Product documentation and scope
+
+README now introduces CommonBeacon as a customer-support community with role-based
+workflows, knowledge publication, search, and operational counts. Removed personal-study
+framing and links to private reference material. Preserved
+optional onboarding examples, factual deployment restrictions, historical commits,
+and measured results. Personal reference files and implementation plans stay ignored.
+Updated outdated setup statements about missing authentication/moderation/replies,
+future reverse proxy/CI work, and browser tests writing to the development database.
+
+The architecture document now records the implemented decisions: one backend,
+session boundaries, Flyway schema ownership, accepted-answer integrity, ordered
+locks and reviewed versions, atomic moderation, separate reports/action history,
+article lifecycle, PostgreSQL full-text search, snapshot reads, and client cache
+isolation. Moderation and knowledge documents describe current behavior rather
+than pending implementation targets. The [operator walkthrough](../operator-walkthrough.md)
+uses actual accounts/routes and covers the complete community/moderation/article flow.
+
+### OpenAPI verification
+
+Added [OpenAPI 3.1](../openapi.json): **39 operations and 44 schemas**, including
+form login, cookie sessions, fresh CSRF headers, role/owner requirements, page
+bounds, nullable context, request/response DTOs, lifecycle versions, and errors.
+Health probes are explicitly outside the application API contract. A source-route
+comparison found exact equality with controller methods plus security-filter login
+and logout. `openapi-spec-validator 0.9.0` validated the document; `jsonschema 4.26.0`
+validated all component schemas, request examples, and live request/response bodies.
+These optional tools were installed in a temporary environment, not app dependencies.
+
+The live check exercised all 39 operations and validated **114 HTTP responses**.
+It verified public/private article projections, session/CSRF flow, role denials,
+report receipt shape and duplicate conflict, accepted-answer clearing on hide,
+restoration without acceptance, independently hidden children after parent restore,
+private action history, operational counts, draft exclusion, publication/search,
+live editing, stale-write rejection, and terminal archival. It also verified the
+initial three boards, nine questions, 45 visible replies, nine accepted answers,
+and initial summary 0/1/1. All checks passed.
+
+The first validation attempt found that security-filter ProblemDetail omits `type`.
+The contract was corrected to make `type` optional, then the complete live check
+passed. No application behavior was changed to fit the documentation. UTF-16 server
+length bounds versus JSON Schema Unicode-code-point bounds are documented.
+
+### Source-only setup and restart
+
+Environment: Windows/PowerShell, Docker Desktop Linux engine, PostgreSQL 18.6,
+Java 21 and Node 24.13.1 tooling, npm 11.8.0, Chrome via Playwright. Created a new
+source-only copy of tracked files plus the contract under
+`%TEMP%/commonbeacon-stage13-source-20260921`. Asserted it contained no development
+`.env`, `.git`, `node_modules`, `frontend/dist`, or `backend/target`. Then generated a
+new `.env` from `.env.example` with unique disposable passwords, opt-in seeding, and
+port 4181. Docker layer caches were available; this was not an uncached build claim.
+
+In that directory, the README startup procedure passed with an explicit isolated
+project name:
+
+```powershell
+docker compose --project-name commonbeacon-handoff-20260921 config --quiet
+docker compose --project-name commonbeacon-handoff-20260921 up -d --build --wait --wait-timeout 180
+```
+
+Both images built from the source copy and all services became healthy. The API
+workflow above used Nginx at `http://127.0.0.1:4181`, not a host backend. Restarted
+only that project's backend and waited for readiness. The old session returned 401;
+a fresh login succeeded. Exact fingerprints across all seven domain tables stayed
+equal. Resolved reports, three reply visibility actions, hidden reply, cleared
+acceptance, archived article, summary, and search remained consistent.
+
+### Browser observations and cleanup
+
+Inspected Chrome screenshots at 390 x 844 after the workflow and restart:
+
+- Moderator overview showed 1 unanswered question, 1 open report, and 1 published
+  article, with cards, explanations, and queue controls fitting the viewport.
+- Archived article deep link showed read-only fields and the terminal-state notice.
+- Public restored question showed its archived-board notice, zero public replies,
+  and no accepted panel; the independently hidden reply remained absent.
+
+All three deep links and width checks passed. The initial question capture was
+taken while replies loaded; a follow-up used the actual `Room for the first reply.`
+label after an incorrect temporary selector timed out. The fully loaded screenshot
+was then inspected. This was a verification-script correction, not an application fix.
+
+Logs and inspected screenshots are local artifacts under `%TEMP%` with prefix
+`commonbeacon-stage13-`: `clean-start.log`, `contract.log`, `restart.log`,
+`compose.log`, `summary.png`, `article.png`, and `question.png`. Temporary API-check
+scripts are session verification utilities, not additions to the maintained suite.
+The walkthrough and existing isolated browser/persistence commands remain repeatable.
+
+Final `down --volumes --remove-orphans` targeted only
+`commonbeacon-handoff-20260921`. Docker label checks found no remaining containers,
+network, or volume for that project. `commonbeacon_postgres_data` remains present;
+no development credentials or data were used by these checks.
+
+### Completion evidence and remaining limits
+
+- Community/report/role and cache behavior: original integration/component/browser
+  evidence above, plus the Stage 13 live operations and inspected screens.
+- Atomicity, rollback, and both accept/hide lock orders: Stage 4/5 PostgreSQL tests.
+- Article lifecycle/privacy and search consistency: Stages 6-9 and live Stage 13 checks.
+- Search and summary plans: captured Stage 9/10 measurements, with dataset sizes and
+  no unmeasured performance or production latency claims.
+- Clean migrations, populated V5-to-V9 upgrade, Hibernate validation, restart/down-up,
+  and injected-failure cleanup: Stage 12, now green in remote CI.
+- Full baseline regression: Stage 12 passed **122 backend tests (5 unit + 117 integration)**,
+  **127 frontend tests**, lint/types/build, and **11 browser tests**. All three remote
+  jobs passed for the exact pushed revision. Stage 13 does not relabel these as new
+  full-suite runs; documentation changes received the targeted checks above.
+- Final local Markdown file/anchor checks, product-positioning scan, OpenAPI validation,
+  and Git whitespace checks passed. No credentials, generated artifacts, or private
+  planning/reference files are included in the intended Stage 13 changes.
+
+Milestone B product work is complete locally. Public hosting, TLS/proxy hardening,
+shared sessions/rate limiting, password recovery/MFA, verified backup recovery,
+rolling upgrades, high-contention throughput, and non-English/typo-tolerant search
+remain outside the verified scope. Audit history is not tamper-proof. Milestone C
+is planned and has not been implemented by this handoff.

@@ -8,7 +8,7 @@
 Start the app with the commands in [frontend setup](frontend-setup.md). The home
 page lists every board, including archived boards. Open a card to visit
 /boards/{id}; direct links and refresh work. Stage 6 adds paginated questions, creation, and owner editing; see [questions](questions.md).
-Empty boards show an invitation to ask the first question. Replies are still planned.
+Empty boards show an invitation to ask the first question. Question threads support replies and accepted answers.
 
 Sign in as an administrator and choose **Manage boards** (/admin/boards).
 Create a board with its name, slug, and description. Choose **Edit board** to change
@@ -38,7 +38,7 @@ Seeding is disabled by default. It requires both the local profile and the enabl
 flag; it is disabled when prod is active, even with local also active.
 Missing/invalid demo passwords fail startup before any seed data is written.
 
-The fictional accounts all initially use the configured DEMO_PASSWORD:
+The sample accounts all initially use the configured DEMO_PASSWORD:
 
 - alex.member@example.test — Alex River, MEMBER.
 - sam.member@example.test — Sam Reed, MEMBER.
@@ -87,7 +87,7 @@ version column. V1 remains unchanged. Spring Security checks endpoint permission
 and BoardService repeats administrator enforcement with @PreAuthorize so another
 caller cannot bypass authorization by avoiding the controller.
 
-## Verification and Java learning
+## Verification and implementation notes
 
 Run scripts/verify.ps1 for backend and frontend checks. Board integration tests
 use real HTTP cookie sessions and disposable PostgreSQL containers. They verify
@@ -95,22 +95,12 @@ public access, permissions, CSRF, validation, duplicate slugs, archive/reopen,
 concurrent edits, and repeat seeding. Separate tests verify the profile/flag gate
 and invalid-password behavior.
 
-For the Chrome checks, start the backend with demo seeding, then use:
+For browser checks, run `npm run test:smoke` from frontend with Docker and Chrome
+available. The runner builds its own isolated stack, tests administrator board
+creation/edit/archive/reopen and anonymous reads, then removes the test database.
+See [browser verification](browser-testing.md); the development stack is untouched.
 
-~~~powershell
-. .\scripts\use-dev-tools.ps1
-. .\scripts\use-local-database.ps1
-Set-Location frontend
-npm.cmd run test:smoke
-~~~
-
-The browser test logs in with the seeded administrator, creates a uniquely named
-fictional board, edits/archives/reopens it, and checks it from a separate anonymous
-browser context. Smoke tests leave their fictional account/board rows in the
-configured development database; they do not delete application data.
-Use a disposable database for repeated runs. Full isolated workflows belong to Stage 10.
-
-Java concepts to trace:
+Implementation responsibilities:
 
 - A controller validates a request record and calls a Spring-managed service.
 - @PreAuthorize checks the authenticated user's role before the service runs.
@@ -123,8 +113,8 @@ Java concepts to trace:
 - The demo seeder uses PostgreSQL ON CONFLICT DO NOTHING to preserve existing rows
   while avoiding changes to the public registration rule that always grants MEMBER.
 
-Stage 6 enforces archive restrictions for question creation and owner editing.
-Reply restrictions arrive with replies. Board listing remains unpaginated.
+Archived boards reject ordinary question/reply creation, owner editing, and
+accepted-answer changes; reporting and moderation remain available. Board listing remains unpaginated.
 
 ## Verified results — 2026-09-16
 

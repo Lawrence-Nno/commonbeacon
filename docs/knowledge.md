@@ -1,9 +1,9 @@
-# Milestone B knowledge and search contracts
+# Knowledge articles
 
-Status: Stage 6 article lifecycle/public APIs and Stage 7 article screens are
-implemented locally as of 2026-09-20. Stage 9 weighted full-text search is also implemented. See
-[Milestone B evidence](evidence/milestone-b.md) for verification and commit status.
-See [search implementation notes](search.md) for the current Stage 9 API and browser route.
+Administrators manage article drafts, publication, live edits, and archival.
+Public readers browse published guidance at `/knowledge` and `/knowledge/:slug`.
+See [OpenAPI](openapi.json), [search](search.md), and
+[verification evidence](evidence/milestone-b.md).
 
 ## Shared conventions
 
@@ -11,7 +11,7 @@ Paths use `/api/v1`; UUID strings, UTC ISO-8601 timestamps, nonnegative versions
 plain-text rendering, sessions, CSRF, and ProblemDetail follow the existing app.
 Use the same bounded page envelope and 32-bit offset limit described in
 [moderation contracts](moderation.md). List defaults are page 0 and size 20;
-maximum size 100. No client-controlled sort in this milestone. Unknown JSON
+maximum size 100. No client-controlled sort is supported. Unknown JSON
 request fields fail with `400 INVALID_REQUEST` on these new DTOs only.
 
 Article title length is 5–200 and body 10–20,000 after `String.trim()`, measured
@@ -34,16 +34,16 @@ on later edits. Do not accept `authorId`, `status`, or timestamps from clients.
   commit; there is no separate working revision. The editor must explain this.
 - Archive moves DRAFT or PUBLISHED -> ARCHIVED. Preserve any prior publication
   timestamp; an archived never-published draft retains null `publishedAt`.
-- ARCHIVED is terminal and read-only in Milestone B. No unarchive, return-to-draft,
+- ARCHIVED is terminal and read-only. No unarchive, return-to-draft,
   hard-delete, revision-history, scheduled publication, or slug-change endpoint.
 
 Require `expectedVersion` on every existing-article write. Reject stale versions
 with `409 STALE_EDIT` before evaluating transitions. Duplicate/repeated or forbidden
 state transitions return `409 ARTICLE_STATE_CONFLICT`. Each successful transition
-or edit increments version and updates `updatedAt`; a same-value edit may leave
-version unchanged if no persisted fields change. No-op lifecycle actions conflict.
+or edit updates `updatedAt` and advances the persisted version when the entity
+changes. No-op lifecycle actions conflict.
 
-## Exact REST shapes: Stages 6–7
+## REST shapes
 
 Public DTOs never contain drafts, administrative state, another user's email, or
 password data. `PublicAuthor` is `{id, displayName}`.
@@ -91,7 +91,7 @@ and PUBLISHED has one; ARCHIVED permits either based on its history. V1-V7 are
 unchanged. Listing indexes cover public published-time order,
 administrator update-time order, and status-filtered update-time order.
 
-Tests must cover administrator versus moderator/member/visitor permissions; CSRF;
+Integration tests cover administrator versus moderator/member/visitor permissions; CSRF;
 forged metadata; trimmed validation and malformed/duplicate slugs; concurrent slug
 creation; stale edit, publish, and archive races; draft/archived public `404` and
 list totals; publication timestamps; immediate published edits; immutable slug
@@ -99,66 +99,19 @@ and preserved author; terminal archival; plain-text rendering and pagination.
 
 UI routes are `/knowledge`, `/knowledge/:slug`, and `/admin/articles` (editor views
 may be nested). Preserve content on validation/network/conflict errors and require
-explicit reload/reconciliation. Invalidate public/admin detail/lists plus later
+explicit reload/reconciliation. Invalidate public/admin detail/lists plus
 search/summary queries after state changes. Cancel and clear private queries on
 logout, expiry, and account switch, including late response handling. Verify SPA
 deep links, labels, focus, keyboard access, and narrow screens.
 
-## Frozen search contract: Stages 8–9
+## Search integration
 
-`GET /search?q=...&page=0&size=20` is public. Missing q is equivalent to empty.
-Trim q; maximum 200 UTF-16 code units. Reject excess length with
-`400 VALIDATION_FAILED` and `fieldErrors.q`; blank/whitespace q returns an empty
-page with zero totals. Validate page bounds even for blank input.
+Only PUBLISHED articles participate in [public full-text search](search.md).
+Draft and archived text contributes no hits, snippets, or totals. Published edits
+update generated vectors in the same database write. Client mutations invalidate
+search and operational-summary queries; other sessions refetch on navigation/focus.
 
-Each hit is exactly `{kind, id, title, snippet, url, rank}`. Kind is QUESTION or
-ARTICLE; URLs are relative `/questions/{id}` or `/knowledge/{slug}`. Rank is a
-finite nonnegative number, not a percentage or cross-query confidence score.
-Snippet is at most 240 UTF-16 code units including an optional ellipsis, cut
-without splitting surrogate pairs; it contains plain text with no trusted HTML.
-
-Stage 8 searches titles using parameterized case-insensitive literal substring
-matching with SQL pattern escaping, rank 0, and a bounded body-prefix snippet.
-Stage 9 replaces matching with explicit PostgreSQL `english` full-text search over
-weighted title (A) and body (B), using `websearch_to_tsquery`, `ts_rank_cd`, and
-maintained tsvectors/GIN indexes. Input operators follow that parser; do not pass
-raw query text as SQL. Stop-word-only or tokenless queries return empty results.
-Keep the bounded plain-text snippet contract; highlights are not required.
-Verify specific parser/index behavior against the installed PostgreSQL release
-when implementing, rather than treating this plan as library documentation.
-
-Both stages merge eligible questions and articles before global ordering and
-pagination. Sort `rank DESC, kind ASC, id ASC`, with explicit kind order ARTICLE
-before QUESTION, then PostgreSQL UUID ordering. Return the standard page envelope
-with one combined count and identical visibility predicates for results/counts.
-Use one read snapshot per response so items and totals correspond under concurrent
-moderation/publication. Offset pages can still move across separate requests.
-
-Eligible data: VISIBLE questions, including archived-board questions, and PUBLISHED
-articles only. Replies, reports, moderator notes, draft and archived articles are
-not sources. A hidden question contributes neither hit nor snippet nor count.
-Hide/restore, editing, publish/archive must affect reads begun after their commit;
-already-rendered text in another browser is not remotely erased. Refetch on
-navigation/focus and invalidate current-client caches; no real-time push is claimed.
-
-Search tests cover literal pattern characters in Stage 8; punctuation/operators,
-empty and stop-word input in Stage 9; no matches, mixed kinds, global counts/pages,
-rank ties, title/body weighting in controlled fixtures, stale results on edit,
-distinctive private text, and migration backfill. Record query plans for selective
-and broad queries using stated dataset sizes; do not promise an index scan on a
-tiny table or an unmeasured speedup. English stemming, no typo correction, no
-separate reply search, and page shifts are documented limits.
-
-## Java discussion checkpoint
-
-Explain DTO records, validation after normalization, author derivation from the
-session, enum transition rules, transactional version checks, and public query
-predicates. Compare JPA entity queries with typed native-SQL projections for mixed
-search results. Rehearse publication and stale-edit paths in source when they exist;
-these contracts are implementation targets, not evidence of personal proficiency.
-
-
-## Stage 6 implementation notes and API walkthrough
+## Transaction behavior and API walkthrough
 
 The article entity implements DRAFT/PUBLISHED/ARCHIVED transitions with microsecond
 UTC timestamps and optimistic versions. Administrator mutations acquire a fresh
@@ -182,7 +135,7 @@ Offset pages may still shift between separate requests.
 Using the session and fresh CSRF flow in [the API reference](api.md):
 
 1. POST `/api/v1/admin/articles` with
-   `{"slug":"first-steps","title":"Your first steps","body":"Follow these fictional setup instructions."}`.
+   `{"slug":"first-steps","title":"Your first steps","body":"Follow these sample setup instructions."}`.
    Expect 201 with Location, DRAFT, version 0, and null publishedAt.
 2. GET `/api/v1/articles/first-steps` returns 404 while it is a draft.
 3. POST `/api/v1/admin/articles/{id}/publish` with `{"expectedVersion":0}`.
@@ -198,7 +151,7 @@ Replace example versions with the version actually reviewed. A lost response or
 409 requires a reload before deciding whether to submit again. JSON bodies are
 plain text, including literal markup; the article screens render them as text.
 
-## Stage 7 screens and browser walkthrough
+## Screens and browser walkthrough
 
 Public navigation includes Knowledge. `/knowledge?page=0` lists published guides
 in pages of 20; `/knowledge/:slug` shows title, original author, publication time,
@@ -235,7 +188,7 @@ manual retry; the globally unique slug prevents duplicate creation if the first
 request committed but its response was lost.
 
 Successful mutations invalidate administrator lists/details, public article
-queries, and the reserved search/moderation query prefixes for future views.
+queries, and search/moderation query prefixes.
 Private queries include the actor ID and consume cancellation signals. Logout,
 expiry, and account changes use the shared authentication cache cancellation and
 clear operation; actor-keyed editors unmount, clearing draft state. Late mutation

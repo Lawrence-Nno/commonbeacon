@@ -32,7 +32,7 @@ moderator, and Avery is an administrator. All initially use your DEMO_PASSWORD.
 - An OPEN report on the reporting lesson demonstrates the private review queue.
 - A HIDDEN reply under the restoration lesson has a RESOLVED/HIDE report and a
   matching audit entry. This extra reply is private and is not one of the five
-  visible learning answers. Restoring it does not change the selected correct
+  visible onboarding answers. Restoring it does not change the selected correct
   answer; it will then become a sixth visible reply.
 - **Writing a helpful question** is published at
   `/knowledge/demo-writing-a-helpful-question`.
@@ -43,9 +43,9 @@ On a fresh untouched seeded database, the overview shows **0 unanswered question
 1 open report, and 1 published article**. All nine lessons have selected answers.
 Existing data and later actions can change these counts.
 
-To practice moderation, create your own question and reply, accept the reply as
+To verify moderation, create your own question and reply, accept the reply as
 its owner, report it, then hide it as Morgan. The question becomes unanswered.
-Restoring the hidden reply alone leaves it unaccepted. For article practice, use
+Restoring the hidden reply alone leaves it unaccepted. For article verification, use
 Avery to edit/publish the draft, search its body, change its published text, and
 archive it. Check public visibility and overview counts after each change.
 

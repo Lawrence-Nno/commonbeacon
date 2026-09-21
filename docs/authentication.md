@@ -5,7 +5,7 @@
 ## Try it locally
 
 Start PostgreSQL, the backend, and Vite using [frontend setup](frontend-setup.md).
-Open http://127.0.0.1:5173/register, create a fictional member, then sign in.
+Open http://127.0.0.1:5173/register, create a sample member, then sign in.
 Reload to verify the session survives browser navigation; use **Sign out** to invalidate it.
 
 Registration does not sign the user in automatically. Stage 5 adds opt-in local administrator and other demo
@@ -72,7 +72,7 @@ including successes. It retains at most 10,000 address windows and returns 429 w
 capacity is reached. It uses the socket address, not untrusted forwarded headers.
 Through the local Vite proxy, users share the proxy address and therefore its limit.
 
-This is a local learning implementation. Multi-instance sessions, distributed
+The supplied deployment uses a single backend instance. Shared sessions, distributed
 throttling, trusted deployment proxy configuration, email verification, password
 reset, and MFA are not implemented. These require separate design before deployment.
 
@@ -87,14 +87,13 @@ logout invalidation, denied role/ownership access, and HTTP throttling.
 Frontend tests cover form errors, registration success, cache clearing, stale
 startup responses, CSRF renewal, credential encoding, and no automatic mutation retry.
 
-With the backend running, `npm run test:smoke` in frontend also exercises registration,
-sign-in, reload, logout, invalid credentials, and externally invalidated sessions
-in Chrome. The auth smoke test creates one unique fictional smoke-UUID@example.test
-account in the configured development database. Its address is attached to the test
-result; the test does not delete existing data. Use a disposable database for
-repeated smoke runs. Full isolated community workflows arrive in Stage 10.
+`npm run test:smoke` in frontend builds an isolated Compose stack and exercises
+registration, sign-in, reload, logout, invalid credentials, and externally invalidated
+sessions in Chrome. Test accounts exist only in its disposable database; no running
+host backend, development `.env`, or development volume is used. See
+[browser verification](browser-testing.md).
 
-## Java learning checkpoint
+## Authentication and authorization boundaries
 
 **Authentication** establishes who made a request. Spring Security filters process
 cookies, CSRF, and credentials before the controller runs. A successful login stores

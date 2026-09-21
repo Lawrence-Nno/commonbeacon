@@ -1,8 +1,8 @@
-# Public search: Stage 9 weighted full-text search
+# Public search
 
 `GET /api/v1/search` and `/search` now search titles and bodies of visible questions
 and published articles with PostgreSQL English full-text matching. Stage 9 replaces
-the Stage 8 literal-title baseline while preserving the bounded response shape and
+the earlier literal-title implementation while preserving the bounded response shape and
 public visibility rules. English stemming, phrase/OR/exclusion syntax, and relevance
 ranking are supported. There is no typo correction, separate reply search, HTML
 highlighting, or real-time push to other browsers.
@@ -139,11 +139,3 @@ Get-Content -Raw scripts/measure-full-text-search.sql |
 The historical title baseline remains reproducible with
 `scripts/measure-title-search.sql` and the Stage 8 evidence record. Current matching
 semantics are the Stage 9 semantics above.
-
-## Java discussion checkpoint
-
-Trace bounded URL input through JDBC binding, typed projection, weighted vectors,
-public predicates, snapshot transaction, and the React query key. Explain why GIN
-candidate lookup does not remove ranking/sorting costs, why broad queries can choose
-sequential scans, and why filtering private rows after pagination breaks totals.
-Personal explanation practice is separate from automated verification.

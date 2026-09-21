@@ -35,7 +35,7 @@ most one selected reply. There is no separate persisted solved flag.
 > Stage 10 update: npm run test:smoke now creates and cleans up an isolated test stack. Earlier verification notes below describe the historical development-database runs. Follow [current browser testing instructions](browser-testing.md); no development credentials or running host backend are required.
 
 
-Public solved status additionally requires the referenced reply to be visible. If a reply is hidden without clearing its reference (for example by a direct database write), question details suppress its body and author, and board badges, counts, and filters treat the question as unanswered. Reads do not mutate the stored reference. Future moderation must still clear an accepted reference atomically when hiding a reply. List queries fetch accepted replies alongside authors to avoid per-question visibility lookups.
+Public solved status additionally requires the referenced reply to be visible. If a reply is hidden without clearing its reference (for example by a direct database write), question details suppress its body and author, and board badges, counts, and filters treat the question as unanswered. Reads do not mutate the stored reference. Moderation clears an accepted reference atomically when hiding a reply. List queries fetch accepted replies alongside authors to avoid per-question visibility lookups.
 
 These protections solve different problems:
 
@@ -46,7 +46,7 @@ These protections solve different problems:
   Acceptance follows the established **board -> question -> reply** order.
   The board lock coordinates archival; the question lock precedes any reply
   lock. A scalar board lookup avoids loading an outdated managed question before
-  locking it. Future reply hiding must follow this same order and clear an
+  locking it. Reply hiding follows this same order and clears an
   accepted selection atomically. The accept-versus-hide test belongs to Milestone B.
 - **Expected versions** reject a stale user's intent after waiting for a lock.
   JPA `@Version` also protects against other versioned question writers.
@@ -84,15 +84,12 @@ in the URL, resets to page zero when changed, and persists between pages.
   pending controls, explicit conflict recovery, unavailable controls, independent
   accepted-answer display, response consistency, and filter pagination.
 
-Commands: select tools with `scripts/use-dev-tools.ps1`, then run Maven `verify`
-and frontend `npm run lint`, `typecheck`, `test:run`, and `build` (or use
-`scripts/verify.ps1`). Stop a running packaged backend before rebuilding its JAR
-on Windows. For Chrome, start the backend with the local datasource helper and
-demo seeding enabled, load that helper in the test terminal, then run
-`npm run test:smoke` from frontend. See [demo setup](boards.md).
+Current verification commands: select tools with `scripts/use-dev-tools.ps1`, then
+run `scripts/verify.ps1`. From frontend, `npm run test:smoke` builds its own isolated
+Compose stack and disposable database with Docker and Chrome; no host backend or
+local datasource helper is required. See [browser verification](browser-testing.md).
 
-Stage 7 was committed and pushed as `4b08546`. Stage 8 is locally verified and
-uncommitted; remote CI has not run for it. Smoke tests leave uniquely named
-fictional development records. Isolated end-to-end fixtures and full Compose
-packaging remain Stages 10 and 9, respectively. Sessions remain in memory, so the
-backend restart during verification signed existing users out.
+The results above are the original Stage 8 observations. Current revisions, CI,
+and isolated migration/restart checks are recorded in
+[Milestone B evidence](evidence/milestone-b.md). Sessions remain in memory; backend
+restart signs existing users out without deleting conversations.

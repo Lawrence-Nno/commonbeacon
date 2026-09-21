@@ -4,7 +4,7 @@
 
 Use Java 21, Node 24.13.1 with npm 11.8.0, Git, and Docker Desktop with its WSL 2 Linux backend. Exact selected application versions are recorded in the root README.
 
-The JDK includes the Java compiler and JVM. The compiler converts Java source to bytecode; the JVM executes it. Maven resolves dependencies and runs the build; Spring Boot configures and starts the application. A Maven Wrapper will be added in Stage 2, so a global Maven installation is unnecessary.
+The JDK includes the Java compiler and JVM. The compiler converts Java source to bytecode; the JVM executes it. Maven resolves dependencies and runs the build; Spring Boot configures and starts the application. The checked-in Maven Wrapper pins the build tool, so a global Maven installation is unnecessary.
 
 ## Windows setup
 
@@ -26,7 +26,7 @@ Node 24.13.1 is already installed on the development machine through nvm-windows
 
 On another machine, install the version in `.nvmrc` first. The helper also accepts explicit `-JavaHome` and `-NodeHome` directories for nonstandard installations. It does not download tools or change persistent environment variables.
 
-The check script validates Java runtime/compiler versions, pinned Node/npm versions, Git, Compose, and a reachable Linux Docker engine. It exits nonzero on failure. The optional container smoke check uses a floating diagnostic image only; application container versions will be pinned in Stage 2.
+The check script validates Java runtime/compiler versions, pinned Node/npm versions, Git, Compose, and a reachable Linux Docker engine. It exits nonzero on failure. The optional container smoke check uses a floating diagnostic image only; application container versions and digests are pinned in the Compose and Docker files.
 
 ## Troubleshooting
 
@@ -36,7 +36,6 @@ The check script validates Java runtime/compiler versions, pinned Node/npm versi
 - **Docker engine unavailable:** open Docker Desktop and wait for engine readiness. A successful CLI version check alone is insufficient.
 - **WSL or virtualization error:** follow Docker's Windows prerequisites and complete required OS setup; do not skip integration tests to hide an unavailable engine.
 - **Registry download failure:** check network/proxy access; no successful container test is claimed until the image actually runs.
-- **Old workspace path:** open `C:\work\codebase\commonbeacon`. This session originally started in a different folder; all Stage 1 changes belong in the CommonBeacon folder.
 
 ## Verification record
 
@@ -66,4 +65,4 @@ This record covers Stage 1 prerequisites. Stages 2 and 3 are now implemented; se
 - [Docker Desktop Windows installation](https://docs.docker.com/desktop/setup/install/windows-install/).
 - [Temurin installation](https://adoptium.net/installation/).
 
-Frontend package versions and compatibility constraints were read from the public npm registry on 2026-09-15; full install/build validation belongs to Stage 3.
+Frontend package versions and compatibility constraints were read from the public npm registry on 2026-09-15; subsequent install/build and CI results are recorded in the milestone evidence.

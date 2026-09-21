@@ -30,7 +30,7 @@ compose.e2e.yaml is standalone, not an override of compose.yaml. PostgreSQL uses
 tmpfs at /var/lib/postgresql, with no named or external volume. Each run receives
 a generated commonbeacon-e2e-* project name. All startup, log, and cleanup calls
 specify that project and file. The runner uses .env.example explicitly; it never
-loads development credentials. Disposable credentials are fictional, fixed, and
+loads development credentials. Disposable credentials are sample, fixed, and
 used only by this localhost test backend.
 
 Cleanup uses down --remove-orphans on that generated project, without volume

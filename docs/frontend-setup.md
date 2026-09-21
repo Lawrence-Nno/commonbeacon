@@ -1,8 +1,8 @@
-# Stage 3: frontend and verification
+# Frontend development and verification
 
 ## What exists
 
-React and TypeScript provide a responsive community home, an about route, and a not-found route. The home lists public boards; each board shows paginated questions, with creation and owner editing available on open boards. See [question workflows](questions.md). See [boards and demo setup](boards.md) for Stage 5 administration. Stage 4 adds registration and login routes; see [authentication](authentication.md).
+React and TypeScript provide a responsive community home, an about route, and a not-found route. The home lists public boards; each board shows paginated questions, with creation and owner editing available on open boards. See [question workflows](questions.md). See [boards and demo setup](boards.md) for board administration. Registration and login routes are implemented; see [authentication](authentication.md).
 
 The connection card calls the real backend through Vite. It supports loading, healthy, offline, timeout, and retry states. A failed refresh replaces previously cached success; automatic checks run every 30 seconds while the tab is active.
 
@@ -64,11 +64,11 @@ npm.cmd run test:run
 npm.cmd run build
 ```
 
-npm run test starts interactive test watching. The production output is frontend/dist. Vite preview serves those static files but does not provide the development API proxy; use npm run dev for the connected local application until the production reverse proxy is added.
+npm run test starts interactive test watching. The production output is frontend/dist. Vite preview serves those static files but does not provide the development API proxy; use npm run dev for host development or the Nginx-backed Compose deployment for the packaged application.
 
 ## Real-browser checks
 
-Run npm run test:smoke from frontend with Docker Desktop and Chrome available. Stage 10 starts a real backend with disposable PostgreSQL automatically; no development backend or .env is needed. See [isolated browser verification](browser-testing.md) for commands, isolation, coverage, and failure artifacts.
+Run npm run test:smoke from frontend with Docker Desktop and Chrome available. The runner starts a real backend with disposable PostgreSQL automatically; no development backend or .env is needed. See [isolated browser verification](browser-testing.md) for commands, isolation, coverage, and failure artifacts.
 
 ## Dependency decisions
 
@@ -80,12 +80,13 @@ All direct package versions are exact. package-lock.json records the full resolv
 
 ## Continuous integration
 
-.github/workflows/ci.yml defines two jobs on GitHub-hosted Ubuntu:
+.github/workflows/ci.yml defines three jobs on GitHub-hosted Ubuntu:
 
 - Backend: Temurin 21, Docker availability check, Maven verify with Testcontainers.
 - Frontend: pinned Node and npm, npm ci, lint, type checking, component/client tests, and production build.
+- Containers/browser: image builds, browser workflows, persistent-storage checks, injected-failure cleanup, and retained failure artifacts.
 
-The jobs use read-only repository permissions. Stage 11 adds an isolated container/browser job with report uploads and always-run cleanup. See [milestone evidence](evidence/milestone-a.md) for the exact remote-versus-local status.
+The jobs use read-only repository permissions. Container verification includes report uploads and always-run cleanup. See [Milestone B evidence](evidence/milestone-b.md) for exact remote-versus-local status.
 
 ## Verification evidence
 

@@ -1,19 +1,18 @@
 # CommonBeacon
 
-An independent customer-support community built to learn Java: Spring Boot,
-PostgreSQL, React/TypeScript, and Docker Compose.
+CommonBeacon is a customer-support community for asking questions, sharing answers,
+and publishing reliable product guidance. Members can mark accepted solutions and
+report concerns; moderators review reports and manage content visibility;
+administrators organize boards and maintain the knowledge library.
 
-Milestone A implements accounts, boards, questions, replies, accepted solutions,
-owner/role permissions, conflict handling, and repeatable tests. Milestone B adds
-member reporting, a protected moderator queue, atomic report resolution, and
-content hiding/restoration with private audit history. Administrator knowledge-article
-APIs and screens support drafts, publication, live edits, and archival. Browse
-published guides at `/knowledge`; administrators manage them at `/admin/articles`.
-Search visible questions and published articles by title and body at `/search`,
-with weighted English full-text matching. Moderators and administrators see
-unanswered-question, open-report, and published-article counts at `/moderation`.
-See the milestone evidence
-for local verification and remote CI status.
+## Capabilities
+
+- Public boards, questions, answers, and published knowledge articles.
+- Account registration, session authentication, owner editing, and accepted answers.
+- Private reporting, moderator review, restoration, and visibility-change history.
+- Administrator-managed article drafts, publication, live edits, and archival.
+- English full-text search across question and article titles and bodies.
+- Protected operational counts for unanswered questions, open reports, and published articles.
 
 ## Start from a fresh checkout
 
@@ -26,7 +25,7 @@ cd commonbeacon
 Copy-Item .env.example .env
 ```
 
-Edit .env: replace POSTGRES_PASSWORD with a unique local password. For fictional
+Edit .env: replace POSTGRES_PASSWORD with a unique local password. For optional
 demo accounts, set DEMO_SEED_ENABLED=true and a unique DEMO_PASSWORD of 12–128
 characters. Then:
 
@@ -85,17 +84,18 @@ Getting started, Product help, and Using CommonBeacon each contain three practic
 onboarding questions. Each question has five visible answers: one accepted
 explanation and four clearly labeled misconceptions with corrections (nine
 questions and 45 visible answers in total). Private moderation examples and the
-published/draft knowledge articles remain available for operator practice.
+published/draft knowledge articles support the operator walkthrough.
 Reseeding preserves later edits, credentials, selections, and moderation decisions.
-See the [onboarding walkthrough](docs/demo-walkthrough.md).
+See the [onboarding walkthrough](docs/demo-walkthrough.md) and
+[operator verification walkthrough](docs/operator-walkthrough.md).
 
 ## Documentation
 
 - [Compose startup, persistence, troubleshooting](docs/compose.md)
 - [Host tool setup](docs/development-setup.md) and [host backend](docs/backend-setup.md)
 - [Isolated browser tests](docs/browser-testing.md)
-- [REST API examples](docs/api.md)
-- [Architecture decisions and Java learning notes](docs/architecture.md)
+- [REST API examples](docs/api.md) and [OpenAPI contract](docs/openapi.json)
+- [Architecture decisions](docs/architecture.md)
 - [Milestone evidence, demo script, and limitations](docs/evidence/milestone-a.md)
 - [Reporting and moderator review](docs/moderation.md), [Milestone B evidence](docs/evidence/milestone-b.md)
 - [Knowledge-article screens, APIs, and search contracts](docs/knowledge.md)
@@ -114,5 +114,14 @@ frontend/ contains the client and browser tests. scripts/ contains host helpers.
 .github/workflows/ci.yml defines backend, frontend, and container/browser jobs.
 
 Local planning documents, .env, build output, and test artifacts are ignored.
-Never force-add credentials or planning documents. Branding and demo content are
-original and fictional. Java package: com.lawrencenno.commonbeacon.
+Never force-add credentials or planning documents. Demo accounts and content are optional sample data.
+
+## Deployment scope
+
+The supplied Compose configuration binds the frontend to localhost. Sessions and
+login throttling are held in one backend process. Public hosting requires TLS,
+trusted proxy configuration, credential and backup management, and deployment
+hardening. Email verification, password recovery, MFA, shared sessions, and
+distributed rate limiting are not implemented. Database persistence and forward
+migrations are tested; backup recovery and rolling upgrades are not certified.
+See [architecture decisions](docs/architecture.md) for constraints and tradeoffs.

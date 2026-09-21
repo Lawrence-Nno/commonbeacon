@@ -1,75 +1,110 @@
-# Architecture decisions and Java discussion notes
+# Architecture decisions
 
-## 1. One backend application
+## One backend and one database
 
-Spring MVC controllers validate transport input and call transactional services.
-Repositories handle persistence; DTO records define public responses. Keeping
-identity, boards, questions, and replies in one application makes database
-transactions and debugging understandable for this learning project. Separate
-services would add deployment and consistency costs without a current requirement.
+A single Spring Boot application owns identity, boards, conversations, moderation,
+knowledge, and search. Controllers validate transport input; services enforce roles,
+ownership, and transactional rules; repositories select explicit response data.
+Keeping these features together allows content, accepted answers, reports, and
+visibility history to change atomically in PostgreSQL. Separate services would
+introduce cross-service consistency and operational costs without a current need.
 
-Discuss: follow a request from controller to service to repository; explain why
-authorization and business checks belong on the server even when buttons are hidden.
+The React client uses same-origin session APIs through Nginx. UI permissions improve
+usability; service and HTTP authorization enforce access even when clients bypass
+buttons. Public author projections expose only ID and display name.
 
-## 2. Server-side sessions
+## Sessions and deployment boundary
 
-The browser holds an HttpOnly, SameSite=Lax session cookie, not a token in local
-storage. Spring Security manages login and session-ID rotation. Every write needs
-CSRF protection. In-memory sessions simplify one-instance development but disappear
-on restart; scaling requires shared session storage or another deliberate design.
-Local HTTP disables Secure only in the local profile; production enables it.
+Spring Security manages server-side sessions and rotates session IDs on login.
+The browser uses an HttpOnly, SameSite=Lax cookie. Writes require session-backed
+CSRF tokens, including registration and login. Local HTTP disables Secure in the
+local profile; the production profile enables it. Sessions and address-based login
+limits live in memory: backend restart signs users out, and multiple instances
+would require shared state. A proxy shares its socket-address login allowance
+among users until trusted deployment proxy handling is designed.
 
-Discuss: distinguish authentication, role checks, ownership, CSRF, and XSS.
-Explain why a valid session alone does not authorize selecting another author's answer.
+## Schema ownership and accepted-answer integrity
 
-## 3. Flyway owns schema changes
+Flyway owns versioned SQL; Hibernate validates rather than modifies the schema.
+Applied migrations are immutable. Foreign keys and checks protect invariants even
+when code is bypassed. The composite foreign key
+`question(id, accepted_reply_id) -> reply(question_id, id)` ensures the selected
+reply belongs to its question. One nullable reference gives at most one selection;
+public solved status additionally requires that reply to be visible.
 
-Versioned SQL migrations establish tables, constraints, and indexes. Hibernate
-validates the schema instead of changing it automatically. Foreign keys protect
-references even when application code is bypassed. Applied migrations are immutable;
-later changes require another migration.
+V1-V5 establish the community; V6-V7 add reports and visibility history; V8 adds
+articles; V9 adds generated search vectors and partial GIN indexes. Clean startup
+and forward upgrade from populated V5 are tested with schema validation. This does
+not establish reverse migrations, old-binary compatibility, or zero-downtime upgrades.
+V9's stored-column/index work occurs during Flyway startup.
 
-Discuss: explain the composite foreign key
-question(id, accepted_reply_id) -> reply(question_id, id). It ensures the selected
-reply belongs to that question. A single nullable reference permits at most one
-selection, without a second persisted solved flag.
+## Moderation atomicity and concurrency
 
-## 4. Locks and versions protect different things
+Thread mutations acquire locks in order: board, question, target reply if present,
+then report when resolving. Scalar lookups locate IDs before fresh locked entity
+reads; preloaded managed state must not determine decisions after a lock wait.
+Permissions, visibility, archival rules, and reviewed versions are rechecked under
+those locks. Board locks coordinate archival but serialize unrelated writes on
+one board, a deliberate throughput limitation.
 
-Acceptance locks board -> question -> selected reply, then rechecks permissions,
-visibility, archival state, membership, and expectedVersion. The board lock
-coordinates archival but serializes unrelated conversations on that board.
-This is an explicit simplicity/throughput tradeoff.
+`expectedVersion` protects reviewed intent; JPA `@Version` guards persistence
+updates; constraints protect structure. Locks alone cannot detect a stale form.
+Hiding an accepted reply clears selection and writes the visibility event in the
+same transaction as report resolution. A failure rolls back all three. Hiding a
+parent preserves child states and internal acceptance; restoring a reply does not
+reaccept it. Moderation remains available on archived boards without permitting
+ordinary member writes. PostgreSQL tests cover both accept/hide lock orders and
+injected failures, with exact stored-state and event-count assertions.
 
-The expected version rejects an outdated user's intent. JPA @Version guards
-versioned persistence updates. Database constraints enforce structural integrity.
-None replaces ownership checks. Two racing edits must produce a success and a
-conflict rather than silently lose a write.
+## Reports and visibility history are separate
 
-Public solved status also requires a visible referenced reply. Defensive reads
-do not repair storage. Future moderation must clear an accepted reference in the
-same transaction that hides it, following the same lock order.
+Reports capture a member's concern and its resolution. Partial unique indexes
+allow only one OPEN report per reporter and target. Other reporters remain
+independent; resolving one report does not resolve the rest. DISMISS and
+ACKNOWLEDGE_HIDDEN update report metadata without inventing a visibility change.
+HIDE and RESTORE append to `moderation_action` only when visibility changes.
 
-Discuss: walk through two browser tabs saving version 0. Explain what the database
-lock guarantees and why a lock alone does not detect a stale draft.
+Private context and history require moderator/administrator access and no-store
+responses. Public DTOs omit report text and hidden content. History is append-only
+through application behavior, not tamper-proof against database administrators.
+This separation preserves what was reported independently of later content actions.
 
-## 5. Explicit response loading
+## Knowledge lifecycle
 
-JPA relationships are lazy. Entity graphs fetch the relationships needed for list
-and detail DTOs; DTO conversion happens within transactions. open-in-view is off.
-JSON serialization receives records, not entities or lazy proxies. Public author
-objects omit email and password hash.
+Administrators create DRAFT articles, publish them once, and archive drafts or
+published articles. Published edits become public immediately; there is no separate
+working revision. ARCHIVED is terminal. Slug and original author remain immutable.
+Fresh row locks plus reviewed versions prevent stale edits or transitions. Article
+writes do not acquire thread/report locks. Public queries select PUBLISHED rows
+before pagination and never expose private lifecycle fields.
 
-Discuss: show how returning entities could cause extra queries, recursion, or data
-exposure; distinguish a foreign key, a Java relationship, and a response DTO.
+## PostgreSQL full-text search
 
-## 6. Same-origin deployment and testing
+PostgreSQL owns stored generated title/body vectors with explicit English parsing,
+title weight A and body weight B. Partial GIN indexes cover only eligible content.
+This avoids an external search service and asynchronous indexing consistency work.
+`websearch_to_tsquery` is bound as data; `ts_rank_cd` ranks the merged question and
+article candidates before global pagination. GIN reduces candidate lookup, not
+ranking/sorting cost. Broad queries can legitimately use sequential scans.
 
-Nginx serves the compiled frontend and proxies /api. Docker DNS names db and backend
-are container addresses; the browser uses localhost. PostgreSQL's named volume
-survives ordinary shutdown. Browser tests use a separate project and tmpfs database.
-Unit tests cover small logic; integration tests prove SQL constraints/transactions;
-browser tests prove cookies, focus, routing, and the connected user journey.
+Public search, article pages, and compound moderation reads use consistent snapshots
+for counts and items. The operational summary uses one aggregate SQL statement.
+Separate page requests can move as content changes. English stemming, no typo
+correction, body-prefix snippets, and no reply search are explicit limits.
+See [measured search plans](search.md#verification-and-measured-query-plans).
 
-Use these prompts to explain the actual source during an interview. Test results
-demonstrate behavior; they do not establish personal understanding without practice.
+## Loading, caching, and verification
+
+JPA relationships are lazy, with explicit entity graphs/projections for DTOs.
+Conversion occurs within service transactions; open-in-view is disabled. Responses
+never serialize entities or lazy proxies. Client query keys include the actor for
+private data; logout, expiry, and account switching cancel and clear cached data.
+Failed refetches hide stale private content. Other browsers refresh on navigation
+or focus; there is no real-time remote erasure promise.
+
+Nginx serves the client and proxies `/api`; Docker service names are internal.
+Ordinary shutdown retains the PostgreSQL named volume. Browser tests use an isolated
+tmpfs database; persistence checks use a separate disposable named volume. Unit,
+real PostgreSQL integration, browser, migration, and restart checks verify different
+boundaries. [Milestone B evidence](evidence/milestone-b.md) records exact revisions,
+counts, CI status, and remaining operational limits.

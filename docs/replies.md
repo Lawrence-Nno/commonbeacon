@@ -32,7 +32,7 @@ updatedAt, and version. They never serialize JPA entities or account credentials
 Validation returns 400, unauthenticated mutations 401, forbidden edits or missing
 CSRF 403, unavailable records 404, and stale edits/archived boards 409.
 
-## Java and database learning notes
+## Persistence and concurrency
 
 Flyway V4 creates reply with question and author foreign keys, body/visibility/version
 checks, and an index on question_id, created_at, id. Foreign keys prevent dangling
@@ -48,8 +48,8 @@ uses the same board lock, so a reply write waiting behind archival rechecks the
 archived state after obtaining the lock. Scalar parent lookup avoids loading an
 outdated managed question before acquiring that lock.
 
-Stage 8 accepted solutions follow this order; future moderation must do so too.
-See [accepted solutions](accepted-solutions.md). Moderation controls remain planned.
+Accepted solutions and moderation follow this order.
+See [accepted solutions](accepted-solutions.md) and [moderation](moderation.md).
 
 ## Frontend behavior
 
@@ -78,9 +78,8 @@ second-member reply, reloads it, rejects a forged edit, edits from two tabs,
 recovers a conflict, verifies public literal-text rendering, and checks archived
 reply controls. The 390px mobile screenshot was inspected and overflow checks pass.
 
-Run Chrome checks with the backend running and local demo configuration loaded:
-scripts/use-dev-tools.ps1, scripts/use-local-database.ps1, then in frontend run
-npm run test:smoke. See boards.md for opt-in demo accounts. Smoke tests leave
-fictional development records; isolated browser fixtures belong to Stage 10.
+Run `npm run test:smoke` from frontend with Docker and Chrome. The runner creates
+and removes its own isolated stack and never uses the development database.
+See [browser verification](browser-testing.md) for commands and artifacts.
 
 Stage 6 was committed and pushed as 19ce858. Stage 7 was committed and pushed as 4b08546. Remote CI status is not recorded here.

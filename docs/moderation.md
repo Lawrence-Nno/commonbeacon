@@ -1,9 +1,9 @@
-# Milestone B moderation contract
+# Reporting and moderation
 
-Status: Stages 2-5 implement submission, report queue/context, atomic resolution,
-content hiding/restoration, and private audit-history viewing locally on 2026-09-19.
-Summary remains Stage 10 work. See the
-[Milestone B evidence](evidence/milestone-b.md) for verification status.
+Member reporting, private review, resolution, restoration, audit history, and the
+operational summary are implemented. See the [OpenAPI contract](openapi.json),
+[operator walkthrough](operator-walkthrough.md), and
+[verification evidence](evidence/milestone-b.md).
 
 ## Shared conventions and permissions
 
@@ -12,8 +12,8 @@ versions are nonnegative integers. Required numeric fields must distinguish miss
 values from zero. Bodies are plain text. Trim text before validating it; reason,
 resolution-note, and restoration-reason lengths are 5–2,000 Java/JavaScript UTF-16
 code units. Null, blank, missing, malformed, and out-of-range required input fails.
-New request DTOs reject unknown fields with `400 INVALID_REQUEST`; scope this
-policy to new DTOs rather than changing existing Milestone A contracts globally.
+Moderation request DTOs reject unknown fields with `400 INVALID_REQUEST`.
+Legacy board/question/reply DTOs retain their existing input policies.
 
 - Visitors read visible public content but cannot report or use moderation APIs.
 - Members report visible questions/replies, including their own and content on
@@ -36,10 +36,10 @@ privileged author/reporter/actor reference is only `{id, displayName}`.
 Lists use `{items, page, size, totalElements, totalPages}`. Defaults: `page=0`,
 `size=20`; size 1–100; page nonnegative; `page * size <= 2147483647` using wide
 arithmetic. Beyond-last-page results are empty with accurate totals. No custom
-sort parameter in this milestone; reject unsupported filters/sorts rather than
+sort parameter is supported; the API rejects unsupported filters/sorts rather than
 interpolating them into SQL. Offset pages may shift during concurrent inserts.
 
-## Report submission: Stage 2
+## Report submission
 
 `POST /reports` accepts exactly these fields:
 
@@ -80,10 +80,10 @@ Implementation lives in the backend `moderation` package and frontend
 `features/moderation`. The service reuses board/question/reply locking repositories
 and obtains the reporter through IdentityService. V6's text constraints count UTF-16
 units (including supplementary characters) consistently with the request validator.
-`ReportIT`, `ReportControl.test.tsx`, and `e2e/reports.spec.ts` verify this slice;
-the remaining moderation scenarios below are requirements for later stages.
+`ReportIT`, `ReportControl.test.tsx`, and `e2e/reports.spec.ts` verify submission.
+Resolution and restoration have separate integration and browser coverage.
 
-## Queue, report details, and restoration context: Stages 3 and 5
+## Queue, report details, and restoration context
 
 `GET /moderation/reports?status=OPEN&page=0&size=20` accepts `OPEN` or `RESOLVED`
 (default OPEN). Order by `createdAt ASC, id ASC` for oldest-first triage.
@@ -96,8 +96,8 @@ fields are null while open. Text content is loaded through detail, not every row
 `report` is the summary above. `availableDecisions` is an array of the enum values
 below; it is a UI hint, always revalidated transactionally on submission.
 
-Stage 4 uses `availableDecisions` for the resolution form. Stage 5 adds independent
-content-history and restoration pages linked from report details. OPEN reports return DISMISS plus HIDE for a visible target, or DISMISS
+The resolution form uses `availableDecisions`; independent content-history and
+restoration pages are linked from report details. OPEN reports return DISMISS plus HIDE for a visible target, or DISMISS
 plus ACKNOWLEDGE_HIDDEN for a target that is itself hidden; RESOLVED reports return
 an empty array. An internally visible reply under a hidden question still has
 HIDE eligibility, while effective public visibility is false.
@@ -137,7 +137,7 @@ question is hidden. Context loading must be consistent within a database snapsho
 so versions and displayed state correspond to the same review. Do not load an
 unbounded thread or audit collection into a detail DTO.
 
-Stage 5 implements these explicit extensions to the guide:
+The following protected content routes are available:
 
 - `GET /moderation/questions/{id}` returns `ModerationContext` for any visibility.
 - `GET /moderation/replies/{id}` returns context including the parent at any visibility.
@@ -214,28 +214,11 @@ exactly-one-target check, action enum check, required reason, creation timestamp
 and target/history indexes. Audit records are append-only by application behavior,
 not a tamper-proof compliance log. No failed mutation may leave a misleading event.
 
-## Transaction inspection and required lock order
+## Transaction boundaries and lock order
 
-Source inspection at `2d33c96` found:
-
-- `BoardService.update` locks the board, then validates its version and mutates.
-- `QuestionService.create` locks the board before checking archival and inserting.
-- `QuestionService.accept` uses a scalar visible-board lookup, then locks board,
-  question, and selected reply; version/owner/archive checks follow the locks.
-- `QuestionService.update` loads a managed visible question and checks ownership
-  before locking its board. It does not reload/recheck question visibility after
-  the wait. Existing optimistic versioning protects against concurrent stale
-  persistence, but this path does not yet follow the stronger moderation design.
-- `ReplyService.writableQuestion` gets a scalar board ID, locks board then visible
-  question, and checks archive state. Creation uses it; editing first resolves a
-  scalar parent ID, then uses it, loads the reply and relies on its UPDATE/version
-  check for the final reply write. No managed reply is loaded before the board lock.
-
-Stage 4 implements the required question-edit change: scalar lookup -> board lock
--> fresh locked question -> visibility/ownership/version checks. Reply paths were
-rechecked and retain their coordinating locks. Separate privileged lock queries
-include hidden rows while public predicates remain visible-only. This change was
-not part of Stage 1; its deterministic regression evidence is recorded for Stage 4.
+Question edits locate scalar IDs, acquire the board lock, and load a fresh locked
+question before checking visibility, ownership, and version. Reply creation and
+editing use the same coordinating order.
 
 For all moderation writes use board -> question -> target reply if any -> report
 if resolving. Obtain locating IDs through scalar queries without preloading managed
@@ -272,27 +255,7 @@ narrow-screen usability, and account-switch/expiry cancellation of privileged
 queries. Existing `AuthProvider` cancels and clears queries; new queries must pass
 abort signals and must not let late privileged responses render for another user.
 
-## Operational summary: Stage 10
-
-`GET /moderation/summary` returns exactly
-`{unansweredQuestions, openReports, publishedArticles}` as nonnegative integer
-counts, computed in one database snapshot. It is moderator/administrator-only.
-Count visible questions with no effective visible accepted reply across all boards,
-including archived ones. Count OPEN report rows (not distinct targets), and only
-PUBLISHED articles. A question with replies but no accepted solution is unanswered.
-The response contains no target text, draft counts, or report identities.
-
-## Java discussion checkpoint
-
-Trace authentication -> controller/DTO validation -> authorized transactional
-service -> ordered repository locks -> state transition -> flush/commit -> DTO.
-Explain why a lock protects concurrent execution, a supplied version protects
-reviewed intent, and a constraint protects stored structure. A preloaded managed
-entity can remain stale after waiting for a lock; a fresh locked read avoids making
-decisions from that state. Rehearse this with source; this document does not certify
-personal fluency.
-
-## Stage 4 implementation
+## Resolution screen and transaction
 
 Moderators and administrators can resolve an open report from its detail screen.
 Choose a decision and enter a private resolution note (5-2000 trimmed characters).
@@ -309,7 +272,7 @@ the resolution response joins its existing write transaction with content locks 
 
 V7 creates `moderation_action` with actor/target foreign keys, exactly one target,
 HIDE/RESTORE action values, trimmed reason bounds, and target-history indexes.
-Only HIDE is emitted in Stage 4. The application repository exposes an append
+HIDE and RESTORE are visibility actions. The application repository exposes an append
 operation and no update/delete endpoint; this is not tamper-proof storage.
 Dismissal and acknowledgement update resolution metadata without adding an action.
 Other reports on the target stay open for explicit review and acknowledgement.
@@ -323,11 +286,11 @@ permission to edit other authors' content or select their solutions.
 
 Question editing now loads scalar board ID, locks the board, and then freshly locks
 and checks the visible question. Reply creation/editing already follows this ordering.
-Restoration, history endpoints, and the full two-direction accept/hide race matrix
-remain the next stage.
+Restoration, history endpoints, and both accept/hide lock orders are verified
+by the restoration integration suite.
 
 
-## Stage 5 implementation
+## Restoration screen and history
 
 The six protected question/reply context, history, and restoration routes above
 are implemented. Context and history reads use REPEATABLE_READ snapshots; history
@@ -339,7 +302,7 @@ parent version for reply targets; question requests omit it or supply null.
 
 Restoration locks board -> question -> reply, checks the target's own visibility
 and reviewed versions, sets only that target to VISIBLE, appends one RESTORE
-entry, flushes, and returns confirmed context. There is no new migration in Stage 5.
+entry, flushes, and returns confirmed context. Both action types use the V7 table.
 It does not reopen reports or restore acceptance. A question restoration retains
 a still-valid selection and does not alter hidden children. Reply restoration
 under a hidden parent succeeds internally but remains publicly inaccessible.
@@ -361,13 +324,14 @@ reply creation versus hide, restoration versus another hide, and board archival
 versus hide/restore. Two reports targeting one reply produce one hide followed
 by an explicit acknowledgement after reload. Injected audit failure proves
 restoration rollback; Stage 4 retains the accepted-reply hide rollback test.
-Personal Java/concurrency rehearsal remains separate from automated verification.
 
-## Operational overview (Stage 10)
+## Operational overview
 
 Moderators and administrators see three cards above the report queue at
 `/moderation`. The protected `/api/v1/moderation/summary` endpoint returns only
-`unansweredQuestions`, `openReports`, and `publishedArticles`.
+`unansweredQuestions`, `openReports`, and `publishedArticles`. No query parameters
+are accepted; unsupported filters return `400 INVALID_REQUEST`. A fresh seeded
+database returns `{"unansweredQuestions":0,"openReports":1,"publishedArticles":1}`.
 
 - Unanswered questions are VISIBLE questions without a VISIBLE accepted reply
   belonging to the same question. An unselected reply does not make a question

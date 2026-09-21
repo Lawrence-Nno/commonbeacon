@@ -1,5 +1,8 @@
 # REST API quick reference
 
+The checked-in [OpenAPI 3.1 contract](openapi.json) defines every `/api/v1` route,
+request and response schema, session/CSRF requirements, and documented errors.
+
 Use the same origin as the UI, normally http://127.0.0.1:8081. IDs are UUIDs.
 Content is plain text. Responses never include password hashes or email addresses.
 
@@ -92,7 +95,7 @@ public endpoints. Hidden accepted content is suppressed defensively on reads;
 moderation atomically clears acceptance when hiding an accepted reply.
 
 
-## Knowledge articles (Stage 6 API)
+## Knowledge articles
 
 Public reads expose PUBLISHED articles only:
 
@@ -105,7 +108,7 @@ Only administrators can use these no-store routes:
   otherwise use DRAFT, PUBLISHED, or ARCHIVED. Updated-time descending, then ID.
 - GET `/api/v1/admin/articles/{id}`: detail at any status.
 - POST `/api/v1/admin/articles` with
-  `{"slug":"first-steps","title":"Your first steps","body":"Follow these fictional setup instructions."}`.
+  `{"slug":"first-steps","title":"Your first steps","body":"Follow these sample setup instructions."}`.
   Returns 201, Location, DRAFT, and version 0.
 - PATCH `/api/v1/admin/articles/{id}` with
   `{"title":"Updated first steps","body":"Updated instructions for the article.","expectedVersion":0}`.
@@ -124,9 +127,9 @@ parameters and invalid status/page values fail with 400.
 See [the knowledge contract](knowledge.md) for exact public/admin DTOs, limits,
 publication timestamp behavior, and a complete session-based walkthrough.
 Article screens are available at `/knowledge`, `/knowledge/:slug`, and
-`/admin/articles`; see the [article UI walkthrough](knowledge.md#stage-7-screens-and-browser-walkthrough).
+`/admin/articles`; see the [article UI walkthrough](knowledge.md#screens-and-browser-walkthrough).
 
-## Public full-text search (Stage 9)
+## Public full-text search
 
 GET `/api/v1/search?q=setup&page=0&size=20` requires no session. It combines visible
 questions and published articles in one globally ranked page; archived-board
@@ -149,7 +152,7 @@ items share a snapshot and visibility predicates.
 Use `/search?q=setup&page=0` in the browser. See [search documentation](search.md)
 for parser examples, V9 backfill/index design, limitations, tests, and query plans.
 
-## Operational summary (Stage 10)
+## Operational summary
 
 GET `/api/v1/moderation/summary` requires MODERATOR or ADMINISTRATOR and returns
 exactly `{unansweredQuestions,openReports,publishedArticles}` as nonnegative
@@ -159,4 +162,25 @@ integer counts. Visitors receive 401 and members 403. The response uses
 One SQL statement counts visible questions without an effective visible accepted
 reply belonging to that question (including archived boards), OPEN report rows,
 and PUBLISHED articles. Counts share one database snapshot and contain no content,
-report reasons, or identifiers. See [the overview behavior](moderation.md#operational-overview-stage-10).
+report reasons, or identifiers. See [the overview behavior](moderation.md#operational-overview).
+
+## Checking the contract
+
+`docs/openapi.json` is OpenAPI 3.1, with 39 implemented operations and 44 schemas.
+It covers the application API; Nginx and Actuator health probes are separate.
+OpenAPI-compatible validators and clients can load the file directly. An optional
+Python validator can run without changing application dependencies:
+
+```powershell
+python -m venv "$env:TEMP/commonbeacon-openapi-tools"
+& "$env:TEMP/commonbeacon-openapi-tools/Scripts/python.exe" -m pip install openapi-spec-validator
+& "$env:TEMP/commonbeacon-openapi-tools/Scripts/python.exe" -m openapi_spec_validator docs/openapi.json
+```
+
+Schema validation checks structure, not authorization or transactions. See the
+[operator walkthrough](operator-walkthrough.md) and [verification evidence](evidence/milestone-b.md)
+for live-response and lifecycle checks. Server text bounds count UTF-16 units;
+JSON Schema string lengths count Unicode code points, so clients must also honor
+the documented server limits. ProblemDetail `type`/`instance` may be omitted,
+including security-filter responses. Infrastructure errors can differ from the
+application's documented ProblemDetail failures.
