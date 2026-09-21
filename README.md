@@ -125,3 +125,21 @@ hardening. Email verification, password recovery, MFA, shared sessions, and
 distributed rate limiting are not implemented. Database persistence and forward
 migrations are tested; backup recovery and rolling upgrades are not certified.
 See [architecture decisions](docs/architecture.md) for constraints and tradeoffs.
+
+## License
+
+Copyright (C) 2026 CommonBeacon contributors.
+
+CommonBeacon's original source code and documentation are licensed under the
+**GNU Affero General Public License, version 3 only** (`AGPL-3.0-only`).
+You may redistribute and modify them under the terms of that license.
+See [LICENSE](LICENSE) for the complete terms.
+
+CommonBeacon is distributed without any warranty, including implied warranties
+of merchantability or fitness for a particular purpose.
+
+If you modify CommonBeacon and make that version available for remote network
+interaction, AGPLv3 requires offering those users access to the Corresponding
+Source of your modified version. See section 13 of the license for the exact terms.
+Third-party dependencies and bundled third-party tooling retain their own licenses
+and copyright notices; this declaration does not relicense them.
