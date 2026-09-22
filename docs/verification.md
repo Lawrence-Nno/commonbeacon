@@ -249,3 +249,26 @@ production load are not verified. Visibility history is append-only through the
 application, not tamper-proof against database administrators. Search uses English
 stemming without typo correction or separate reply search. Counts are snapshots;
 other sessions refresh through navigation/focus rather than real-time push.
+
+
+Stage 10 staging/dry-run review (2026-09-22), based on pushed `cdf215e`, passed the
+full verification script: 60 backend unit tests, 197 integration tests, 157 frontend
+tests, lint, type checking and production build. Final staging-count and terminal
+upload cleanup refinements then passed 60 unit and 51 targeted integration tests
+(17 import, 15 transfer access, 19 transfer lifecycle). The combined inventory is
+258 backend tests. Fresh schema and populated V14 upgrade coverage preserve prior
+inspection data and validate V15 against the current application.
+
+All 14 browser journeys passed, including a real proxy upload, dry-run request,
+safe populated-target review and cancellation with unchanged live boards. The
+persistence suite retained staged payload fingerprints and the review digest across
+backend/database restarts and Compose down/up. Its injected-failure run confirmed
+that the real exported archive produces only the expected target eligibility error
+and that the disposable containers, network and volumes are removed. OpenAPI's 57
+operation IDs are unique and all local references resolve.
+
+These checks cover deterministic retries, expired-lease recovery, no live writes,
+full graph/state errors, timestamp order, duplicate origins, identity/local-ID
+collisions, stale target/mapping/payload reviews, extra staged rows, all warning
+acknowledgements, cancellation/expiry cleanup and reservation release. Activation,
+its exclusive migration gate and measured production capacity remain later work.

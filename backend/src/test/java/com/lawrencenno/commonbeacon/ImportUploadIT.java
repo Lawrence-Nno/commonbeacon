@@ -54,7 +54,7 @@ class ImportUploadIT {
             };
         }
     }
-    @Autowired JdbcTemplate jdbc;@Autowired TransferJobs jobs;@Autowired ArtifactStore store;
+    @Autowired ImportDryRuns dryRuns;@Autowired JdbcTemplate jdbc;@Autowired TransferJobs jobs;@Autowired ArtifactStore store;
     @Autowired com.lawrencenno.commonbeacon.transfer.access.ImportUploadController controller;
     @Autowired PasswordEncoder passwords;@Autowired ObjectMapper json;@LocalServerPort int port;
     @MockitoBean LoginRateLimiter loginLimiter;@MockitoBean(name="transferClock") Clock clock;
@@ -169,6 +169,131 @@ class ImportUploadIT {
         assertThat(jobs.status(admin,intent.id()).errorCode()).isEqualTo(TransferJob.Failure.JOB_EXPIRED);
         assertThat(jdbc.queryForObject("SELECT state FROM transfer_artifact WHERE id=?",String.class,upload.artifact())).isEqualTo("DELETED");
         assertThat(new ImportInspector(jobs,store).runOnce()).isFalse();
+    }
+
+    UUID inspected(Map<String,byte[]> files)throws Exception {
+        var job=jobs.createImport(admin,UUID.randomUUID(),()->{});var upload=jobs.beginUpload(admin,job.id());
+        var bytes=zip(files,false);var saved=store.write(upload.artifact(),67108864,out->out.write(bytes));
+        jobs.finishUpload(upload,saved.bytes(),saved.sha256());assertThat(new ImportInspector(jobs,store).runOnce()).isTrue();return job.id();
+    }
+    JsonNode reviewed(UUID id) {
+        var j=jobs.status(admin,id);dryRuns.request(admin,id,j.version(),UUID.randomUUID());
+        assertThat(new ImportInspector(jobs,store).runOnce()).isFalse();
+        assertThat(new ImportDryRunWorker(jobs,store,dryRuns).runOnce()).isTrue();return dryRuns.review(admin,id);
+    }
+    void emptyTarget(){jdbc.update("DELETE FROM app_user WHERE id=?",member);}
+    @Test void dryRunStagesFullGraphWithoutChangingDomainAndReplaysStableMappings()throws Exception {
+        emptyTarget();UUID id=inspected(fixture("company-full"));String before=domain();
+        var j=jobs.status(admin,id);UUID key=UUID.randomUUID();var queued=dryRuns.request(admin,id,j.version(),key);
+        assertThat(dryRuns.request(admin,id,j.version(),key).version()).isEqualTo(queued.version());
+        assertThatThrownBy(()->dryRuns.request(admin,id,j.version()+1,key)).hasMessage("IDEMPOTENCY_CONFLICT");
+        assertThat(new ImportDryRunWorker(jobs,store,dryRuns).runOnce()).isTrue();var report=dryRuns.review(admin,id);
+        assertThat(report.path("eligible").asBoolean()).as(report.toString()).isTrue();assertThat(report.path("fresh").asBoolean()).isTrue();
+        assertThat(report.path("activationAvailable").asBoolean()).isFalse();assertThat(report.path("counts").path("users").asInt()).isEqualTo(4);
+        assertThat(jobs.status(admin,id).state()).isEqualTo(TransferJob.State.READY_TO_COMMIT);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_stage WHERE job_id=?",Long.class,id)).isEqualTo(22);
+        var mappings=jdbc.queryForList("SELECT entity,source_id,local_id FROM transfer_mapping WHERE job_id=? ORDER BY entity,source_id",id);
+        var again=reviewed(id);assertThat(again.path("mappingRevision").asLong()).isEqualTo(2);
+        assertThat(again.path("reviewDigest").asText()).isNotEqualTo(report.path("reviewDigest").asText());
+        assertThat(jdbc.queryForList("SELECT entity,source_id,local_id FROM transfer_mapping WHERE job_id=? ORDER BY entity,source_id",id)).isEqualTo(mappings);
+        assertThat(domain()).isEqualTo(before);
+        assertThat(report.toString()).doesNotContain("Alex","example.test","resolutionNote","password");
+    }
+    @Test void leaseRecoveryReplaysPartialStageAndRejectsOldWorker()throws Exception {
+        emptyTarget();UUID id=inspected(fixture("company-full"));var j=jobs.status(admin,id);dryRuns.request(admin,id,j.version(),UUID.randomUUID());
+        var first=dryRuns.claim(UUID.randomUUID()).orElseThrow();
+        var data=json.readTree(new String(fixture("company-full").get("users.jsonl"),java.nio.charset.StandardCharsets.UTF_8).lines().findFirst().orElseThrow());
+        var row=new com.lawrencenno.commonbeacon.transfer.archive.ArchiveFormat.Row(com.lawrencenno.commonbeacon.transfer.archive.ArchiveFormat.Entity.users,1,data);
+        dryRuns.stage(first.lease(),List.of(row));UUID local=jdbc.queryForObject("SELECT local_id FROM transfer_mapping WHERE job_id=?",UUID.class,id);
+        jdbc.update("UPDATE transfer_job SET lease_until=clock_timestamp()-interval '1 second' WHERE id=?",id);
+        assertThat(new ImportDryRunWorker(jobs,store,dryRuns).runOnce()).isTrue();
+        assertThat(dryRuns.review(admin,id).path("eligible").asBoolean()).isTrue();
+        assertThat(jdbc.queryForObject("SELECT local_id FROM transfer_mapping WHERE job_id=? AND entity='users' AND source_id=?",UUID.class,id,UUID.fromString(data.path("id").asText()))).isEqualTo(local);
+        assertThatThrownBy(()->dryRuns.stage(first.lease(),List.of(row))).hasMessage("STALE_LEASE");
+    }
+    @Test void targetChangesAndMappingChangesInvalidateReview()throws Exception {
+        emptyTarget();UUID id=inspected(fixture("company-full"));assertThat(reviewed(id).path("fresh").asBoolean()).isTrue();
+        UUID transientUser=user("MEMBER");jdbc.update("DELETE FROM app_user WHERE id=?",transientUser);
+        var stale=dryRuns.review(admin,id);assertThat(stale.path("fresh").asBoolean()).isFalse();assertThat(stale.path("eligible").asBoolean()).isFalse();
+        assertThat(jobs.status(admin,id).state()).isEqualTo(TransferJob.State.REVIEW_REQUIRED);
+        assertThat(reviewed(id).path("fresh").asBoolean()).isTrue();
+        jdbc.update("UPDATE transfer_mapping SET local_id=? WHERE job_id=? AND entity='boards'",UUID.randomUUID(),id);
+        assertThat(dryRuns.review(admin,id).path("fresh").asBoolean()).isFalse();
+    }
+    @Test void nonBootstrapTargetAndDemoConfigurationBlockReadiness()throws Exception {
+        UUID id=inspected(fixture("company-default"));var report=reviewed(id);
+        assertThat(report.path("eligible").asBoolean()).isFalse();assertThat(report.path("errors").toString()).contains("TARGET_NOT_EMPTY_BOOTSTRAP");
+        assertThat(report.path("warnings").toString()).contains("CONTACTS_EXCLUDED","MODERATION_HISTORY_EXCLUDED");
+        assertThat(report.path("requiredAcknowledgements").toString()).contains("CONTACTS_EXCLUDED","MODERATION_HISTORY_EXCLUDED");
+        assertThat(jobs.status(admin,id).state()).isEqualTo(TransferJob.State.REVIEW_REQUIRED);
+        emptyTarget();assertThat(reviewed(id).path("eligible").asBoolean()).isTrue();
+        assertThat(new ImportDryRuns(jobs,jdbc,true).review(admin,id).path("fresh").asBoolean()).isFalse();
+    }
+    @Test void invalidGraphTimestampsAndDuplicateOriginsBlockReadiness()throws Exception {
+        emptyTarget();var files=fixture("company-full");
+        String replies=new String(files.get("replies.jsonl"),java.nio.charset.StandardCharsets.UTF_8).replace("\"updatedAt\":\"2026-09-22T00:00:00Z\"","\"updatedAt\":\"2026-09-21T00:00:00Z\"");
+        files.put("replies.jsonl",replies.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        String origin="\"origin\":{\"sourceInstanceId\":\"00000000-0000-0000-0000-000000000100\",\"sourceId\":\"00000000-0000-0000-0000-000000000001\"},";
+        files.put("users.jsonl",new String(files.get("users.jsonl"),java.nio.charset.StandardCharsets.UTF_8).replace("{\"id\":","{"+origin+"\"id\":").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        // A valid UUID reference that accepts another question's reply.
+        files.put("acceptances.jsonl",new String(files.get("acceptances.jsonl"),java.nio.charset.StandardCharsets.UTF_8).replace("000000000030","000000000031").getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        refreshManifest(files);UUID id=inspected(files);var report=reviewed(id);
+        assertThat(report.path("eligible").asBoolean()).isFalse();assertThat(report.path("errors").toString()).contains("INVALID_TIMESTAMP_ORDER","DUPLICATE_ORIGIN","INVALID_ACCEPTANCE");
+    }
+    void refreshManifest(Map<String,byte[]> files) {
+        var manifest=(tools.jackson.databind.node.ObjectNode)json.readTree(files.get("manifest.json"));
+        for(var entry:manifest.path("files")) {
+            byte[] bytes=files.get(entry.path("name").asText());var e=(tools.jackson.databind.node.ObjectNode)entry;
+            e.put("uncompressedBytes",bytes.length);e.put("sha256",HexFormat.of().formatHex(com.lawrencenno.commonbeacon.transfer.archive.ArchiveCodec.sha256().digest(bytes)));
+            e.put("count",new String(bytes,java.nio.charset.StandardCharsets.UTF_8).lines().count());
+        }
+        files.put("manifest.json",json.writeValueAsBytes(manifest));
+    }
+    @Test void unexpectedStagedRowsCannotBecomeReadyOnReplay()throws Exception {
+        emptyTarget();UUID id=inspected(fixture("company-full"));reviewed(id);
+        jdbc.update("INSERT INTO transfer_stage SELECT job_id,entity,?,line,payload,payload_sha256,byte_count FROM transfer_stage WHERE job_id=? AND entity='contacts'",UUID.randomUUID(),id);
+        assertThat(dryRuns.review(admin,id).path("fresh").asBoolean()).isFalse();
+        var report=reviewed(id);assertThat(report.path("eligible").asBoolean()).isFalse();
+        assertThat(report.path("errors").toString()).contains("STAGING_COUNT_MISMATCH");
+    }
+    @Test void matchingEmailNeverMergesIdentityAndLocalIdCollisionsBlockReview()throws Exception {
+        emptyTarget();var files=fixture("company-full");
+        String email=json.readTree(new String(files.get("contacts.jsonl"),java.nio.charset.StandardCharsets.UTF_8).lines().findFirst().orElseThrow()).path("email").asText();
+        jdbc.update("UPDATE app_user SET email=? WHERE id=?",email,other);
+        UUID id=inspected(files);var report=reviewed(id);
+        assertThat(report.path("eligible").asBoolean()).isTrue();assertThat(report.path("identityCollisions").asLong()).isEqualTo(1);
+        assertThat(report.path("requiredAcknowledgements").toString()).contains("IDENTITIES_REMAIN_SEPARATE");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM imported_author",Long.class)).isZero();
+        UUID local=jdbc.queryForObject("SELECT local_id FROM transfer_mapping WHERE job_id=? AND entity='users' ORDER BY source_id LIMIT 1",UUID.class,id);
+        jdbc.update("INSERT INTO app_user(id,email,display_name,password_hash,role) VALUES (?,?,'Collision','hash','ADMINISTRATOR')",local,local+"@example.test");
+        report=reviewed(id);assertThat(report.path("eligible").asBoolean()).isFalse();assertThat(report.path("errors").toString()).contains("LOCAL_ID_COLLISION");
+        jdbc.update("UPDATE transfer_stage SET payload=jsonb_set(payload,'{displayName}','\"changed\"'::jsonb) WHERE job_id=? AND entity='users'",id);
+        assertThat(dryRuns.review(admin,id).path("fresh").asBoolean()).isFalse();
+    }
+    @Test void cancellationAndExpiryRemoveSensitiveStaging()throws Exception {
+        emptyTarget();UUID id=inspected(fixture("company-full"));reviewed(id);jobs.cancel(admin,id,jobs.status(admin,id).version());jobs.releaseCleanedReservations();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_stage",Long.class)).isZero();assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_dry_run",Long.class)).isZero();
+        new ArtifactReconciler(jobs,store).reconcile();
+        assertThat(jdbc.queryForObject("SELECT reserved_bytes FROM transfer_job WHERE id=?",Long.class,id)).isZero();
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_artifact WHERE job_id=? AND state<>'DELETED'",Long.class,id)).isZero();
+        id=inspected(fixture("company-full"));reviewed(id);jdbc.update("UPDATE transfer_job SET expires_at=clock_timestamp()-interval '1 second' WHERE id=?",id);jobs.releaseCleanedReservations();
+        assertThat(jobs.status(admin,id).errorCode()).isEqualTo(TransferJob.Failure.JOB_EXPIRED);assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_stage",Long.class)).isZero();
+    }
+    @Test void dryRunHttpIsOwnerAdminCsrfAndVersionScoped()throws Exception {
+        UUID id=inspected(fixture("company-empty"));
+        try(var a=new Browser(admin);var b=new Browser(other);var m=new Browser(member)) {
+            var body=Map.of("expectedVersion",jobs.status(admin,id).version());
+            assertThat(b.post(path(id)+"/dry-run",body,UUID.randomUUID()).statusCode()).isEqualTo(404);
+            assertThat(m.get(path(id)+"/review").statusCode()).isEqualTo(403);
+            assertThat(a.send("POST",path(id)+"/dry-run",json.writeValueAsBytes(body),"application/json",false,Map.of("Idempotency-Key",UUID.randomUUID().toString())).statusCode()).isEqualTo(403);
+            assertThat(a.post(path(id)+"/dry-run",Map.of("expectedVersion",9999),UUID.randomUUID()).statusCode()).isEqualTo(409);
+            assertThat(a.post(path(id)+"/dry-run",body,UUID.randomUUID()).statusCode()).isEqualTo(202);
+            assertThat(a.get(path(id)+"/review").statusCode()).isEqualTo(409);
+            new ImportDryRunWorker(jobs,store,dryRuns).runOnce();var response=a.get(path(id)+"/review");
+            assertThat(response.statusCode()).isEqualTo(200);assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
+            assertThat(b.get(path(id)+"/review").statusCode()).isEqualTo(404);
+            jdbc.update("UPDATE app_user SET role='MEMBER' WHERE id=?",admin);assertThat(a.get(path(id)+"/review").statusCode()).isEqualTo(403);
+        }
     }
     class Browser implements AutoCloseable {
         final CookieManager cookies=new CookieManager(null,CookiePolicy.ACCEPT_ALL);

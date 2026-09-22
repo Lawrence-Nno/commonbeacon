@@ -3,7 +3,7 @@
 Stage 9 provides backend upload and inspection APIs for ACTIVE administrators. There
 is no upload screen yet. Inspection never inserts users, content, moderation records
 or staging mappings, and never permits activation. Target eligibility, staging and
-dry-run review belong to Stage 10; activation belongs to Stage 11.
+dry-run review are implemented separately in [Stage 10](import-dry-run.md); activation belongs to Stage 11.
 
 ## Request flow
 

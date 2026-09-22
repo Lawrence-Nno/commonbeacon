@@ -24,6 +24,11 @@ public class ArtifactStoreConfiguration {
     com.lawrencenno.commonbeacon.transfer.inspection.ImportInspector importInspector(TransferJobs jobs,ArtifactStore store) {
         return new com.lawrencenno.commonbeacon.transfer.inspection.ImportInspector(jobs,store);
     }
+    @Bean
+    @ConditionalOnProperty(name="commonbeacon.transfer.import.dry-run.enabled",havingValue="true",matchIfMissing=true)
+    com.lawrencenno.commonbeacon.transfer.inspection.ImportDryRunWorker importDryRunWorker(TransferJobs jobs,ArtifactStore store,ImportDryRuns dryRuns) {
+        return new com.lawrencenno.commonbeacon.transfer.inspection.ImportDryRunWorker(jobs,store,dryRuns);
+    }
     @Bean TransferWorker transferWorker(TransferJobs jobs,ArtifactStore store) {return new TransferWorker(jobs,store);}
     @Bean ArtifactReconciler artifactReconciler(TransferJobs jobs,ArtifactStore store) {return new ArtifactReconciler(jobs,store);}
     @Bean ArtifactStore artifactStore(@Value("${commonbeacon.transfer.storage.directory}") String directory) throws IOException {

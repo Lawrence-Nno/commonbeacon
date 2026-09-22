@@ -58,7 +58,16 @@ test("quarantines native uploads through the proxy without activating domain dat
   expect(report.valid).toBe(true); expect(report.activationAvailable).toBe(false); expect(report.issues).toEqual([]);
   expect(report.archiveSha256).toBe(createHash("sha256").update(archive).digest("hex"));
   expect(await (await page.request.get(origin + "/api/v1/boards")).json()).toEqual(before);
-  const status = await (await page.request.get(origin + `/api/v1/admin/data/jobs/${job.id}`)).json();
+  let status = await (await page.request.get(origin + `/api/v1/admin/data/jobs/${job.id}`)).json();
   expect(status.state).toBe("REVIEW_REQUIRED"); expect(status.allowedActions).not.toContain("DOWNLOAD");
+  const queued = await page.request.post(origin + path + "/dry-run", { headers: { ...headers, "Idempotency-Key": crypto.randomUUID() }, data: { expectedVersion: status.version } });
+  expect(queued.status()).toBe(202);
+  await expect.poll(async () => (await page.request.get(origin + path + "/review")).status(), { timeout: 30000 }).toBe(200);
+  const review = await (await page.request.get(origin + path + "/review")).json();
+  expect(review.activationAvailable).toBe(false); expect(review.eligible).toBe(false); expect(review.fresh).toBe(true);
+  expect(review.errors).toContainEqual({ file: "target", line: 0, code: "TARGET_NOT_EMPTY_BOOTSTRAP" });
+  expect(review.archiveDigest).toBe(report.archiveSha256); expect(review.reviewDigest).toMatch(/^[a-f0-9]{64}$/);
+  expect(await (await page.request.get(origin + "/api/v1/boards")).json()).toEqual(before);
+  status = await (await page.request.get(origin + `/api/v1/admin/data/jobs/${job.id}`)).json();
   const cancelled = await page.request.post(origin + `/api/v1/admin/data/jobs/${job.id}/cancel`, { headers: { ...headers, "Idempotency-Key": crypto.randomUUID() }, data: { expectedVersion: status.version } }); expect(cancelled.status()).toBe(200);
 });

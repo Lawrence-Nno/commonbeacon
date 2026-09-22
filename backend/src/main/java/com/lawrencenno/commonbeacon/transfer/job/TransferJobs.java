@@ -17,7 +17,7 @@ public class TransferJobs {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
     private static final String TERMINAL = "'READY','COMPLETED','FAILED','CANCELLED'";
-    private static final RowMapper<TransferJob> ROW = (r, n) -> new TransferJob(
+    static final RowMapper<TransferJob> ROW = (r, n) -> new TransferJob(
         r.getObject("id",UUID.class),r.getObject("requester_id",UUID.class),Kind.valueOf(r.getString("kind")),
         State.valueOf(r.getString("state")),r.getLong("version"),r.getLong("fence"),r.getInt("attempts"),
         r.getObject("worker_id",UUID.class),r.getTimestamp("lease_until") == null ? null : r.getTimestamp("lease_until").toInstant(),r.getLong("checkpoint"),
@@ -29,22 +29,22 @@ public class TransferJobs {
         transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         transaction.setTimeout(10);
     }
-    private <T> T locked(Supplier<T> action) {
+    <T> T locked(Supplier<T> action) {
         return transaction.execute(status -> {
             jdbc.execute("SET LOCAL lock_timeout='5s'");
             jdbc.queryForObject("SELECT id FROM transfer_control WHERE id=1 FOR UPDATE", Integer.class);
             return action.get();
         });
     }
-    private TransferJob job(UUID id) {
+    TransferJob job(UUID id) {
         return jdbc.query("SELECT * FROM transfer_job WHERE id=? FOR UPDATE", ROW, id).stream().findFirst()
             .orElseThrow(() -> new IllegalStateException("JOB_NOT_FOUND"));
     }
-    private boolean permitted(TransferJob j) {
+    boolean permitted(TransferJob j) {
         if(!permitted(j.requester(),j.kind()))return false;
         return jdbc.queryForObject("SELECT j.authorization_revision=u.auth_revision FROM transfer_job j JOIN app_user u ON u.id=j.requester_id WHERE j.id=?",Boolean.class,j.id());
     }
-    private boolean permitted(UUID requester, Kind kind) {
+    boolean permitted(UUID requester, Kind kind) {
         var roles = jdbc.queryForList("SELECT role FROM app_user WHERE id=? AND account_state='ACTIVE' FOR SHARE", String.class, requester);
         return !roles.isEmpty() && (kind == Kind.PERSONAL_EXPORT || roles.getFirst().equals("ADMINISTRATOR"));
     }
@@ -54,13 +54,13 @@ public class TransferJobs {
         if (!permitted(j.requester(),j.kind())) throw new IllegalStateException("FORBIDDEN");
         return j;
     }
-    private void audit(UUID id, Event event) {
+    void audit(UUID id, Event event) {
         jdbc.update("INSERT INTO transfer_audit(job_id,event) VALUES (?,?)",id,event.name());
     }
-    private void endAttempt(UUID id) {
+    void endAttempt(UUID id) {
         jdbc.update("UPDATE transfer_attempt SET finished_at=clock_timestamp() WHERE job_id=? AND finished_at IS NULL",id);
     }
-    private void fail(TransferJob j, Failure failure) {
+    void fail(TransferJob j, Failure failure) {
         jdbc.update("UPDATE transfer_job SET state='FAILED',error_code=?,version=version+1,worker_id=NULL,lease_until=NULL,updated_at=clock_timestamp() WHERE id=?",failure.name(),j.id());
         endAttempt(j.id()); audit(j.id(),Event.FAILED);
     }
@@ -107,7 +107,7 @@ public class TransferJobs {
             .digest("import:1".getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
         return create(actor,Kind.COMPANY_IMPORT,key,hash,false,false,authorize);
     }
-    private TransferJob ownedImport(UUID actor,UUID id) {
+    TransferJob ownedImport(UUID actor,UUID id) {
         var j=owned(actor,id);if(j.kind()!=Kind.COMPANY_IMPORT)throw new IllegalStateException("JOB_NOT_FOUND");
         if(!permitted(j))throw new IllegalStateException("FORBIDDEN");return j;
     }
@@ -150,7 +150,7 @@ public class TransferJobs {
         return locked(()->{
             recoverLocked();
             if(jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE lease_until>clock_timestamp()",Long.class)>0)return Optional.empty();
-            var pending=jdbc.query("SELECT * FROM transfer_job WHERE kind='COMPANY_IMPORT' AND state IN ('UPLOADED','VALIDATING') AND worker_id IS NULL ORDER BY created_at,id LIMIT 10 FOR UPDATE",ROW);
+            var pending=jdbc.query("SELECT * FROM transfer_job WHERE kind='COMPANY_IMPORT' AND state IN ('UPLOADED','VALIDATING') AND NOT EXISTS (SELECT 1 FROM transfer_dry_run d WHERE d.job_id=transfer_job.id) AND worker_id IS NULL ORDER BY created_at,id LIMIT 10 FOR UPDATE",ROW);
             for(var j:pending) {
                 if(!permitted(j)){fail(j,Failure.AUTHORIZATION_REVOKED);continue;}
                 if(j.attempts()>=3){fail(j,Failure.ATTEMPTS_EXHAUSTED);continue;}
@@ -198,7 +198,7 @@ public class TransferJobs {
         return locked(() -> {
             recoverLocked();
             if (jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE lease_until>clock_timestamp()",Long.class)>0) return Optional.empty();
-            var candidates=jdbc.query("SELECT * FROM transfer_job WHERE state IN ('QUEUED','RUNNING','VALIDATING') AND worker_id IS NULL AND (? OR kind<>'COMPANY_IMPORT') AND (NOT ? OR kind='COMPANY_EXPORT') ORDER BY created_at,id LIMIT 10 FOR UPDATE",ROW,includeImports,companyOnly);
+            var candidates=jdbc.query("SELECT * FROM transfer_job WHERE state IN ('QUEUED','RUNNING','VALIDATING') AND worker_id IS NULL AND NOT EXISTS (SELECT 1 FROM transfer_dry_run d WHERE d.job_id=transfer_job.id) AND (? OR kind<>'COMPANY_IMPORT') AND (NOT ? OR kind='COMPANY_EXPORT') ORDER BY created_at,id LIMIT 10 FOR UPDATE",ROW,includeImports,companyOnly);
             for (var j:candidates) {
                 if (!permitted(j)) { fail(j,Failure.AUTHORIZATION_REVOKED); continue; }
                 if (j.attempts()>=3) { fail(j,Failure.ATTEMPTS_EXHAUSTED); continue; }
@@ -210,7 +210,7 @@ public class TransferJobs {
             return Optional.empty();
         });
     }
-    private void recoverLocked() {
+    void recoverLocked() {
         for (var j:jdbc.query("SELECT * FROM transfer_job WHERE state NOT IN ("+TERMINAL+") AND (expires_at<=clock_timestamp() OR lease_until<=clock_timestamp()) FOR UPDATE",ROW)) {
             if (j.state()==State.COMMITTING) { fail(j,Failure.ACTIVATION_RECONCILIATION_REQUIRED); continue; }
             boolean expired=jdbc.queryForObject("SELECT expires_at<=clock_timestamp() FROM transfer_job WHERE id=?",Boolean.class,j.id());
@@ -220,7 +220,7 @@ public class TransferJobs {
             else jdbc.update("UPDATE transfer_job SET worker_id=NULL,lease_until=NULL,version=version+1,updated_at=clock_timestamp() WHERE id=?",j.id());
         }
     }
-    private TransferJob current(Lease lease) {
+    TransferJob current(Lease lease) {
         if(lease.worker()==null || lease.fence()<1)throw new IllegalStateException("STALE_LEASE");
         var j=job(lease.jobId());
         if (!Objects.equals(j.worker(),lease.worker()) || j.fence()!=lease.fence() || j.terminal()
@@ -326,7 +326,8 @@ public class TransferJobs {
                 return true;
             }
             boolean abandoned=state.equals("WRITING") && (j.terminal() || j.worker()==null || j.fence()!=((Number)a.get("fence")).longValue());
-            if(expired || abandoned || state.equals("DELETING") || state.equals("MISSING")) {
+            boolean abandonedImport=j.kind()==Kind.COMPANY_IMPORT && j.terminal() && "UPLOAD".equals(a.get("purpose"));
+            if(expired || abandoned || abandonedImport || state.equals("DELETING") || state.equals("MISSING")) {
                 if(expired && !state.equals("DELETING"))audit(j.id(),Event.EXPIRED);
                 if(!state.equals("DELETING"))audit(j.id(),Event.CLEANUP_STARTED);
                 jdbc.update("UPDATE transfer_artifact SET state='DELETING' WHERE id=?",artifact);return true;
@@ -422,6 +423,8 @@ public class TransferJobs {
     }
     public void releaseCleanedReservations() {
         locked(() -> {recoverLocked();jdbc.update("DELETE FROM transfer_mapping m USING transfer_job j WHERE m.job_id=j.id AND j.state IN ("+TERMINAL+")");
+            jdbc.update("DELETE FROM transfer_stage s USING transfer_job j WHERE s.job_id=j.id AND j.state IN ("+TERMINAL+")");
+            jdbc.update("DELETE FROM transfer_dry_run d USING transfer_job j WHERE d.job_id=j.id AND j.state IN ("+TERMINAL+")");
             reconcileReservationsLocked();return null;});
     }
 }

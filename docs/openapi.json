@@ -6092,7 +6092,7 @@
             }
           }
         ],
-        "description": "Requester-only ACTIVE ADMINISTRATOR. Returns 409 until an inspection is available. Results have at most 1000 file/line/code issues and no raw source values. valid means native archive inspection passed, not eligibility to activate. Both valid and rejected archives move to REVIEW_REQUIRED; activationAvailable is always false. Staging, target review and activation are future stages.",
+        "description": "Requester-only ACTIVE ADMINISTRATOR. Returns 409 until an inspection is available. Results have at most 1000 file/line/code issues and no raw source values. valid means native archive inspection passed, not eligibility to activate. Both valid and rejected archives move to REVIEW_REQUIRED; activationAvailable is always false. Request the separate dry-run endpoint for private staging and target review; activation remains unavailable.",
         "responses": {
           "400": {
             "description": "Invalid request",
@@ -6216,6 +6216,377 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ArchiveInspection"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/data/imports/{id}/dry-run": {
+      "post": {
+        "operationId": "requestImportDryRun",
+        "summary": "Stage and validate a native import",
+        "tags": [
+          "transfers"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Requester-only ACTIVE administrator with unchanged authorization revision. Idempotent, version-checked and CSRF-protected. Queues bounded private staging; writes no live domain records. The uploaded archive is immutable. Retention is 24 hours from the first dry run; retries do not extend it. Returns 202, or 409 for state/version/key conflicts.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Invalid request",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in required",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF/grant/ticket",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found (also another requester or wrong namespace)",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version/state/idempotency conflict or download already active",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "JSON request exceeds 4096 bytes",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Transfer storage unavailable",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferJob"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportDryRunRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/data/imports/{id}/review": {
+      "get": {
+        "operationId": "getImportReview",
+        "summary": "Get a versioned import dry-run review",
+        "tags": [
+          "transfers"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "description": "Owner-only ACTIVE administrator. Returns 409 while pending and 410 after termination/expiry. Rechecks target generation and state, mapping/staging fingerprints and source metadata; changed inputs mark the review stale. Reports no raw source values. READY_TO_COMMIT means validation and bootstrap-target checks passed, not permission to activate. activationAvailable is always false; activation is not implemented.",
+        "responses": {
+          "400": {
+            "description": "Invalid request",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in required",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF/grant/ticket",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found or not owned",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version/state/idempotency conflict or download already active",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Transfer storage unavailable",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Dry-run review, never activation approval",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportReview"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Review expired or job terminated",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
                 }
               }
             }
@@ -8221,6 +8592,201 @@
           "activationAvailable": {
             "type": "boolean",
             "const": false
+          }
+        }
+      },
+      "ImportDryRunRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ImportReview": {
+        "type": "object",
+        "required": [
+          "jobId",
+          "archiveDigest",
+          "validationVersion",
+          "mappingVersion",
+          "mappingRevision",
+          "activationAvailable",
+          "expiresAt",
+          "counts",
+          "checkpoints",
+          "errors",
+          "totalErrors",
+          "warnings",
+          "requiredAcknowledgements",
+          "target",
+          "targetGeneration",
+          "budget",
+          "identityCollisions",
+          "mappingPreview",
+          "mappingPreviewLimit",
+          "stagingDigest",
+          "reviewDigest",
+          "fresh",
+          "eligible"
+        ],
+        "properties": {
+          "archiveDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "stagingDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "reviewDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "jobId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "sourceInstanceId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "profile": {
+            "const": "company"
+          },
+          "formatVersion": {
+            "const": 1
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "validationVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mappingVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mappingRevision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalErrors": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "targetGeneration": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "identityCollisions": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "mappingPreviewLimit": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "fresh": {
+            "type": "boolean"
+          },
+          "eligible": {
+            "type": "boolean"
+          },
+          "activationAvailable": {
+            "const": false
+          },
+          "staleReason": {
+            "const": "REVIEW_INPUT_CHANGED"
+          },
+          "counts": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "checkpoints": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          "warnings": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "requiredAcknowledgements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "errors": {
+            "type": "array",
+            "maxItems": 1000,
+            "items": {
+              "type": "object",
+              "required": [
+                "file",
+                "line",
+                "code"
+              ],
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "line": {
+                  "type": "integer"
+                },
+                "code": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "mappingPreview": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "required": [
+                "entity",
+                "sourceId",
+                "localId"
+              ],
+              "properties": {
+                "entity": {
+                  "type": "string"
+                },
+                "sourceId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "localId": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "target": {
+            "type": "object",
+            "description": "Generation, per-entity counts, ineligible account count, demo flag, bootstrap eligibility and digests. No account details."
+          },
+          "budget": {
+            "type": "object",
+            "description": "Enforced record/byte/batch limits, staged bytes and productionCapacityCertified=false. Real production capacity requires measurement before activation."
           }
         }
       }

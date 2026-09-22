@@ -22,7 +22,7 @@ digests return the original job, while mismatches fail. Request adapters
 calculate the digest from the canonical logical request, excluding transient
 authentication grants. V13 stores company export options alongside each job and
 a stable source-instance UUID. V14 adds bounded inspection results and upload/inspection
-audit events. Target dry-run review and confirmation remain later work.
+audit events. V15 adds private staging, deterministic mappings and [dry-run review](import-dry-run.md). Confirmation remains later work.
 
 Short READ COMMITTED transactions lock the singleton coordination row, then the
 job and requester as needed. All foundation mutations use this order; file I/O

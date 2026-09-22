@@ -122,8 +122,27 @@ if (process.argv.includes("--verify-failure-cleanup")) {
     assert.equal(expectedInspection.valid, true); assert.equal(expectedInspection.activationAvailable, false);
     assert.equal(expectedInspection.archiveSha256, expectedArchive);
 
+    const importStatus = await get(admin, `/api/v1/admin/data/jobs/${imported.id}`);
+    await mutate(admin, importPath + "/dry-run", { expectedVersion: importStatus.version }, 202, "POST", { "Idempotency-Key": randomUUID() });
+    let reviewResponse; const reviewDeadline = Date.now() + 90000;
+    do {
+      reviewResponse = await admin.get(importPath + "/review");
+      if (reviewResponse.status() === 200) break;
+      assert.equal(reviewResponse.status(), 409); await new Promise(resolve => setTimeout(resolve, 1000));
+    } while (Date.now() < reviewDeadline);
+    assert.equal(reviewResponse.status(), 200); const expectedReview = await reviewResponse.json();
+    assert.equal(expectedReview.eligible, false); assert.equal(expectedReview.activationAvailable, false);
+    assert.deepEqual(expectedReview.errors, [{ file: "target", line: 0, code: "TARGET_NOT_EMPTY_BOOTSTRAP" }]);
+    assert.equal(expectedReview.totalErrors, 1);
+    const stagedFingerprint = () => compose(["exec", "-T", "db", "psql", "-U", "persistence", "-d", "commonbeacon_persistence", "-At", "-v", "ON_ERROR_STOP=1", "-c", "SELECT md5(coalesce(string_agg(payload::text, '' ORDER BY entity,source_id),'')) FROM transfer_stage"], true).trim();
+    const expectedStage = stagedFingerprint();
+
     async function assertPersisted() {
       assert.deepEqual(await get(admin, importPath + "/inspection"), expectedInspection);
+      const review = await get(admin, importPath + "/review");
+      assert.equal(review.reviewDigest, expectedReview.reviewDigest);
+      assert.equal(review.archiveDigest, expectedReview.archiveDigest);
+      assert.equal(stagedFingerprint(), expectedStage);
       const importStatus = await get(admin, `/api/v1/admin/data/jobs/${imported.id}`);
       assert.equal(importStatus.state, "REVIEW_REQUIRED"); assert.equal(importStatus.errorCode, null);
 
@@ -156,7 +175,7 @@ if (process.argv.includes("--verify-failure-cleanup")) {
     compose(["up", "-d", "--wait", "--wait-timeout", "180"]);
     assert.equal((await admin.get("/api/v1/auth/me")).status(), 401);
     admin = await session("avery.admin@example.test"); await assertPersisted();
-    console.log("Compose down/up preserved reports, audit history, articles, vectors, decisions, protected export bytes, and quarantine inspection metadata; verification passed.");
+    console.log("Compose down/up preserved reports, audit history, articles, vectors, decisions, protected export bytes, quarantine inspection metadata, staged import records and review fingerprints; verification passed.");
   } catch (error) {
     console.error(error.message); process.exitCode = 1;
   } finally {

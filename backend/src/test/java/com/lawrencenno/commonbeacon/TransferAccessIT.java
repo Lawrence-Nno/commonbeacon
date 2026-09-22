@@ -70,7 +70,7 @@ class TransferAccessIT {
         when(clock.instant()).thenAnswer(i->now);when(clock.millis()).thenAnswer(i->now.toEpochMilli());
         when(loginLimiter.allow(anyString())).thenReturn(true);
         DURING_READ.set(null);
-        jdbc.execute("TRUNCATE transfer_inspection,transfer_download,transfer_audit,transfer_completion,transfer_mapping,transfer_artifact,transfer_attempt,transfer_request,transfer_job");
+        jdbc.execute("TRUNCATE transfer_stage,transfer_dry_run,transfer_inspection,transfer_download,transfer_audit,transfer_completion,transfer_mapping,transfer_artifact,transfer_attempt,transfer_request,transfer_job");
         hash=passwords.encode(PASSWORD);admin=user("ADMINISTRATOR");other=user("ADMINISTRATOR");member=user("MEMBER");
     }
     @AfterEach void close(){browsers.forEach(b->b.client.close());}
