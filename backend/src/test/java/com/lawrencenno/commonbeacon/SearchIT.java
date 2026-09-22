@@ -239,7 +239,7 @@ class SearchIT {
             UUID id = UUID.randomUUID();
             jdbc.update("INSERT INTO " + schema + ".question(id,board_id,author_id,title,body) VALUES (?,?,?,?,?)", id, board, author, "Earlier milestone question", "Migrating fictional telescopes safely");
             jdbc.update("INSERT INTO " + schema + ".knowledge_article(id,slug,title,body,status,author_id,published_at) VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP)", id, "upgrade-guide", "Earlier article title", "Migrating fictional telescopes safely", "PUBLISHED", author);
-            var upgrade = org.flywaydb.core.Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).load();
+            var upgrade = org.flywaydb.core.Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).target("9").load();
             assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(1);
             assertThat(upgrade.migrate().migrationsExecuted).isZero();
             for (String table : List.of("question", "knowledge_article")) {

@@ -47,6 +47,10 @@ management:
       show-components: never
 
 commonbeacon:
+  transfer:
+    storage:
+      enabled: ${TRANSFER_STORAGE_ENABLED:false}
+      directory: ${TRANSFER_STORAGE_DIRECTORY:}
   demo:
     enabled: ${DEMO_SEED_ENABLED:false}
     password: ${DEMO_PASSWORD:}

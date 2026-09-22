@@ -113,6 +113,9 @@ later job layer can distinguish storage failure from invalid data.
 
 ## Backend integration boundary
 
+The separate [job and private-storage foundation](data-transfer-storage.md) supplies
+durable orchestration primitives; product transfer handlers are not registered yet.
+
 `ArchiveCodec.validate` accepts manifest bytes, a map of allowlisted entry names
 to input-stream factories, and a row consumer. It streams rows and retains only
 bounded relationship/state indexes, not content bodies. The consumer receives

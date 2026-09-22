@@ -33,10 +33,22 @@ reply belongs to its question. One nullable reference gives at most one selectio
 public solved status additionally requires that reply to be visible.
 
 V1-V5 establish the community; V6-V7 add reports and visibility history; V8 adds
-articles; V9 adds generated search vectors and partial GIN indexes. Clean startup
-and forward upgrade from populated V5 are tested with schema validation. This does
+articles; V9 adds generated search vectors and partial GIN indexes; V10 adds private
+transfer metadata. Clean startup and forward upgrades from populated V5 and V9
+are tested with schema validation. This does
 not establish reverse migrations, old-binary compatibility, or zero-downtime upgrades.
 V9's stored-column/index work occurs during Flyway startup.
+
+## Transfer job and artifact boundary
+
+Transfer jobs use short PostgreSQL transactions with one coordination-row lock
+before job and requester locks. Leases and monotonically increasing fences keep
+stale workers from publishing or advancing checkpoints. File work runs outside
+these transactions, after durable intent; a completion ledger and artifact metadata
+publish atomically. Private files use generated keys outside the application tree.
+The store and reconciliation scheduler are disabled by default. See
+[storage and recovery](data-transfer-storage.md) for guarantees and limitations;
+export/import HTTP workflows remain unavailable.
 
 ## Moderation atomicity and concurrency
 

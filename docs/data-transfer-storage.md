@@ -1,0 +1,151 @@
+# Transfer jobs, private storage and recovery
+
+CommonBeacon has internal durable-job and private-artifact infrastructure for data
+transfers. Export/import endpoints, recent-authentication checks, upload handling,
+snapshot producers and live import activation are not available yet. These classes
+are internal building blocks; accepting an actor UUID in a Java method is not an
+HTTP authorization mechanism.
+
+## Durable metadata
+
+V10 adds transfer jobs, idempotency records, worker attempts, artifacts, staging
+mappings, completion records and metadata-only audit events. It does not rewrite
+existing community tables. Job kinds separate company export, personal export and
+company import. Database checks constrain each kind's allowed states; artifact
+expiry/deletion is separate from a job's retained completion outcome.
+
+Creation persists the requester, kind, request digest and intent before work runs.
+Idempotency keys are scoped by requester and operation for 24 hours: matching
+digests return the original job, while mismatches fail. Future request adapters
+must calculate the digest from the canonical logical request, excluding transient
+authentication grants. Request options and review/confirmation contracts are added
+with their feature workflows; a digest is not a substitute for storing those options.
+
+Short READ COMMITTED transactions lock the singleton coordination row, then the
+job and requester as needed. All foundation mutations use this order; file I/O
+runs outside database transactions. Existing domain services do not acquire this
+transfer lock. Atomic live import needs an additional domain-wide write gate before
+it can be implemented. Row locking follows PostgreSQL's
+[transaction locking rules](https://www.postgresql.org/docs/18/applevel-consistency.html).
+
+The internal job methods check requester ownership and current database roles.
+Company work requires ADMINISTRATOR; personal export is requester-specific.
+There is no takeover by another administrator. Full HTTP/session/CSRF/recent-auth
+enforcement remains a prerequisite for exposing these operations. When inactive
+imported identities are added, the role check must also require an active account.
+
+## Worker leases and publication
+
+There is at most one live worker lease across the deployment. Claims, heartbeat,
+checkpoint, completion and cancellation coordinate through PostgreSQL, so a second
+JVM cannot independently claim the same work. Leases last 60 seconds; the export
+worker heartbeats every 15 seconds. Claims increment a fencing token and attempts
+are capped at three. Expired export attempts restart their snapshot checkpoint at
+zero; validation mappings/checkpoints can survive for later immutable-input handling.
+
+Checkpoint updates cannot move backwards. Old fences, expired leases, cancelled
+jobs and revoked roles cannot publish or advance progress. Revoked authorization
+becomes a terminal failure, not an endless retry. Queue expiry is 30 minutes;
+initial uploads expire after one hour; executing attempts have a ten-minute budget.
+Producer I/O must support cancellation/timeouts; the worker cannot forcibly stop
+arbitrary blocking third-party code. No snapshot producer is registered yet.
+
+The export runner commits artifact intent before asking a producer to write.
+It verifies the finalized file and atomically records availability, READY state,
+the completion ledger and audit event. `TransferJobs.publish` is the low-level
+metadata operation: callers must use the verified-store path, as the export runner
+does. Repeating a successful publication with the original lease/artifact returns
+the original result without a second completion event. An old worker cannot
+publish after a replacement claim. No public download route exists.
+Download artifacts expire 24 hours after successful publication. Missing or
+corrupted artifacts retain the READY outcome with an `ARTIFACT_MISSING` diagnostic.
+
+Import state names, upload artifact purpose and mapping ownership are present for
+subsequent handlers. The export runner does not claim imports or invent an import
+workflow. COMMITTING work is never automatically replayed after expiry: it is
+flagged for activation reconciliation. Live-domain transactions and confirmation
+must be implemented before that state can be used by a product workflow.
+
+## Private local store
+
+Storage and its reconciliation scheduler are disabled by default. For internal
+integration, the backend accepts these environment settings:
+
+```text
+TRANSFER_STORAGE_ENABLED=true
+TRANSFER_STORAGE_DIRECTORY=/var/lib/commonbeacon/transfers
+```
+
+Use an absolute, dedicated directory outside the backend's working/application
+tree. Windows hosts may use a dedicated absolute directory on a private data drive.
+Do not point the setting at a home directory, shared temporary directory or web
+root. The store rejects relative/application paths, symlinked/canonicalized paths,
+and unrelated non-empty directories before changing their permissions.
+
+Files have generated UUID keys, never source filenames or supplied paths. POSIX
+directories/files use 0700/0600; Windows uses an owner-only ACL. The store refuses
+filesystems without either permission model. Reads and deletion reject symlinks
+and non-regular artifact paths. Existing unrelated files are never cleanup targets.
+
+Writes use private `.part` files, byte limits, flush-to-disk, and same-directory
+atomic rename to `.blob`. There is no fallback to a non-atomic move. Final keys
+cannot be overwritten. Cooperating processes serialize filesystem mutations with
+a lock file; all replicas must see the same durable directory and support file
+locking/atomic rename. See Java's [file operation contracts](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/nio/file/Files.html).
+
+The default deployment-wide artifact quota is 2 GiB with a 1 GiB free-space floor.
+Job admission reserves 768 MiB per retained job. Each job has at most ten unfinished
+or available artifact records and aggregate allocated limits of 768 MiB. Individual
+intermediate files cap at 256 MiB and downloads at 64 MiB. Filesystem checks include
+existing bytes before new writes; streamed writes enforce their declared byte cap.
+The quota can therefore admit fewer jobs than the ten-job queue ceiling. There is
+one active job per requester. Job-list requests are bounded to 100 records.
+
+The existing Compose file does not enable this store or mount an artifact volume.
+Before enabling storage in a container deployment, explicitly pass the settings
+and mount a durable private volume writable by the backend service identity.
+An ephemeral container layer is not suitable. Do not enable a migration UI merely
+because the directory is configured; none is implemented yet.
+
+Artifact bytes are **not encrypted by this Java implementation**. Production use
+requires an encrypted filesystem/volume and encrypted backups with keys managed
+outside the archives; database metadata and backups also need appropriate access
+and encryption controls. File permissions do not provide encryption. Verify restore,
+power-loss durability and target-filesystem behavior on the chosen infrastructure.
+
+## Reconciliation and audit
+
+When storage is enabled, reconciliation runs on startup and every 15 minutes.
+It handles missing/corrupted finalized files, expired artifacts, abandoned writes,
+lease loss and recognized orphan files. Orphans have a 15-minute grace period.
+Unknown filenames are not deleted. Failed physical cleanup remains retryable;
+availability is revoked before deletion is attempted. Terminal job reservations
+are released only after their files are deleted; failed staging mappings are then
+removed. A missing file never causes a successfully completed export to rerun.
+
+A crash after rename but before the database publication transaction leaves an
+unavailable artifact. Recovery fences that attempt and removes the abandoned file;
+it does not infer success from the presence of a `.blob`. Completion records remain
+after artifact expiry. Retained job/audit metadata is not automatically purged yet;
+the broader retention/offboarding work adds that policy.
+
+Audit records contain a job reference, fixed event name and timestamp. Requester
+and worker attribution comes from the job and attempt records. Events distinguish
+download attempts from completed delivery; future download handlers must record
+completion only after actual delivery. Confirmation has a defined event value for
+the later confirmation handler. Events contain no content bodies, passwords,
+authentication grants, supplied paths or raw exception messages. Reconciliation
+logs a fixed retry message on failure. This is not a tamper-proof external audit log.
+
+## Verification
+
+`TransferFoundationIT` exercises competing/recreated workers, durable idempotency,
+lease recovery, fencing, permissions, quota admission, mappings, publication replay,
+interrupted work, orphan cleanup, corruption, expiry and retried deletion using
+disposable PostgreSQL and temporary files. `LocalArtifactStoreTest` checks immutable
+publication, file permissions, quotas and unsafe-directory handling. Migration tests
+verify fresh V10 startup and preservation of populated V5 and V9 domain data.
+
+These are functional tests, not production throughput or power-failure benchmarks.
+Large-data, multi-host storage and end-to-end transfer verification remain necessary
+before release. See the [archive format](data-archive-format.md) for entry validation.

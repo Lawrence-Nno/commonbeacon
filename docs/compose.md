@@ -124,13 +124,14 @@ and restarts your app. Use the isolated commands above for routine verification.
 ## Schema compatibility
 
 `MilestoneUpgradeIT` verifies both an empty database and V1-V5 fixtures upgraded
-through V9. It preserves users, credentials, board archival, question/reply bodies,
+through V10. It preserves users, credentials, board archival, question/reply bodies,
 versions, timestamps, hidden states, and accepted selections; checks generated
 search vectors and representative constraints; and starts the current application
-with Hibernate `ddl-auto=validate`. Applied migrations are unchanged.
+with Hibernate `ddl-auto=validate`. A separate populated V9-to-V10 check compares
+all seven domain tables before and after adding transfer metadata. Applied migrations are unchanged.
 
 This verifies forward upgrade to the current application. It does not establish
-that an older binary can run against V9, nor provide reverse migrations or
+that an older binary can run against V10, nor provide reverse migrations or
 an application rollback guarantee. A database backup/restore procedure is separate
 from these tests; do not attempt rollback by editing Flyway history or applied SQL.
 

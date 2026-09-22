@@ -4,7 +4,7 @@
 
 One Spring Boot 4.1.1 application targeting Java 21, built by Maven 3.9.16 through the official Maven Wrapper. PostgreSQL runs in Docker; this guide runs the backend on the host for development. For the complete container deployment, see [Compose](compose.md).
 
-Flyway applies V1-V9. Hibernate validates the mapped schema and never changes it. The backend provides session authentication, community discussions, moderation, knowledge articles, and search; see [REST APIs](api.md).
+Flyway applies V1-V10. Hibernate validates the mapped schema and never changes it. The backend provides session authentication, community discussions, moderation, knowledge articles, and search; see [REST APIs](api.md). V10 adds internal [transfer job and storage infrastructure](data-transfer-storage.md); transfer endpoints are not available yet.
 
 The PostgreSQL image is pinned to 18.6-alpine3.24 and digest `sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2`. Compose and integration tests use the same image. PostgreSQL 18 stores data beneath `/var/lib/postgresql`, where the named volume is mounted.
 

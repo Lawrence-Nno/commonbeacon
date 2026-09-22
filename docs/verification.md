@@ -67,7 +67,11 @@ cleanup, and failure handling.
   English matching, global pagination, snippets, and snapshot consistency.
 - Client behavior: validation, draft recovery, actor-scoped caches, logout/expiry,
   late-response handling, keyboard navigation, mobile layout, and SPA deep links.
-- Deployment and migrations: clean V1-V9 migration, populated V5-to-V9 upgrade,
+- Transfer foundations: versioned archive fixtures, privacy and reference validation,
+  durable idempotency, competing/recreated workers, lease fencing, private filesystem
+  permissions, quota admission, publication replay, corruption and cleanup recovery.
+  These do not yet provide end-to-end export/import workflows.
+- Deployment and migrations: clean V1-V10 migration, populated V5-to-V10 and V9-to-V10 upgrades,
   repeated migration, Hibernate validation, backend/database restarts, normal
   Compose down/up, and cleanup after an intentionally injected failure.
 
@@ -91,7 +95,7 @@ failure cleanup checks also passed. All three jobs passed in
 The subsequent documentation/API-contract revision
 `9b8f72c67c9302a280ea8d9f626ec207d9f42b5f` also passed all three jobs in
 [CI run 35564924579](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/35564924579).
-The present documentation reorganization is not covered by those historical CI runs.
+Later changes are not covered by those historical CI runs.
 
 On 2026-09-21, a source-only copy of the application was started with the documented
 Compose procedure using fresh disposable credentials, a separate project, and
