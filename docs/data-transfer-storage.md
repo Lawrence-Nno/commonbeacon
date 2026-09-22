@@ -2,8 +2,9 @@
 
 CommonBeacon has internal durable-job and private-artifact infrastructure for data
 transfers. [Requester access and protected downloads](data-transfer-access.md) are
-implemented. Export/import creation, upload handling, snapshot producers and live
-import activation are not available yet. These classes
+implemented, including [company export creation and generation](data-transfer-access.md#company-export).
+Personal export creation, upload handling and live import activation remain future
+work. These classes
 are internal building blocks; accepting an actor UUID in a Java method is not an
 HTTP authorization mechanism.
 
@@ -17,14 +18,16 @@ expiry/deletion is separate from a job's retained completion outcome.
 
 Creation persists the requester, kind, request digest and intent before work runs.
 Idempotency keys are scoped by requester and operation for 24 hours: matching
-digests return the original job, while mismatches fail. Future request adapters
-must calculate the digest from the canonical logical request, excluding transient
-authentication grants. Request options and review/confirmation contracts are added
-with their feature workflows; a digest is not a substitute for storing those options.
+digests return the original job, while mismatches fail. Request adapters
+calculate the digest from the canonical logical request, excluding transient
+authentication grants. V13 stores company export options alongside each job and
+a stable source-instance UUID. Import review/confirmation contracts remain later work.
 
 Short READ COMMITTED transactions lock the singleton coordination row, then the
 job and requester as needed. All foundation mutations use this order; file I/O
-runs outside database transactions. Existing domain services do not acquire this
+runs outside coordination transactions; company extraction alone holds its
+read-only database snapshot while writing the bounded intermediate file. Existing
+domain services do not acquire this
 transfer lock. Atomic live import needs an additional domain-wide write gate before
 it can be implemented. Row locking follows PostgreSQL's
 [transaction locking rules](https://www.postgresql.org/docs/18/applevel-consistency.html).
@@ -32,8 +35,8 @@ it can be implemented. Row locking follows PostgreSQL's
 The internal job methods check requester ownership and current database roles.
 Company work requires ADMINISTRATOR; personal export is requester-specific.
 There is no takeover by another administrator. HTTP/session/CSRF and scoped recent-authentication controls protect the implemented
-job and download routes. V11 pins worker authorization revisions to detect revocation. When inactive
-imported identities are added, the role check must also require an active account.
+job and download routes. V11 pins worker authorization revisions to detect revocation. V12 requires ACTIVE
+accounts in addition to roles, including worker and current-session checks.
 
 ## Worker leases and publication
 
@@ -49,7 +52,8 @@ jobs and revoked roles cannot publish or advance progress. Revoked authorization
 becomes a terminal failure, not an endless retry. Queue expiry is 30 minutes;
 initial uploads expire after one hour; executing attempts have a ten-minute budget.
 Producer I/O must support cancellation/timeouts; the worker cannot forcibly stop
-arbitrary blocking third-party code. No snapshot producer is registered yet.
+arbitrary blocking third-party code. The company-export producer is registered when
+storage is enabled; its scheduled polling interval is five seconds.
 
 The export runner commits artifact intent before asking a producer to write.
 It verifies the finalized file and atomically records availability, READY state,
@@ -69,8 +73,8 @@ must be implemented before that state can be used by a product workflow.
 
 ## Private local store
 
-Storage and its reconciliation scheduler are disabled by default. For internal
-integration, the backend accepts these environment settings:
+Storage and its schedulers are disabled by default. The backend accepts these
+environment settings:
 
 ```text
 TRANSFER_STORAGE_ENABLED=true
@@ -102,11 +106,19 @@ existing bytes before new writes; streamed writes enforce their declared byte ca
 The quota can therefore admit fewer jobs than the ten-job queue ceiling. There is
 one active job per requester. Job-list requests are bounded to 100 records.
 
-The existing Compose file does not enable this store or mount an artifact volume.
-Before enabling storage in a container deployment, explicitly pass the settings
-and mount a durable private volume writable by the backend service identity.
-An ephemeral container layer is not suitable. Do not enable a migration UI merely
-because the directory is configured; none is implemented yet.
+For the supplied local Compose deployment, opt in with:
+
+```powershell
+docker compose -f compose.yaml -f compose.transfers.yaml up -d --build
+```
+
+The overlay enables the worker and mounts a dedicated `transfer_artifacts` volume
+at the backend-owned 0700 directory. Use both files on subsequent up/down commands;
+ordinary down retains the volume. The base Compose deployment remains storage-off.
+For other deployments, mount a durable private directory writable by the service
+identity. An ephemeral container layer is unsuitable. No transfer UI exists yet.
+Disabling `commonbeacon.transfer.export.worker.enabled` pauses automatic company
+processing for operator maintenance; queued jobs still obey their expiry limits.
 
 Artifact bytes are **not encrypted by this Java implementation**. Production use
 requires an encrypted filesystem/volume and encrypted backups with keys managed

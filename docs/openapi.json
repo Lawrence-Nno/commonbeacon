@@ -5342,6 +5342,178 @@
           }
         }
       }
+    },
+    "/api/v1/admin/data/exports": {
+      "post": {
+        "operationId": "createCompanyExport",
+        "summary": "Create a private company export",
+        "tags": [
+          "transfers"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Requires an ACTIVE ADMINISTRATOR, CSRF, a UUID Idempotency-Key, acknowledgedPrivateContent=true and a COMPANY_EXPORT recent-authentication grant. Contacts and moderation history default false independently (omitted/null means false). All company archives include hidden content and unpublished articles. Matching logical retries return the original job without consuming another grant; changed options conflict. Storage must be enabled. Poll the requester-owned company job and use a fresh DOWNLOAD grant/ticket when READY. All responses use Cache-Control: no-store.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Invalid request",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in required",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF/grant/ticket",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version/state/idempotency conflict or download already active",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body or reserved transfer capacity exceeds limits",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Transfer storage unavailable",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted; original job on matching retry",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferJob"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompanyExportRequest"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7152,7 +7324,10 @@
               "ATTEMPTS_EXHAUSTED",
               "JOB_EXPIRED",
               "ARTIFACT_MISSING",
-              "ACTIVATION_RECONCILIATION_REQUIRED"
+              "ACTIVATION_RECONCILIATION_REQUIRED",
+              "INVALID_SOURCE_DATA",
+              "TRANSFER_LIMIT_EXCEEDED",
+              "SNAPSHOT_TIMEOUT"
             ]
           },
           "artifactAvailable": {
@@ -7206,6 +7381,38 @@
           "nextCursor"
         ],
         "additionalProperties": false
+      },
+      "CompanyExportRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "includeContacts": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": false
+          },
+          "includeModerationHistory": {
+            "type": [
+              "boolean",
+              "null"
+            ],
+            "default": false
+          },
+          "acknowledgedPrivateContent": {
+            "type": "boolean",
+            "const": true
+          },
+          "recentAuthGrant": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          }
+        },
+        "required": [
+          "acknowledgedPrivateContent",
+          "recentAuthGrant"
+        ]
       }
     }
   }

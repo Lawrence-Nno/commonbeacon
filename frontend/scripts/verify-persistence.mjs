@@ -1,7 +1,7 @@
 import { request } from "@playwright/test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
@@ -44,9 +44,9 @@ if (process.argv.includes("--verify-failure-cleanup")) {
   async function get(context, path) {
     const response = await context.get(path); assert.equal(response.status(), 200, "Read failed: " + path); return response.json();
   }
-  async function mutate(context, path, data, expected = 200, method = "POST") {
+  async function mutate(context, path, data, expected = 200, method = "POST", extraHeaders = {}) {
     const csrf = await get(context, "/api/v1/auth/csrf");
-    const response = await context.fetch(path, { method, data, headers: { [csrf.headerName]: csrf.token } });
+    const response = await context.fetch(path, { method, data, headers: { [csrf.headerName]: csrf.token, ...extraHeaders } });
     assert.equal(response.status(), expected, "Mutation failed: " + path); return response.json();
   }
   function fingerprints() {
@@ -76,8 +76,34 @@ if (process.argv.includes("--verify-failure-cleanup")) {
       articles.push(article);
     }
     const summary = await get(admin, "/api/v1/moderation/summary");
+    const exportGrant = await mutate(admin, "/api/v1/account/data/reauthentication", { password: "disposable-e2e-demo-password", scope: "COMPANY_EXPORT" });
+    const exported = await mutate(admin, "/api/v1/admin/data/exports", {
+      includeContacts: true, includeModerationHistory: true, acknowledgedPrivateContent: true, recentAuthGrant: exportGrant.token,
+    }, 202, "POST", { "Idempotency-Key": randomUUID() });
+    const exportPath = `/api/v1/admin/data/jobs/${exported.id}`;
+    const deadline = Date.now() + 90000;
+    let exportStatus;
+    do {
+      exportStatus = await get(admin, exportPath);
+      if (["READY", "FAILED", "CANCELLED"].includes(exportStatus.state)) break;
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } while (Date.now() < deadline);
+    assert.equal(exportStatus.state, "READY", "Scheduled company export did not complete");
+    assert.equal(compose(["exec", "-T", "backend", "stat", "-c", "%a", "/var/lib/commonbeacon/transfers"], true).trim(), "700");
+    async function archiveHash() {
+      const grant = await mutate(admin, "/api/v1/account/data/reauthentication", { password: "disposable-e2e-demo-password", scope: "DOWNLOAD" });
+      const ticket = await mutate(admin, exportPath + "/download-ticket", { recentAuthGrant: grant.token });
+      const response = await admin.get(exportPath + "/download", { headers: { "X-Download-Ticket": ticket.token } });
+      assert.equal(response.status(), 200); assert.equal(response.headers()["cache-control"], "no-store");
+      assert.equal(response.headers()["content-type"], "application/zip");
+      const bytes = await response.body(); assert.equal(bytes.subarray(0, 2).toString(), "PK");
+      return createHash("sha256").update(bytes).digest("hex");
+    }
+    const expectedArchive = await archiveHash();
     const expectedRows = fingerprints();
     async function assertPersisted() {
+      assert.equal((await get(admin, exportPath)).state, "READY");
+      assert.equal(await archiveHash(), expectedArchive, "Private export bytes changed across restart");
       assert.equal(fingerprints(), expectedRows, "Stored rows changed across restart");
       assert.deepEqual(await get(admin, "/api/v1/moderation/summary"), summary);
       assert.equal((await get(admin, `/api/v1/moderation/reports/${report.id}`)).report.status, "RESOLVED");
@@ -105,7 +131,7 @@ if (process.argv.includes("--verify-failure-cleanup")) {
     compose(["up", "-d", "--wait", "--wait-timeout", "180"]);
     assert.equal((await admin.get("/api/v1/auth/me")).status(), 401);
     admin = await session("avery.admin@example.test"); await assertPersisted();
-    console.log("Compose down/up preserved reports, audit history, articles, vectors, and decisions; verification passed.");
+    console.log("Compose down/up preserved reports, audit history, articles, vectors, decisions, and protected export bytes; verification passed.");
   } catch (error) {
     console.error(error.message); process.exitCode = 1;
   } finally {

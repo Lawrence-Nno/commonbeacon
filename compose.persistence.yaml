@@ -23,6 +23,10 @@ services:
       SPRING_DATASOURCE_PASSWORD: disposable-e2e-database-only
       DEMO_SEED_ENABLED: "true"
       DEMO_PASSWORD: disposable-e2e-demo-password
+      TRANSFER_STORAGE_ENABLED: "true"
+      TRANSFER_STORAGE_DIRECTORY: /var/lib/commonbeacon/transfers
+    volumes:
+      - persistence_artifacts:/var/lib/commonbeacon/transfers
     depends_on:
       db:
         condition: service_healthy
@@ -46,3 +50,4 @@ services:
       retries: 20
 volumes:
   persistence_data:
+  persistence_artifacts:

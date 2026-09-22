@@ -1,8 +1,9 @@
 # Native data archive format v1
 
 CommonBeacon includes schemas and a backend codec for portable community records.
-There is currently no export/download or upload/import workflow. This document
-describes the implemented data format, not instructions for migrating a deployment.
+The [company export API](data-transfer-access.md#company-export) produces this format
+and supports protected downloads. Upload/import and personal export workflows are
+not available yet; this is not a complete migration workflow.
 
 The [schemas](../backend/src/main/resources/data-transfer/v1/) are JSON Schema
 2020-12 documents. The [readable fixtures](../backend/src/test/resources/data-transfer/v1/)
@@ -117,7 +118,8 @@ later job layer can distinguish storage failure from invalid data.
 ## Backend integration boundary
 
 The separate [job and private-storage foundation](data-transfer-storage.md) supplies
-durable orchestration primitives; product transfer handlers are not registered yet.
+durable orchestration primitives; the company-export handler uses the codec after
+closing its database snapshot and before publishing a ZIP.
 
 `ArchiveCodec.validate` accepts manifest bytes, a map of allowlisted entry names
 to input-stream factories, and a row consumer. It streams rows and retains only

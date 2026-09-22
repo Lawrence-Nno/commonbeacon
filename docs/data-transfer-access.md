@@ -1,9 +1,9 @@
 # Data transfer permissions and downloads
 
-The API supports password confirmation, requester-scoped job lists/status,
-cancellation and protected delivery of existing artifacts. Export creation,
-import upload, snapshot generation and live import activation are not available
-yet. The reusable frontend password prompt is ready for future transfer screens;
+The API supports company export creation and generation, password confirmation,
+requester-scoped job lists/status, cancellation and protected downloads. Personal
+export creation, import upload and live import activation are not available yet.
+The reusable frontend password prompt is ready for future transfer screens;
 there is no transfer screen in the application navigation yet.
 
 ## Current identity and permission checks
@@ -67,7 +67,7 @@ personal exports. Both support:
   filename. Disabled/unavailable storage returns 503.
 
 All these responses use Cache-Control: no-store. The [OpenAPI contract](openapi.json)
-defines the exact DTOs and errors. Creation endpoints remain unavailable.
+defines the exact DTOs and errors. Company export creation is described below.
 
 ## Download revocation and cleanup
 
@@ -130,3 +130,64 @@ must never perform that handoff. No automatic email/display-name merge is suppor
 attribution, immutable mappings, rollback, denied role/credential/activation changes,
 stale sessions and worker revocation. `MilestoneUpgradeIT` covers populated V11
 upgrades as well as earlier baselines. Full archive activation remains future work.
+
+## Company export
+
+Enable private storage using the [Compose overlay](data-transfer-storage.md#private-local-store)
+or equivalent durable storage configuration. The scheduled worker polls every five
+seconds and shares the deployment-wide lease with other transfer workers. No
+administrator export screen exists yet.
+
+1. Sign in as an ACTIVE administrator and obtain CSRF as for other mutations.
+2. POST `/api/v1/account/data/reauthentication` with password and scope
+   `COMPANY_EXPORT`. Treat the returned token as a secret.
+3. POST `/api/v1/admin/data/exports` with a UUID `Idempotency-Key`, CSRF header,
+   and `{includeContacts:false, includeModerationHistory:false,
+   acknowledgedPrivateContent:true, recentAuthGrant:"<token>"}`. The response is
+   `202` with the standard job summary. Hidden content and unpublished articles
+   are always included. Set either optional flag to true only when deliberately
+   requesting that private section; omitted/null flags mean false independently.
+4. Poll `/api/v1/admin/data/jobs/{id}` until READY or a terminal failure. Matching
+   idempotent retries return the original job, even with its already-consumed grant;
+   changed options return 409. Replay still requires current administrator access.
+5. Obtain a fresh DOWNLOAD grant, exchange it for a job-specific ticket, then
+   download using the header-based route above. Repeated downloads need fresh
+   tickets and do not delete the artifact. Downloads expire after 24 hours.
+
+V13 persists the selected options and a stable, non-secret source-instance UUID.
+A read-only REPEATABLE_READ transaction extracts explicit field projections in
+keyset pages of at most 32 rows into one private intermediate file. It includes
+all users, boards, questions, replies, acceptances, and article states. Optional
+contacts include known active-account addresses and retained imported contacts;
+users without a known contact have no contact row. Imported author origins survive
+export. Moderation history remains untrusted historical data on import, regardless
+of the source actor's current role.
+
+The snapshot has a 120-second deadline and byte/row limits. Source rows are never
+trimmed or repaired. After closing the transaction, the worker validates all entry
+counts, digests and relationships, then packages the ZIP. Invalid source fields or
+relationships fail with INVALID_SOURCE_DATA; size/count limits use
+TRANSFER_LIMIT_EXCEEDED; snapshot timeouts use SNAPSHOT_TIMEOUT. Other storage or
+execution failures use WORK_FAILED. No raw source text is returned in these errors.
+Exclusions and private-content warnings are declared in the manifest.
+
+ZIP output caps at 64 MiB; total JSONL at 256 MiB, each entry at 128 MiB. Entries
+that would compress beyond 100:1 use ZIP STORED instead, and still count against the
+64 MiB output cap. Worker attempts have a ten-minute overall budget. Extraction,
+validation, and compression use bounded buffers; the codec's relationship index is
+row-bounded and still needs the planned capacity/heap measurements.
+
+A recovered lease discards all previous intermediate/output bytes and starts a new
+snapshot from the first page. Complete snapshots are not reused across attempts in
+this implementation. No database snapshot remains open during packaging or download.
+Publication rechecks the current requester and fence, then atomically marks a fully
+written ZIP READY. Cancellation/revocation/failure leaves no downloadable partial;
+cleanup retries failed physical deletions. Existing protected-download checks handle
+client disconnects, expiry, revocation and corrupt files.
+
+`CompanyExportIT` checks the fixture projections, independent private options,
+concurrent edits/hides/publication, recovery, invalid source relationships, limits,
+low disk, compression ratio fallback, HTTP authorization, replay, downloads and
+expiry. The disposable persistence suite creates an export through the scheduled
+worker and checks identical protected bytes after service restarts and Compose
+down/up, including cleanup of its separate artifact volume.

@@ -1,0 +1,10 @@
+# Opt-in private artifact storage: docker compose -f compose.yaml -f compose.transfers.yaml up -d --build
+services:
+  backend:
+    environment:
+      TRANSFER_STORAGE_ENABLED: "true"
+      TRANSFER_STORAGE_DIRECTORY: /var/lib/commonbeacon/transfers
+    volumes:
+      - transfer_artifacts:/var/lib/commonbeacon/transfers
+volumes:
+  transfer_artifacts:

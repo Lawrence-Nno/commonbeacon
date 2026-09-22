@@ -12,6 +12,12 @@ import com.lawrencenno.commonbeacon.transfer.job.*;
 @EnableScheduling
 @ConditionalOnProperty(name="commonbeacon.transfer.storage.enabled",havingValue="true")
 public class ArtifactStoreConfiguration {
+    @Bean
+    @ConditionalOnProperty(name="commonbeacon.transfer.export.worker.enabled",havingValue="true",matchIfMissing=true)
+    com.lawrencenno.commonbeacon.transfer.export.CompanyExportWorker companyExportWorker(TransferJobs jobs,ArtifactStore store,
+            com.lawrencenno.commonbeacon.transfer.export.CompanySnapshot snapshot) {
+        return new com.lawrencenno.commonbeacon.transfer.export.CompanyExportWorker(jobs,store,snapshot);
+    }
     @Bean TransferWorker transferWorker(TransferJobs jobs,ArtifactStore store) {return new TransferWorker(jobs,store);}
     @Bean ArtifactReconciler artifactReconciler(TransferJobs jobs,ArtifactStore store) {return new ArtifactReconciler(jobs,store);}
     @Bean ArtifactStore artifactStore(@Value("${commonbeacon.transfer.storage.directory}") String directory) throws IOException {

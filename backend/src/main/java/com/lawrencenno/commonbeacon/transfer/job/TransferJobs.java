@@ -65,6 +65,14 @@ public class TransferJobs {
         endAttempt(j.id()); audit(j.id(),Event.FAILED);
     }
     public TransferJob create(UUID actor, Kind kind, UUID requestKey, String payloadHash) {
+        return create(actor,kind,requestKey,payloadHash,false,false,()->{});
+    }
+    public TransferJob createCompanyExport(UUID actor, UUID key, boolean contacts, boolean history, Runnable authorize) {
+        String hash=java.util.HexFormat.of().formatHex(com.lawrencenno.commonbeacon.transfer.archive.ArchiveCodec.sha256()
+            .digest(("company:1:"+contacts+":"+history+":true").getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
+        return create(actor,Kind.COMPANY_EXPORT,key,hash,contacts,history,authorize);
+    }
+    private TransferJob create(UUID actor,Kind kind,UUID requestKey,String payloadHash,boolean contacts,boolean history,Runnable authorize) {
         if (payloadHash == null || !payloadHash.matches("[a-f0-9]{64}")) throw new IllegalArgumentException("INVALID_REQUEST_HASH");
         Objects.requireNonNull(actor); Objects.requireNonNull(kind); Objects.requireNonNull(requestKey);
         return locked(() -> {
@@ -80,25 +88,27 @@ public class TransferJobs {
                 throw new IllegalStateException("TRANSFER_QUOTA_EXCEEDED");
             if (jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE requester_id=? AND state NOT IN ("+TERMINAL+")",Long.class,actor)>0)
                 throw new IllegalStateException("ACTIVE_JOB_EXISTS");
+            authorize.run();
             UUID id=UUID.randomUUID();
-            jdbc.update("INSERT INTO transfer_job(id,requester_id,kind,state,expires_at,authorization_revision) VALUES (?,?,?,?,clock_timestamp()+? * interval '1 minute',(SELECT auth_revision FROM app_user WHERE id=?))",
-                id,actor,kind.name(),kind==Kind.COMPANY_IMPORT?"UPLOADING":"QUEUED",kind==Kind.COMPANY_IMPORT?60:30,actor);
+            jdbc.update("INSERT INTO transfer_job(id,requester_id,kind,state,expires_at,authorization_revision,include_contacts,include_moderation_history) VALUES (?,?,?,?,clock_timestamp()+? * interval '1 minute',(SELECT auth_revision FROM app_user WHERE id=?),?,?)",
+                id,actor,kind.name(),kind==Kind.COMPANY_IMPORT?"UPLOADING":"QUEUED",kind==Kind.COMPANY_IMPORT?60:30,actor,contacts,history);
             jdbc.update("INSERT INTO transfer_request VALUES (?,?,?,?,?,clock_timestamp()+interval '24 hours')",actor,kind.name(),requestKey,payloadHash,id);
             audit(id,Event.CREATED); return job(id);
         });
     }
     public Optional<TransferJob> claim(UUID worker) {
-        return claim(worker,true);
+        return claim(worker,true,false);
     }
     public Optional<TransferJob> claimExport(UUID worker) {
-        return claim(worker,false);
+        return claim(worker,false,false);
     }
-    private Optional<TransferJob> claim(UUID worker,boolean includeImports) {
+    public Optional<TransferJob> claimCompanyExport(UUID worker) {return claim(worker,false,true);}
+    private Optional<TransferJob> claim(UUID worker,boolean includeImports,boolean companyOnly) {
         Objects.requireNonNull(worker);
         return locked(() -> {
             recoverLocked();
             if (jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE lease_until>clock_timestamp()",Long.class)>0) return Optional.empty();
-            var candidates=jdbc.query("SELECT * FROM transfer_job WHERE state IN ('QUEUED','RUNNING','VALIDATING') AND worker_id IS NULL AND (? OR kind<>'COMPANY_IMPORT') ORDER BY created_at,id LIMIT 10 FOR UPDATE",ROW,includeImports);
+            var candidates=jdbc.query("SELECT * FROM transfer_job WHERE state IN ('QUEUED','RUNNING','VALIDATING') AND worker_id IS NULL AND (? OR kind<>'COMPANY_IMPORT') AND (NOT ? OR kind='COMPANY_EXPORT') ORDER BY created_at,id LIMIT 10 FOR UPDATE",ROW,includeImports,companyOnly);
             for (var j:candidates) {
                 if (!permitted(j)) { fail(j,Failure.AUTHORIZATION_REVOKED); continue; }
                 if (j.attempts()>=3) { fail(j,Failure.ATTEMPTS_EXHAUSTED); continue; }

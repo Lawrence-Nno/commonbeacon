@@ -72,12 +72,13 @@ cleanup, and failure handling.
   permissions, quota admission, publication replay, corruption and cleanup recovery.
   Real HTTP tests also cover current roles, requester isolation, CSRF, scoped
   password grants, ticket replay/expiry, cancellation retries and in-flight revocation.
-  These do not yet provide end-to-end export/import workflows.
-- Deployment and migrations: clean V1-V12 migration, populated V5-to-V12, V9-to-V12 and V11-to-V12 upgrades,
+  Company export now has API-to-ZIP, snapshot consistency, recovery and durable
+  artifact checks. Personal export and live import workflows remain future work.
+- Deployment and migrations: clean V1-V13 migration, populated V5-to-V13, V9-to-V13 and V11-to-V13 upgrades,
   repeated migration, Hibernate validation, backend/database restarts, normal
   Compose down/up, and cleanup after an intentionally injected failure.
 
-The [OpenAPI contract](openapi.json) describes 50 application operations and 50
+The [OpenAPI contract](openapi.json) describes 51 application operations and 51
 schemas. [API documentation](api.md#checking-the-contract) gives an optional
 structural-validation command. Schema validation alone does not prove permissions,
 transaction behavior, or server-specific UTF-16 length bounds.
@@ -130,6 +131,18 @@ checks, and injected-failure cleanup passed on disposable resources. Coverage
 includes inactive-author constraints, contact isolation, session/worker revocation,
 and populated V11-to-V12 upgrades preserving credentials and roles. These local
 results do not claim a CI run or a complete archive-import workflow.
+
+On 2026-09-22, local Stage 6 company-export changes based on Stage 5 commit
+`3825fe6` passed `scripts/verify.ps1`: 197 backend tests (31 unit and 166 integration),
+132 frontend tests, lint, type checking and build. All 11 browser tests passed.
+The expanded disposable persistence suite generated a company export through the
+scheduled worker/API and verified identical protected archive bytes after backend
+and database restarts and Compose down/up. Directory mode 0700 and cleanup of both
+disposable volumes, including injected-failure cleanup, passed. Export tests cover
+snapshot consistency, independent private options, invalid source data, crash
+recovery, limits, revocation and HTTP delivery. OpenAPI JSON and local references
+were checked; the optional full specification validator was not installed. These
+are local working-tree results, not remote CI or measured production capacity.
 
 ## Query-plan evidence
 

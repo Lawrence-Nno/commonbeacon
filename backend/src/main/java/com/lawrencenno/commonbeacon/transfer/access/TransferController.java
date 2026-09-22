@@ -34,18 +34,23 @@ public class TransferController {
         this.jobs=jobs;this.access=access;this.recent=recent;this.stores=stores;
     }
     private boolean personal(HttpServletRequest r){return r.getServletPath().startsWith("/api/v1/account/");}
-    private <T> T run(Supplier<T> action) {
+    static <T> T run(Supplier<T> action) {
         try{return action.get();}catch(IllegalStateException e){
             String code=Objects.toString(e.getMessage(),"");
             int status=switch(code){case "JOB_NOT_FOUND"->404;case "FORBIDDEN"->403;case "ARTIFACT_EXPIRED"->410;
-                case "JOB_CONFLICT","IDEMPOTENCY_CONFLICT","DOWNLOAD_IN_PROGRESS"->409;default->503;};
+                case "JOB_CONFLICT","IDEMPOTENCY_CONFLICT","DOWNLOAD_IN_PROGRESS","ACTIVE_JOB_EXISTS"->409;case "TRANSFER_QUOTA_EXCEEDED"->413;default->503;};
             if(status==503)code="TRANSFER_UNAVAILABLE";
+            if(status==413)code="TRANSFER_LIMIT_EXCEEDED";
+            if(code.equals("ACTIVE_JOB_EXISTS"))code="JOB_CONFLICT";
             throw new ApiFailure(status,code,status==404?"The transfer job was not found.":status==403?"You do not have permission for this action.":
-                status==410?"The download is no longer available.":status==409?"The transfer changed. Reload it and try again.":"Transfer storage is unavailable. Try again later.");
+                status==410?"The download is no longer available.":status==413?"The transfer exceeds the available capacity.":status==409?"The transfer changed. Reload it and try again.":"Transfer storage is unavailable. Try again later.");
         }
     }
     private Summary summary(TransferJob j) {
         boolean available=stores.getIfAvailable()!=null && run(()->jobs.artifactAvailable(j.requester(),j.id()));
+        return summary(j,available);
+    }
+    static Summary summary(TransferJob j,boolean available) {
         var actions=new ArrayList<String>();
         if(!j.terminal() && j.state()!=TransferJob.State.COMMITTING)actions.add("CANCEL");
         if(available)actions.add("DOWNLOAD");
