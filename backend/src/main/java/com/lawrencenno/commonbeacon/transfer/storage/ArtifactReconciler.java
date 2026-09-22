@@ -26,7 +26,8 @@ public final class ArtifactReconciler {
     public void scheduledReconciliation() {
         try {reconcile();}catch(IOException | RuntimeException e) {
             // Never include file paths, exception messages or payloads in operational logs.
-            org.slf4j.LoggerFactory.getLogger(ArtifactReconciler.class).warn("Transfer artifact reconciliation needs retry");
+            com.lawrencenno.commonbeacon.shared.OperationalLogs.failure(
+                org.slf4j.LoggerFactory.getLogger(ArtifactReconciler.class),"transfer.reconciliation_failed",e,null);
         }
     }
 }

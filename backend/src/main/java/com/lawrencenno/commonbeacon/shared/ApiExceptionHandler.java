@@ -13,6 +13,18 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+    @ExceptionHandler(Exception.class)
+    Object unexpected(Exception exception) {
+        // Preserve framework statuses (404, 405, 415, etc.) without exposing their messages.
+        if (exception instanceof org.springframework.web.ErrorResponse error && error.getStatusCode().is4xxClientError())
+            return new org.springframework.http.ResponseEntity<>(
+                    ApiProblems.problem(error.getStatusCode().value(), "INVALID_REQUEST", "The request could not be processed."),
+                    error.getHeaders(), error.getStatusCode());
+        OperationalLogs.failure(org.slf4j.LoggerFactory.getLogger(ApiExceptionHandler.class),
+                "http.unexpected_failure", exception, null);
+        return ApiProblems.problem(500, "INTERNAL_ERROR", "The service could not complete the request.");
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ProblemDetail validation(MethodArgumentNotValidException exception) {
         var problem = ApiProblems.problem(400, "VALIDATION_FAILED", "Check the highlighted fields.");

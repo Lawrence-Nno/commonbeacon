@@ -14,7 +14,8 @@ public class ApiProblems {
     public static ProblemDetail problem(int status, String code, String detail) {
         var problem = ProblemDetail.forStatusAndDetail(HttpStatus.valueOf(status), detail);
         problem.setProperty("code", code);
-        problem.setProperty("requestId", UUID.randomUUID().toString());
+        String requestId = org.slf4j.MDC.get("requestId");
+        problem.setProperty("requestId", requestId == null ? UUID.randomUUID().toString() : requestId);
         return problem;
     }
     public void write(HttpServletResponse response, int status, String code, String detail) throws IOException {

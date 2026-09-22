@@ -79,6 +79,11 @@ and version are checked in the transaction.
 
 ## Errors and restrictions
 
+Requests handled by the backend receive a server-generated `X-Request-Id` response
+header, reused in problem bodies and structured backend logs. Incoming request IDs
+are not trusted. Unexpected failures return a generic 500 `INTERNAL_ERROR` problem;
+private diagnostics remain server-side. See [backend logging](logging.md).
+
 Responses use application/problem+json with status/detail/code/requestId, and
 fieldErrors where applicable. Use status and fieldErrors for controlled UI feedback;
 retain drafts on recoverable errors.

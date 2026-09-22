@@ -4,6 +4,8 @@ This is a localhost development deployment. Docker Desktop must be running Linux
 containers. Java and Node are only needed for host development and test tooling;
 the images build the application from source.
 
+For structured backend events and request-ID searches, see [backend logging](logging.md).
+
 ## Start
 
 Copy .env.example to .env if it does not exist. Set a non-placeholder

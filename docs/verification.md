@@ -1,5 +1,10 @@
 # Testing and verification
 
+Backend operational logging is covered by `RequestLoggingTest` and
+`OperationalLoggingIT`: JSON output, correlation across security and MVC,
+safe exception diagnostics, HTTP semantics, response resets, and MDC cleanup.
+See [logging operations](logging.md).
+
 CommonBeacon uses unit tests, real PostgreSQL integration tests, browser workflows,
 and disposable deployment checks. Each covers a different boundary; a passing
 build does not establish production readiness or a performance service level.

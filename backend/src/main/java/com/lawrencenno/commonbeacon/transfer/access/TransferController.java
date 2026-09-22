@@ -117,6 +117,8 @@ public class TransferController {
                 response.getOutputStream().flush();delivered=true;
             }
         } catch(ApiFailure | IOException failure) {
+            if(failure instanceof IOException) com.lawrencenno.commonbeacon.shared.OperationalLogs.failure(
+                org.slf4j.LoggerFactory.getLogger(TransferController.class),"transfer.download_failed",failure,id);
             if(!response.isCommitted()) {
                 response.reset();response.setHeader("Cache-Control","no-store");
                 if(failure instanceof ApiFailure api)throw api;

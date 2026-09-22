@@ -148,7 +148,8 @@ download attempts from completed server delivery; handlers record completion onl
 after writing the verified response. Active download leases delay physical cleanup. Confirmation has a defined event value for
 the later confirmation handler. Events contain no content bodies, passwords,
 authentication grants, supplied paths or raw exception messages. Reconciliation
-logs a fixed retry message on failure. This is not a tamper-proof external audit log.
+logs a structured failure event with exception types and application code locations,
+excluding raw exception messages (see [backend logging](logging.md)). This is not a tamper-proof external audit log.
 
 ## Verification
 

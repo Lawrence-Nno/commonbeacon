@@ -1,4 +1,14 @@
+logging:
+  structured:
+    format:
+      console: logstash
+  level:
+    org.hibernate.orm.jdbc.error: "OFF"
+    org.hibernate.engine.jdbc.spi.SqlExceptionHelper: "OFF"
+
 spring:
+  main:
+    banner-mode: "off"
   application:
     name: commonbeacon
   datasource:
