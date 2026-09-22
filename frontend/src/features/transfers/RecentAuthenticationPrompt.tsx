@@ -11,11 +11,13 @@ export function RecentAuthenticationPrompt(props: Props) {
 }
 function Prompt({ scope, onConfirmed, onCancel }: Props) {
   const id = useId();
+  const input = useRef<HTMLInputElement>(null);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const generation = useRef({ value: 0 });
   useEffect(() => {
+    input.current?.focus();
     const attempts = generation.current;
     const expired = () => { attempts.value++; setPassword(""); setBusy(false); setError("Please sign in again."); };
     window.addEventListener("commonbeacon:session-expired", expired);
@@ -39,7 +41,7 @@ function Prompt({ scope, onConfirmed, onCancel }: Props) {
     <p>Confirm your identity before continuing with this data transfer.</p>
     <form onSubmit={submit}>
       <label htmlFor={id}>Current password</label>
-      <input id={id} type="password" autoComplete="current-password" required maxLength={128}
+      <input ref={input} id={id} type="password" autoComplete="current-password" required maxLength={128}
         value={password} onChange={event => setPassword(event.target.value)} disabled={busy} />
       {error && <p role="alert">{error}</p>}
       <Button type="submit" disabled={busy}>{busy ? "Checking..." : "Confirm password"}</Button>

@@ -3,8 +3,9 @@
 The API supports company export creation and generation, password confirmation,
 requester-scoped job lists/status, cancellation and protected downloads. Personal
 export creation, import upload and live import activation are not available yet.
-The reusable frontend password prompt is ready for future transfer screens;
-there is no transfer screen in the application navigation yet.
+Administrators can use **Data management** in the application navigation to create
+company exports, check their own history, cancel supported jobs, and download archives.
+See the [administrator guide](data-management.md).
 
 ## Current identity and permission checks
 
@@ -135,8 +136,8 @@ upgrades as well as earlier baselines. Full archive activation remains future wo
 
 Enable private storage using the [Compose overlay](data-transfer-storage.md#private-local-store)
 or equivalent durable storage configuration. The scheduled worker polls every five
-seconds and shares the deployment-wide lease with other transfer workers. No
-administrator export screen exists yet.
+seconds and shares the deployment-wide lease with other transfer workers. The
+administrator screen at `/admin/data` provides the following API workflow.
 
 1. Sign in as an ACTIVE administrator and obtain CSRF as for other mutations.
 2. POST `/api/v1/account/data/reauthentication` with password and scope

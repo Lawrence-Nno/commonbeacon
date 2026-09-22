@@ -149,6 +149,25 @@ recovery, limits, revocation and HTTP delivery. OpenAPI JSON and local reference
 were checked; the optional full specification validator was not installed. These
 are local working-tree results, not remote CI or measured production capacity.
 
+On 2026-09-22, the administrator export screen based on `571b861` passed
+`scripts/verify.ps1`: 203 backend tests (35 unit and 168 integration), 149 frontend
+tests, lint, type checking and production build. All 12 isolated browser tests
+passed, including a real company ZIP download and manifest/file checksum checks.
+The transfer journey covers expired confirmation, safe replay after a lost success
+response, keyboard operation, 390px layout, logout and member denial. Desktop/mobile
+captures were visually inspected. Frontend tests also cover late actor responses,
+cache clearing, lifecycle states, cancellation versions and bounded downloads.
+The browser stack stores artifacts only in its disposable backend container and
+was removed successfully. No development data or storage configuration changed.
+Persistence/restart checks were not rerun for this frontend-only slice; the Stage 6
+storage evidence above remains separate. These are local results, not remote CI.
+
+Download feedback follow-up (2026-09-22): all 152 frontend tests, lint and type
+checking passed. The isolated real-download browser journey passed again, including
+production image builds, inline password confirmation, ZIP checksums and mobile
+completion feedback. Controlled streams verify byte progress, interruption, stopping,
+and that only complete downloads are handed to the browser. No backend change.
+
 ## Query-plan evidence
 
 The [evidence directory](evidence/README.md) contains captured PostgreSQL plans for

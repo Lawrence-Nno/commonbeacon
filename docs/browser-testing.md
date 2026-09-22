@@ -33,12 +33,23 @@ specify that project and file. The runner uses .env.example explicitly; it never
 loads development credentials. Disposable credentials are sample, fixed, and
 used only by this localhost test backend.
 
+Company-export storage is enabled in the backend container's private writable
+directory. No artifact volume is mounted; removing the disposable container removes
+its archives. Production deployments still require the durable storage overlay.
+
 Cleanup uses down --remove-orphans on that generated project, without volume
 deletion. It cannot name or mount the development volume. If the process is forcibly
 killed, inspect docker compose ls and remove only the abandoned commonbeacon-e2e-*
 project using compose.e2e.yaml. Never use development-stack cleanup commands for tests.
 
 ## Coverage
+
+The administrator data-management journey creates a real company export, verifies
+ZIP manifest/checksums, and checks private option defaults, keyboard confirmation,
+mobile overflow, logout clearing, and member denial. It injects expired confirmation
+and a lost success response, then verifies that explicit retries reuse one request
+key and do not create a duplicate job. The real worker, private store and protected
+download endpoint complete the successful path.
 
 The real HTTP/PostgreSQL suite covers registration, separate member/admin browser
 sessions, question creation, replies, acceptance/replacement/clearing, reload and

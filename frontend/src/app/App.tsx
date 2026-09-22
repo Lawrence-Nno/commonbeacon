@@ -1,4 +1,5 @@
 import { AdminArticles } from "../features/knowledge/AdminArticles";
+import { DataManagement } from "../features/transfers/DataManagement";
 import { SearchPage } from "../features/search/SearchPage";
 import { KnowledgePage, KnowledgeArticlePage } from "../features/knowledge/KnowledgePage";
 import { NewQuestionPage } from "../features/questions/NewQuestionPage";
@@ -19,7 +20,7 @@ function PageTitle() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    document.title = `${pathname === "/search" ? "Search" : pathname.startsWith("/admin/articles") ? "Manage articles" : pathname.startsWith("/knowledge") ? "Knowledge" : pathname.startsWith("/moderation") ? "Report review" : pathname.startsWith("/questions/") ? "Question" : pathname.endsWith("/questions/new") ? "Ask a question" : pathname.startsWith("/boards/") ? "Board" : pathname === "/admin/boards" ? "Manage boards" : pathname === "/about" ? "About" : pathname === "/login" ? "Sign in" : pathname === "/register" ? "Join" : pathname === "/" ? "Community" : "Page not found"} · CommonBeacon`;
+    document.title = `${pathname === "/admin/data" ? "Data management" : pathname === "/search" ? "Search" : pathname.startsWith("/admin/articles") ? "Manage articles" : pathname.startsWith("/knowledge") ? "Knowledge" : pathname.startsWith("/moderation") ? "Report review" : pathname.startsWith("/questions/") ? "Question" : pathname.endsWith("/questions/new") ? "Ask a question" : pathname.startsWith("/boards/") ? "Board" : pathname === "/admin/boards" ? "Manage boards" : pathname === "/about" ? "About" : pathname === "/login" ? "Sign in" : pathname === "/register" ? "Join" : pathname === "/" ? "Community" : "Page not found"} · CommonBeacon`;
   }, [pathname]);
   return null;
 }
@@ -184,7 +185,7 @@ function Shell() {
             <span aria-hidden="true">◎</span> About this space
           </NavLink>
           {user?.role === "ADMINISTRATOR" && (
-            <><NavLink to="/admin/boards">Manage boards</NavLink><NavLink to="/admin/articles">Manage articles</NavLink></>
+            <><NavLink to="/admin/boards">Manage boards</NavLink><NavLink to="/admin/articles">Manage articles</NavLink><NavLink to="/admin/data">Data management</NavLink></>
           )}
           {(user?.role === "MODERATOR" || user?.role === "ADMINISTRATOR") && (
             <NavLink to="/moderation">Report review</NavLink>
@@ -231,7 +232,7 @@ function Shell() {
                             ? "Board"
                             : pathname === "/admin/boards"
                               ? "Manage boards"
-                              : pathname === "/search" ? "Search" : pathname.startsWith("/admin/articles") ? "Manage articles" : pathname.startsWith("/knowledge") ? "Knowledge" : pathname.startsWith("/moderation") ? "Report review" : "Not found"}
+                              : pathname === "/admin/data" ? "Data management" : pathname === "/search" ? "Search" : pathname.startsWith("/admin/articles") ? "Manage articles" : pathname.startsWith("/knowledge") ? "Knowledge" : pathname.startsWith("/moderation") ? "Report review" : "Not found"}
             </strong>
           </span>
           <AuthControls />
@@ -249,6 +250,7 @@ function Shell() {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/knowledge/:slug" element={<KnowledgeArticlePage />} />
             <Route path="/admin/articles" element={<AdminArticles />} />
+            <Route path="/admin/data" element={<DataManagement />} />
             <Route path="/admin/articles/new" element={<AdminArticles creating />} />
             <Route path="/admin/articles/:articleId" element={<AdminArticles />} />
             <Route path="/boards/:boardId" element={<BoardPage />} />

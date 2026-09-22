@@ -7,6 +7,7 @@ export class ApiError extends Error {
     public readonly status?: number,
     public readonly requestId?: string,
     public readonly fieldErrors?: Record<string, string>,
+    public readonly code?: string,
   ) {
     super(message);
     this.name = "ApiError";
@@ -37,6 +38,7 @@ export async function getJson<T>(
           ? "Please sign in to continue."
           : "The community service is unavailable. Please try again.";
       let fields: Record<string, string> | undefined;
+      let code: string | undefined;
       const isAuth = path.startsWith("/api/v1/auth/");
       if (
         (isAuth ||
@@ -58,6 +60,7 @@ export async function getJson<T>(
         try {
           const problem: unknown = await response.json();
           if (typeof problem === "object" && problem !== null) {
+            if ("code" in problem && typeof problem.code === "string" && /^[A-Z_]{1,80}$/.test(problem.code)) code = problem.code;
             if ("detail" in problem && typeof problem.detail === "string")
               message = problem.detail;
             if (
@@ -85,6 +88,7 @@ export async function getJson<T>(
         response.status,
         response.headers.get("x-request-id") ?? undefined,
         fields,
+        code,
       );
     }
     if (response.status === 204) return decode(undefined);
@@ -145,18 +149,20 @@ export async function postJson<T>(
   body: unknown,
   decode: (value: unknown) => T,
   method: "POST" | "PATCH" | "PUT" | "DELETE" = "POST",
+  options: { signal?: AbortSignal; idempotencyKey?: string } = {},
 ): Promise<T> {
   // Obtain a fresh session token for every mutation, including after login/logout.
   // Do not retry a mutation automatically: it may already have taken effect.
-  const csrf = await getJson("/api/v1/auth/csrf", readCsrf);
+  const csrf = await getJson("/api/v1/auth/csrf", readCsrf, options.signal);
   const form = body instanceof URLSearchParams;
-  return getJson(path, decode, undefined, 8_000, {
+  return getJson(path, decode, options.signal, 8_000, {
     method,
     headers: {
       "Content-Type": form
         ? "application/x-www-form-urlencoded"
         : "application/json",
       [csrf.headerName]: csrf.token,
+      ...(options.idempotencyKey ? { "Idempotency-Key": options.idempotencyKey } : {}),
     },
     body:
       body === null ? undefined : form ? body.toString() : JSON.stringify(body),
