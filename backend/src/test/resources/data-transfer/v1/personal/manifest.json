@@ -1,0 +1,64 @@
+{
+  "formatVersion": 1,
+  "profile": "personal",
+  "sourceInstanceId": "00000000-0000-0000-0000-000000000100",
+  "exportId": "00000000-0000-0000-0000-000000000101",
+  "productVersion": "0.0.1",
+  "snapshotStartedAt": "2026-09-22T00:00:00Z",
+  "snapshotCompletedAt": "2026-09-22T00:00:00Z",
+  "options": {
+    "includeContacts": false,
+    "includeModerationHistory": false
+  },
+  "exclusions": [
+    "credentials",
+    "local-authority",
+    "external-references"
+  ],
+  "warnings": [],
+  "files": [
+    {
+      "name": "users.jsonl",
+      "count": 1,
+      "uncompressedBytes": 146,
+      "sha256": "92064d2a99b6bab153e04792fbfe77953d90e295dbc63853ca0ee6f2d0281885"
+    },
+    {
+      "name": "boards.jsonl",
+      "count": 1,
+      "uncompressedBytes": 96,
+      "sha256": "9e784bfe8ecc568ebb51e325fe2a8410f55bd12fc0964f81971db8bc90c01dc4"
+    },
+    {
+      "name": "questions.jsonl",
+      "count": 2,
+      "uncompressedBytes": 685,
+      "sha256": "3d0b0c7d34f2f21fcc6bb4581204212342ca68746dfa51a73733b97e6fa1a745"
+    },
+    {
+      "name": "replies.jsonl",
+      "count": 1,
+      "uncompressedBytes": 299,
+      "sha256": "c58f37285a15c67cf351f82ac5c569b370de7db481d2bfdf955b9e5f24171a0d"
+    },
+    {
+      "name": "acceptances.jsonl",
+      "count": 2,
+      "uncompressedBytes": 206,
+      "sha256": "8efbf9d3fcd16a61c4e5446a3e3b6a35ea8b3498659684496ac8061b0c60fe1c"
+    },
+    {
+      "name": "articles.jsonl",
+      "count": 3,
+      "uncompressedBytes": 1003,
+      "sha256": "9d92b9e01054554041e75cc6c6f0509465efb959e9335272b7b64f2290b6cd6b"
+    },
+    {
+      "name": "reports.jsonl",
+      "count": 1,
+      "uncompressedBytes": 188,
+      "sha256": "cfc16369c61fc5c4cc082c77261c7a1fb54b27db1e54b1d409b7b809fb910cb5"
+    }
+  ],
+  "referencePolicy": "opaque-personal-context"
+}

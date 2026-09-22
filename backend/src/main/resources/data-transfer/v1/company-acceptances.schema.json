@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "company-acceptances",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "questionId",
+    "replyId"
+  ],
+  "properties": {
+    "questionId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "replyId": {
+      "type": "string",
+      "format": "uuid"
+    }
+  }
+}

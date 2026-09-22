@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "company-questions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "boardId",
+    "authorId",
+    "title",
+    "body",
+    "visibility",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "boardId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "authorId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 5,
+      "maxLength": 200,
+      "x-maxUtf16Length": 200,
+      "x-trimmed": true,
+      "x-minUtf16Length": 5
+    },
+    "body": {
+      "type": "string",
+      "minLength": 10,
+      "maxLength": 20000,
+      "x-maxUtf16Length": 20000,
+      "x-trimmed": true,
+      "x-minUtf16Length": 10
+    },
+    "visibility": {
+      "type": "string",
+      "enum": [
+        "VISIBLE",
+        "HIDDEN"
+      ]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceInstanceId",
+        "sourceId"
+      ],
+      "properties": {
+        "sourceInstanceId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    }
+  }
+}

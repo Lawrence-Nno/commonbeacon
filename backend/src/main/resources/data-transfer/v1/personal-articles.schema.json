@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "personal-articles",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "slug",
+    "title",
+    "body",
+    "status",
+    "authorId",
+    "createdAt",
+    "updatedAt",
+    "publishedAt"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "slug": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 100,
+      "x-maxUtf16Length": 100,
+      "x-trimmed": true,
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "x-minUtf16Length": 3
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "x-maxUtf16Length": 200,
+      "x-trimmed": true,
+      "x-minUtf16Length": 5
+    },
+    "body": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20000,
+      "x-maxUtf16Length": 20000,
+      "x-trimmed": true,
+      "x-minUtf16Length": 10
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "PUBLISHED",
+        "ARCHIVED"
+      ]
+    },
+    "authorId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "publishedAt": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

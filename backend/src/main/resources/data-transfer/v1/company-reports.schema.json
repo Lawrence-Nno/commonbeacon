@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "company-reports",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "reporterId",
+    "questionId",
+    "replyId",
+    "reason",
+    "status",
+    "createdAt",
+    "updatedAt",
+    "resolverId",
+    "resolvedAt",
+    "resolutionDecision",
+    "resolutionNote"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "reporterId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "questionId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "replyId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "x-maxUtf16Length": 2000,
+      "x-trimmed": true,
+      "x-minUtf16Length": 5
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "OPEN",
+        "RESOLVED"
+      ]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "resolverId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "resolvedAt": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "date-time"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "resolutionDecision": {
+      "anyOf": [
+        {
+          "type": "string",
+          "enum": [
+            "DISMISS",
+            "HIDE",
+            "ACKNOWLEDGE_HIDDEN"
+          ]
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "resolutionNote": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "x-maxUtf16Length": 2000,
+          "x-trimmed": true,
+          "x-minUtf16Length": 5
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceInstanceId",
+        "sourceId"
+      ],
+      "properties": {
+        "sourceInstanceId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,75 @@
+{
+  "formatVersion": 1,
+  "profile": "company",
+  "sourceInstanceId": "00000000-0000-0000-0000-000000000100",
+  "exportId": "00000000-0000-0000-0000-000000000101",
+  "productVersion": "0.0.1",
+  "snapshotStartedAt": "2026-09-22T00:00:00Z",
+  "snapshotCompletedAt": "2026-09-22T00:00:00Z",
+  "options": {
+    "includeContacts": true,
+    "includeModerationHistory": true
+  },
+  "exclusions": [
+    "credentials",
+    "local-authority"
+  ],
+  "warnings": [],
+  "files": [
+    {
+      "name": "users.jsonl",
+      "count": 4,
+      "uncompressedBytes": 411,
+      "sha256": "4a2832c72c4b56b6d6c3e2b562eb73362e77fd2fec34642409180c71c21e6cb0"
+    },
+    {
+      "name": "boards.jsonl",
+      "count": 1,
+      "uncompressedBytes": 187,
+      "sha256": "a6eb28006909344c1b338f3dabc8670a67143b341ed6bd1e4e75aaf10424adae"
+    },
+    {
+      "name": "questions.jsonl",
+      "count": 2,
+      "uncompressedBytes": 685,
+      "sha256": "3d0b0c7d34f2f21fcc6bb4581204212342ca68746dfa51a73733b97e6fa1a745"
+    },
+    {
+      "name": "replies.jsonl",
+      "count": 3,
+      "uncompressedBytes": 896,
+      "sha256": "c326bfd07e998d999ab9cfd662fe2fe857b328d168c0f8c827adda74955d3dd5"
+    },
+    {
+      "name": "acceptances.jsonl",
+      "count": 2,
+      "uncompressedBytes": 206,
+      "sha256": "8efbf9d3fcd16a61c4e5446a3e3b6a35ea8b3498659684496ac8061b0c60fe1c"
+    },
+    {
+      "name": "articles.jsonl",
+      "count": 3,
+      "uncompressedBytes": 1003,
+      "sha256": "9d92b9e01054554041e75cc6c6f0509465efb959e9335272b7b64f2290b6cd6b"
+    },
+    {
+      "name": "contacts.jsonl",
+      "count": 1,
+      "uncompressedBytes": 78,
+      "sha256": "a41fd1590a00386869d474b02f5461fd1c9ffab5218646221f7099c0fe3add3f"
+    },
+    {
+      "name": "reports.jsonl",
+      "count": 4,
+      "uncompressedBytes": 1778,
+      "sha256": "f4e4fc27ae6e9b36969e0b294f16ad9a39a1a269443196ccc1581c32ad98b121"
+    },
+    {
+      "name": "actions.jsonl",
+      "count": 2,
+      "uncompressedBytes": 618,
+      "sha256": "00dea003389e6a3cf1a4cf9e3d2b6deb40644656ee37ec208f9fc3e791954331"
+    }
+  ],
+  "referencePolicy": "internal-only"
+}

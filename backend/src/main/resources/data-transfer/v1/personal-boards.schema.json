@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "personal-boards",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "slug",
+    "name"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "slug": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "x-maxUtf16Length": 80,
+      "x-trimmed": true,
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "x-minUtf16Length": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "x-maxUtf16Length": 120,
+      "x-trimmed": true,
+      "x-minUtf16Length": 1
+    }
+  }
+}

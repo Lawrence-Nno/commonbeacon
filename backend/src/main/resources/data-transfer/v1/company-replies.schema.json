@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "company-replies",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "questionId",
+    "authorId",
+    "body",
+    "visibility",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "questionId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "authorId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "body": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 20000,
+      "x-maxUtf16Length": 20000,
+      "x-trimmed": true,
+      "x-minUtf16Length": 1
+    },
+    "visibility": {
+      "type": "string",
+      "enum": [
+        "VISIBLE",
+        "HIDDEN"
+      ]
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceInstanceId",
+        "sourceId"
+      ],
+      "properties": {
+        "sourceInstanceId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    }
+  }
+}

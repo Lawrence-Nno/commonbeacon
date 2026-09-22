@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "personal-users",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "displayName",
+    "createdAt",
+    "email",
+    "role"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "x-maxUtf16Length": 80,
+      "x-trimmed": true,
+      "x-minUtf16Length": 1
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "email": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 254,
+      "x-maxUtf16Length": 254,
+      "x-trimmed": true,
+      "x-minUtf16Length": 3
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "MEMBER",
+        "MODERATOR",
+        "ADMINISTRATOR"
+      ]
+    }
+  }
+}

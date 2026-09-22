@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "company-actions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "actorId",
+    "questionId",
+    "replyId",
+    "action",
+    "reason",
+    "createdAt"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "actorId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "questionId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "replyId": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "HIDE",
+        "RESTORE"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "x-maxUtf16Length": 2000,
+      "x-trimmed": true,
+      "x-minUtf16Length": 5
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceInstanceId",
+        "sourceId"
+      ],
+      "properties": {
+        "sourceInstanceId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    }
+  }
+}

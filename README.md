@@ -100,6 +100,7 @@ See the [onboarding walkthrough](docs/demo-walkthrough.md) and
 - [Reporting and moderator review](docs/moderation.md)
 - [Knowledge-article screens, APIs, and search contracts](docs/knowledge.md)
 - [Weighted full-text search, visibility, and query plans](docs/search.md)
+- [Native archive schemas and codec (transfer workflows not yet available)](docs/data-archive-format.md)
 - [Authentication](docs/authentication.md), [boards](docs/boards.md),
   [questions](docs/questions.md), [replies](docs/replies.md), [solutions](docs/accepted-solutions.md)
 

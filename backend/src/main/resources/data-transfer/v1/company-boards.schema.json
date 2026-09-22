@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "company-boards",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "slug",
+    "name",
+    "description",
+    "archived",
+    "createdAt"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "slug": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 80,
+      "x-maxUtf16Length": 80,
+      "x-trimmed": true,
+      "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+      "x-minUtf16Length": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "x-maxUtf16Length": 120,
+      "x-trimmed": true,
+      "x-minUtf16Length": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000,
+      "x-maxUtf16Length": 2000,
+      "x-trimmed": true,
+      "x-minUtf16Length": 1
+    },
+    "archived": {
+      "type": "boolean"
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "origin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceInstanceId",
+        "sourceId"
+      ],
+      "properties": {
+        "sourceInstanceId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "sourceId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    }
+  }
+}
