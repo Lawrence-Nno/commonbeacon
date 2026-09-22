@@ -193,6 +193,21 @@ article test now awaits its field after editor navigation/reload. No backend,
 storage or retention changes; backend/persistence suites were not rerun for this UI
 change. Evidence: export-history-tests.log and export-history-browser.log.
 
+Transfer-capacity fix (2026-09-22): finished jobs now reserve only retained
+published download bytes after temporary/uncertain artifacts are confirmed deleted.
+Reconciliation before admission recovers old completed-export reservations; active
+jobs retain the 768 MiB working reservation. The shared quota error now explains
+that shared transfer capacity is full. All 35 backend unit tests and 55 targeted
+integration tests (foundation, company/personal exports and transfer access) passed.
+New cases cover retained archives allowing personal admission, active-capacity
+rejection, pending cleanup, download leases and final deletion. Maven failsafe
+verification passed separately after PowerShell treated a routine Mockito warning
+as an error in the initial wrapper. No schema migration or frontend changes.
+Local backend rebuild passed. Startup reconciliation reduced the two existing
+company-export reservations from 1,610,612,736 to 26,672 bytes while retaining both
+available archives. Evidence: capacity-final-verify.log, capacity-deploy.log and
+Maven XML reports. These are local results.
+
 ## Query-plan evidence
 
 The [evidence directory](evidence/README.md) contains captured PostgreSQL plans for

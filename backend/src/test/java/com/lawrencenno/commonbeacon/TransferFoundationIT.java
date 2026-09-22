@@ -38,6 +38,47 @@ class TransferFoundationIT {
     TransferJob create(UUID actor) {return jobs.create(actor,Kind.COMPANY_EXPORT,UUID.randomUUID(),"a".repeat(64));}
     void expire(UUID job) {jdbc.update("UPDATE transfer_job SET lease_until=clock_timestamp()-interval '1 second' WHERE id=?",job);}
     long events(UUID job,String event) {return jdbc.queryForObject("SELECT count(*) FROM transfer_audit WHERE job_id=? AND event=?",Long.class,job,event);}
+    long reserved(UUID id) {return jdbc.queryForObject("SELECT reserved_bytes FROM transfer_job WHERE id=?",Long.class,id);}
+    @Test void completedCompanyArchivesDoNotBlockPersonalExportAndRemainDownloadable() {
+        for (int i=0;i<2;i++) {
+            var intent=create(admin);var claim=jobs.claim(UUID.randomUUID()).orElseThrow();
+            var artifact=jobs.beginArtifact(claim.lease(),"DOWNLOAD",67108864L);
+            assertThat(jobs.publish(claim.lease(),artifact,123,"a".repeat(64))).isTrue();
+            // Simulate a retained archive from before this accounting fix.
+            jdbc.update("UPDATE transfer_job SET reserved_bytes=805306368 WHERE id=?",intent.id());
+        }
+        var personal=jobs.createPersonalExport(member,UUID.randomUUID(),()->{});
+        assertThat(reserved(personal.id())).isEqualTo(805306368L);
+        var completed=jdbc.queryForList("SELECT id FROM transfer_job WHERE state='READY'",UUID.class);
+        assertThat(completed).hasSize(2);
+        for(var id:completed) {
+            assertThat(reserved(id)).isEqualTo(123);
+            assertThat(jobs.downloadInfo(admin,id).bytes()).isEqualTo(123);
+        }
+        jobs.releaseCleanedReservations();
+        assertThat(reserved(personal.id())).isEqualTo(805306368L);
+    }
+    @Test void uncertainArtifactsHoldReservationUntilConfirmedDeletion() {
+        var intent=create(admin);var claim=jobs.claim(UUID.randomUUID()).orElseThrow();
+        var temporary=jobs.beginArtifact(claim.lease(),"INTERMEDIATE",268435456L);
+        var archive=jobs.beginArtifact(claim.lease(),"DOWNLOAD",67108864L);
+        jobs.publish(claim.lease(),archive,456,"b".repeat(64));
+        jobs.releaseCleanedReservations();assertThat(reserved(intent.id())).isEqualTo(805306368L);
+        assertThat(jobs.needsCleanup(temporary,true)).isTrue();
+        jobs.releaseCleanedReservations();assertThat(reserved(intent.id())).isEqualTo(805306368L);
+        jobs.cleaned(temporary);assertThat(reserved(intent.id())).isEqualTo(456);
+        var lease=jobs.beginDownload(admin,intent.id());
+        jobs.releaseCleanedReservations();assertThat(reserved(intent.id())).isEqualTo(456);
+        jobs.finishDownload(admin,intent.id(),lease.lease(),true);
+        jdbc.update("UPDATE transfer_artifact SET expires_at=clock_timestamp()-interval '1 second' WHERE id=?",archive);
+        assertThat(jobs.needsCleanup(archive,true)).isTrue();
+        jobs.releaseCleanedReservations();assertThat(reserved(intent.id())).isEqualTo(456);
+        jobs.cleaned(archive);assertThat(reserved(intent.id())).isZero();
+    }
+    @Test void twoActiveWorkingReservationsStillRejectAnotherTransfer() {
+        create(admin);create(other);
+        assertThatThrownBy(()->jobs.createPersonalExport(member,UUID.randomUUID(),()->{})).hasMessage("TRANSFER_QUOTA_EXCEEDED");
+    }
     @Test void creationIsDurableIdempotentAndOwnerScoped() {
         UUID key=UUID.randomUUID();var first=jobs.create(admin,Kind.COMPANY_EXPORT,key,"a".repeat(64));
         var restarted=new TransferJobs(jdbc,transactions);

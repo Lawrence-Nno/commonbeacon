@@ -43,7 +43,7 @@ public class TransferController {
             if(status==413)code="TRANSFER_LIMIT_EXCEEDED";
             if(code.equals("ACTIVE_JOB_EXISTS"))code="JOB_CONFLICT";
             throw new ApiFailure(status,code,status==404?"The transfer job was not found.":status==403?"You do not have permission for this action.":
-                status==410?"The download is no longer available.":status==413?"The transfer exceeds the available capacity.":status==409?"The transfer changed. Reload it and try again.":"Transfer storage is unavailable. Try again later.");
+                status==410?"The download is no longer available.":status==413?"Shared transfer capacity is currently full. Wait for active transfers or archive cleanup to finish, then try again.":status==409?"The transfer changed. Reload it and try again.":"Transfer storage is unavailable. Try again later.");
         }
     }
     private Summary summary(TransferJob j) {

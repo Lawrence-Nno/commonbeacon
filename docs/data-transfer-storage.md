@@ -100,7 +100,13 @@ a lock file; all replicas must see the same durable directory and support file
 locking/atomic rename. See Java's [file operation contracts](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/nio/file/Files.html).
 
 The default deployment-wide artifact quota is 2 GiB with a 1 GiB free-space floor.
-Job admission reserves 768 MiB per retained job. Each job has at most ten unfinished
+Job admission reserves 768 MiB of working space per active job. Once a job is
+terminal and every remaining artifact is a published download with a known size,
+its reservation shrinks to the total retained download bytes. Temporary, missing
+or deleting artifacts prevent this reduction until deletion is confirmed. This
+reconciliation runs before admission, after confirmed cleanup, and in scheduled
+reconciliation, including for exports created before this accounting change.
+Each job has at most ten unfinished
 or available artifact records and aggregate allocated limits of 768 MiB. Individual
 intermediate files cap at 256 MiB and downloads at 64 MiB. Filesystem checks include
 existing bytes before new writes; streamed writes enforce their declared byte cap.
@@ -135,8 +141,8 @@ It handles missing/corrupted finalized files, expired artifacts, abandoned write
 lease loss and recognized orphan files. Orphans have a 15-minute grace period.
 Unknown filenames are not deleted. Failed physical cleanup remains retryable;
 availability is revoked before deletion is attempted. Terminal job reservations
-are released only after their files are deleted; failed staging mappings are then
-removed. A missing file never causes a successfully completed export to rerun.
+retain the bytes of downloadable archives until their files are deleted; unused
+working space is released as described above. Failed staging mappings are removed. A missing file never causes a successfully completed export to rerun.
 
 A crash after rename but before the database publication transaction leaves an
 unavailable artifact. Recovery fences that attempt and removes the abandoned file;

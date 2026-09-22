@@ -88,6 +88,7 @@ public class TransferJobs {
                 if (!requests.getFirst().get("request_hash").equals(payloadHash)) throw new IllegalStateException("IDEMPOTENCY_CONFLICT");
                 return job((UUID)requests.getFirst().get("job_id"));
             }
+            reconcileReservationsLocked();
             if (jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE state NOT IN ("+TERMINAL+")",Long.class)>=10
                 || jdbc.queryForObject("SELECT coalesce(sum(reserved_bytes),0) FROM transfer_job",Long.class)+805306368L>2147483648L)
                 throw new IllegalStateException("TRANSFER_QUOTA_EXCEEDED");
@@ -252,7 +253,8 @@ public class TransferJobs {
     public void cleaned(UUID artifact) {
         locked(() -> {
             var rows=jdbc.queryForList("SELECT job_id FROM transfer_artifact WHERE id=? AND state IN ('DELETING','MISSING') FOR UPDATE",artifact);
-            if(!rows.isEmpty()) {jdbc.update("UPDATE transfer_artifact SET state='DELETED' WHERE id=?",artifact);audit((UUID)rows.getFirst().get("job_id"),Event.CLEANUP_COMPLETED);}return null;
+            if(!rows.isEmpty()) {jdbc.update("UPDATE transfer_artifact SET state='DELETED' WHERE id=?",artifact);audit((UUID)rows.getFirst().get("job_id"),Event.CLEANUP_COMPLETED);}
+            reconcileReservationsLocked();return null;
         });
     }
     public TransferJob status(UUID actor,UUID id,boolean personal) {
@@ -321,8 +323,21 @@ public class TransferJobs {
             if(changed==1 && delivered && permitted(actor,j.kind()))audit(id,Event.DOWNLOAD_COMPLETED);return null;
         });
     }
+    // Called only under the deployment-wide transfer lock. Active/uncertain files
+    // retain the full working reservation until deletion is confirmed.
+    private void reconcileReservationsLocked() {
+        jdbc.update("""
+            UPDATE transfer_job j SET reserved_bytes=(
+                SELECT coalesce(sum(a.byte_count),0) FROM transfer_artifact a
+                WHERE a.job_id=j.id AND a.state='AVAILABLE')
+            WHERE j.state IN ('READY','COMPLETED','FAILED','CANCELLED')
+              AND NOT EXISTS (SELECT 1 FROM transfer_artifact a WHERE a.job_id=j.id
+                AND a.state<>'DELETED' AND
+                (a.state<>'AVAILABLE' OR a.purpose<>'DOWNLOAD' OR a.byte_count IS NULL))
+            """);
+    }
     public void releaseCleanedReservations() {
         locked(() -> {recoverLocked();jdbc.update("DELETE FROM transfer_mapping m USING transfer_job j WHERE m.job_id=j.id AND j.state IN ("+TERMINAL+")");
-            jdbc.update("UPDATE transfer_job j SET reserved_bytes=0 WHERE state IN ("+TERMINAL+") AND NOT EXISTS(SELECT 1 FROM transfer_artifact a WHERE a.job_id=j.id AND a.state<>'DELETED')");return null;});
+            reconcileReservationsLocked();return null;});
     }
 }
