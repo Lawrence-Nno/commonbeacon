@@ -9,17 +9,17 @@ import { cancelJob, createExport, createPersonalExport, downloadArchive, listJob
 import type { ExportOptions, Job } from "./api";
 import type { RecentAuthGrant } from "./recentAuthentication";
 
-export function DataManagement({ personal = false }: { personal?: boolean }) {
+export function DataManagement({ personal = false, history = false }: { personal?: boolean; history?: boolean }) {
   const { user, sessionError } = useAuth();
   if (user === undefined) return <p role="status">{sessionError ? "Account connection unavailable. Reload to try again." : "Checking your account..."}</p>;
   if (!user) return <section className="board-page"><h1>Sign in to manage data.</h1><Link to="/login">Sign in</Link></section>;
   if (!personal && user.role !== "ADMINISTRATOR") return <section className="board-page"><h1>Data management is restricted to administrators.</h1><Link to="/">Back to the community</Link></section>;
-  return <ActorExports key={`${user.id}:${personal}`} actorId={user.id} personal={personal} />;
+  return <ActorExports key={`${user.id}:${personal}:${history}`} actorId={user.id} personal={personal} history={history} />;
 }
-function ActorExports({ actorId, personal }: { actorId: string; personal: boolean }) {
+function ActorExports({ actorId, personal, history }: { actorId: string; personal: boolean; history: boolean }) {
   const [blocked, setBlocked] = useState(false);
   if (blocked) return <section className="board-page"><h1>Data management access is no longer available.</h1><p>Sign in with an authorized account to continue.</p><Link to="/login">Sign in</Link></section>;
-  return <ExportScreen actorId={actorId} personal={personal} onDenied={() => setBlocked(true)} />;
+  return <ExportScreen actorId={actorId} personal={personal} history={history} onDenied={() => setBlocked(true)} />;
 }
 type Attempt = { key: string; options: ExportOptions };
 type Action = { kind: "create"; attempt: Attempt } | { kind: "download"; job: Job };
@@ -36,9 +36,11 @@ function stateLabel(job: Job, now: number) {
   if (job.state === "READY" && !job.artifactAvailable) return "Archive unavailable";
   return ({ QUEUED: "Queued", RUNNING: "Running", READY: "Ready to download", FAILED: "Failed", CANCELLED: "Cancelled" } as Record<string, string>)[job.state] ?? job.state;
 }
-function ExportScreen({ actorId, personal, onDenied }: { actorId: string; personal: boolean; onDenied: () => void }) {
+function ExportScreen({ actorId, personal, history, onDenied }: { actorId: string; personal: boolean; history: boolean; onDenied: () => void }) {
   const client = useQueryClient();
   const queryPrefix = personal ? "personalTransfers" : "companyTransfers";
+  const basePath = personal ? "/account/data" : "/admin/data";
+  const [selected, setSelected] = useState<string>();
   const [options, setOptions] = useState<ExportOptions>(defaults);
   const [acknowledged, setAcknowledged] = useState(false);
   const [attempt, setAttempt] = useState<Attempt>();
@@ -52,8 +54,8 @@ function ExportScreen({ actorId, personal, onDenied }: { actorId: string; person
   const [now, setNow] = useState(Date.now);
   const life = useRef({ active: true, controller: new AbortController(), urls: new Set<string>() });
   const heading = useRef<HTMLHeadingElement>(null);
-  const query = useQuery({ queryKey: [queryPrefix, actorId, cursor], queryFn: async ({ signal }) => {
-    try { return await listJobs(cursor, signal, personal); }
+  const query = useQuery({ queryKey: [queryPrefix, actorId, history, cursor], queryFn: async ({ signal }) => {
+    try { return await listJobs(cursor, signal, personal, history ? 20 : 1); }
     catch (error) { if (!signal.aborted && life.current.active && denied(error)) onDenied(); throw error; }
   }, retry: false, gcTime: 0, refetchInterval: busy || action ? false : 5_000, refetchOnWindowFocus: !busy && !action });
   useEffect(() => {
@@ -94,7 +96,7 @@ function ExportScreen({ actorId, personal, onDenied }: { actorId: string; person
         else await createExport(action.attempt.options, grant.token, action.attempt.key, current.controller.signal);
         if (!current.active) return;
         setAttempt(undefined); setAcknowledged(false); setCursor(null);
-        setMessage("Export requested. Its status appears in your history below.");
+        setMessage("Export requested. Its status appears under Latest export below.");
       } else {
         const signal = AbortSignal.any([current.controller.signal, downloadController.current!.signal]);
         const blob = await downloadArchive(action.job, grant.token, signal, (received, total) => {
@@ -131,7 +133,9 @@ function ExportScreen({ actorId, personal, onDenied }: { actorId: string; person
     finally { if (current.active) setBusy(false); }
   }
   return <section className="board-page data-management">
-    <p className="eyebrow">{personal ? "YOUR ACCOUNT" : "ADMINISTRATION"}</p><h1 ref={heading} tabIndex={-1}>{personal ? "Export my data" : "Data management"}</h1>
+    <p className="eyebrow">{personal ? "YOUR ACCOUNT" : "ADMINISTRATION"}</p><h1 ref={heading} tabIndex={-1}>{history ? "Export history" : personal ? "Export my data" : "Data management"}</h1>
+    {history && <p><Link to={basePath}>Back to exports</Link></p>}
+    {!history && <>
     <p>{personal ? "Download a private copy of your own account data and contributions." : "Export a private copy of your company community."} Exporting and downloading never delete live data.</p>
     <div className="transfer-warning"><strong>{personal ? "Your personal archive contains private data." : "Every company archive is private."}</strong><p>{personal ? "Includes your email, your own hidden content and unpublished articles. Other people's profiles, content, and private moderation decisions are excluded, even for administrators." : "Hidden questions and replies, drafts, and archived articles are always included."} Store the downloaded file securely and share it only with authorized people.</p></div>
     <section className="transfer-panel" aria-labelledby="export-scope"><h2 id="export-scope">{personal ? "Personal export" : "Company export"}</h2>
@@ -155,19 +159,23 @@ function ExportScreen({ actorId, personal, onDenied }: { actorId: string; person
         {attempt && !action && <Button disabled={busy} onClick={() => { setAttempt(undefined); setError(""); }}>{personal ? "Start a new request" : "Review different options"}</Button>}</div>
       {attempt && <p>Retry keeps the same request{personal ? "" : " and options"} to avoid duplicate jobs. Before starting a different request, check your history in case the earlier request succeeded.</p>}
     </section>
+    </>}
     {action?.kind === "create" && <div className="transfer-panel"><RecentAuthenticationPrompt actorId={actorId} scope={personal ? "PERSONAL_EXPORT" : "COMPANY_EXPORT"} onConfirmed={grant => void confirmed(grant)} onCancel={() => { setAction(undefined); heading.current?.focus(); }} /></div>}
     {busy && download?.phase !== "starting" && download?.phase !== "receiving" && <p role="status">Processing your transfer request...</p>}
     {error && <p className="form-error" role="alert">{error}</p>}{message && <p role="status">{message}</p>}
-    <section aria-labelledby="transfer-history"><div className="section-heading"><h2 id="transfer-history">Your export history</h2><Button disabled={query.isFetching || busy} onClick={() => void query.refetch()}>Refresh history</Button></div>
-      <p>Only your requests are shown, up to 20 per page. Status refreshes every five seconds while this page is open.</p>
-      {query.isPending ? <p role="status">Loading export history...</p> : query.isError ? <p role="alert">History unavailable. {failureMessage(query.error)} Use Refresh history to try again.</p> : <>
-        {query.data.items.length === 0 ? <p className="empty-state">No export requests on this page.</p> : <ol className="transfer-history">{query.data.items.map(job => <li className="transfer-panel" key={job.id}>
+    <section aria-labelledby="transfer-history"><div className="section-heading"><h2 id="transfer-history">{history ? "Your export history" : "Latest export"}</h2><Button disabled={query.isFetching || busy} onClick={() => void query.refetch()}>{history ? "Refresh history" : "Refresh status"}</Button></div>
+      <p>{history ? "Only your requests are shown, up to 20 per page. Select a request to view its details." : "Your latest request is shown, including running or failed attempts."} Status refreshes every five seconds while this page is open.</p>
+      {!history && <p><Link to={`${basePath}/history`}>View export history</Link></p>}
+      {query.isPending ? <p role="status">Loading exports...</p> : query.isError ? <p role="alert">Exports unavailable. {failureMessage(query.error)} Use the refresh button to try again.</p> : <>
+        {query.data.items.length === 0 ? <p className="empty-state">No export requests on this page.</p> : <ol className="transfer-history">{(history ? query.data.items : query.data.items.slice(0, 1)).map(job => <li className={`transfer-panel${history ? " transfer-history-row" : ""}`} key={job.id}>
+          {history && <button className="transfer-history-toggle" aria-expanded={selected === job.id} aria-controls={`details-${job.id}`} disabled={busy || !!action} onClick={() => setSelected(selected === job.id ? undefined : job.id)}><span>{stateLabel(job, now)}</span><time dateTime={job.createdAt}>{new Date(job.createdAt).toLocaleString()}</time><span>{selected === job.id ? "Hide details" : "View details"}</span></button>}
+          {(!history || selected === job.id) && <div id={`details-${job.id}`}>
           <h3>{job.kind === "PERSONAL_EXPORT" ? "Personal export" : job.kind === "COMPANY_EXPORT" ? "Company export" : "Company transfer"} — {stateLabel(job, now)}</h3>
           <p className="transfer-id">Reference: {job.id}</p><p>Requested <time dateTime={job.createdAt}>{new Date(job.createdAt).toLocaleString()}</time></p>
           <p>{job.processedRecords} records processed at the latest checkpoint. This is not a final archive count.</p>
           {job.state === "READY" && <p>Download expiry: <time dateTime={job.expiresAt}>{new Date(job.expiresAt).toLocaleString()}</time>.</p>}
           {job.errorCode && <p>Reason: {job.errorCode}. Review the export options and limits before requesting another export.</p>}
-          {(job.state === "FAILED" || job.state === "CANCELLED" || job.state === "READY" && !job.artifactAvailable) && <p>To try again, review the options above and create a new export. Previous jobs are retained in history.</p>}
+          {(job.state === "FAILED" || job.state === "CANCELLED" || job.state === "READY" && !job.artifactAvailable) && <p>To try again, <Link to={basePath}>review the export scope and create a new export</Link>. Previous jobs are retained in history.</p>}
           <div className="article-actions">{job.allowedActions.includes("CANCEL") && <Button disabled={busy || !!action} onClick={() => void cancel(job)}>Cancel export</Button>}
           {(job.kind === "COMPANY_EXPORT" || job.kind === "PERSONAL_EXPORT") && job.artifactAvailable && job.allowedActions.includes("DOWNLOAD") && Date.parse(job.expiresAt) > now && <Button disabled={busy || !!action} onClick={() => { setAction({ kind: "download", job }); setDownload(undefined); setError(""); setMessage(""); }}>Download archive</Button>}</div>
           {action?.kind === "download" && action.job.id === job.id && <div className="download-feedback">
@@ -181,8 +189,9 @@ function ExportScreen({ actorId, personal, onDenied }: { actorId: string; person
             {download.phase === "sent" && <p role="status">Archive sent to your browser downloads ({bytesLabel(download.total)}). Check your browser’s Downloads list for <strong>commonbeacon-{job.id}.zip</strong>. Your browser may ask where to save it. Keep it private; your community data has not been deleted.</p>}
             {download.phase === "error" && <p className="form-error" role="alert">{download.error}</p>}
           </div>}
+          </div>}
         </li>)}</ol>}
-        <div className="article-actions"><Button disabled={!cursor || busy || !!action} onClick={() => setCursor(null)}>Newest requests</Button><Button disabled={!query.data.nextCursor || busy || !!action} onClick={() => setCursor(query.data.nextCursor)}>Older requests</Button></div>
+        {history && <div className="article-actions"><Button disabled={!cursor || busy || !!action} onClick={() => { setSelected(undefined); setCursor(null); }}>Newest requests</Button><Button disabled={!query.data.nextCursor || busy || !!action} onClick={() => { setSelected(undefined); setCursor(query.data.nextCursor); }}>Older requests</Button></div>}
       </>}
     </section>
   </section>;

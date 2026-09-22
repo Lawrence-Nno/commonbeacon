@@ -1088,3 +1088,10 @@ a.board-card:hover {
 .download-feedback progress { display: block; width: 100%; height: 18px; margin-block: 12px; accent-color: #34745c; }
 .transfer-id { font-family: monospace; font-size: 13px; overflow-wrap: anywhere; }
 @media (max-width: 600px) { .transfer-panel { padding: 16px; } .data-management .section-heading { flex-wrap: wrap; gap: 12px; } }
+
+.transfer-history-row { padding: 16px; margin-block: 8px; }
+.transfer-history-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; padding: 8px; }
+.transfer-history-toggle span:first-child { font-weight: 700; }
+.transfer-history-toggle span:last-child { margin-left: auto; text-decoration: underline; }
+.transfer-history-toggle:focus-visible { outline: 3px solid #a8782b; outline-offset: 3px; }
+.transfer-history-row > div { margin-top: 20px; }

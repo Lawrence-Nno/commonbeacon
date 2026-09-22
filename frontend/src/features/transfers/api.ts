@@ -35,7 +35,7 @@ export function readPage(value: unknown, personal = false): JobPage {
   if (items.some(job => (job.kind === "PERSONAL_EXPORT") !== personal)) return invalid();
   return { items, nextCursor: v.nextCursor };
 }
-export const listJobs = (cursor: string | null, signal?: AbortSignal, personal = false) => getJson(`${personal ? personalRoot : root}/jobs?size=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, value => readPage(value, personal), signal);
+export const listJobs = (cursor: string | null, signal?: AbortSignal, personal = false, size: 1 | 20 = 20) => getJson(`${personal ? personalRoot : root}/jobs?size=${size}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, value => readPage(value, personal), signal);
 export const createExport = (options: ExportOptions, grant: string, key: string, signal?: AbortSignal) =>
   postJson(`${root}/exports`, { ...options, acknowledgedPrivateContent: true, recentAuthGrant: grant }, readJob, "POST", { signal, idempotencyKey: key });
 export const createPersonalExport = (grant: string, key: string, signal?: AbortSignal) =>

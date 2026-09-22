@@ -5,10 +5,12 @@ Sign in and select **Export my data** beside your account controls, or open
 privacy profile. The deployment must enable [private transfer storage](data-transfer-storage.md).
 
 Review the scope, acknowledge that the archive is private, and choose **Confirm and
-create export**. Confirm your current password. Your history shows queued/running,
-failed/cancelled and ready/expired states; it refreshes every five seconds when no
-confirmation or download is active. Only your personal jobs are listed, 20 at a
-time. Job counts describe processing checkpoints, not invented percentages.
+create export**. Confirm your current password. **Latest export** shows just your newest request, including running, failed,
+cancelled and ready/expired states. It refreshes every five seconds when no
+confirmation or download is active. **View export history** opens
+`/account/data/history`, with up to 20 compact rows of your own requests per page.
+Select a row's **View details** to reveal its details and available actions.
+Job counts describe processing checkpoints, not invented percentages.
 
 When ready, choose **Download archive**. Confirm your password in that job's card.
 The card shows actual bytes received, progress and a Stop download control, then

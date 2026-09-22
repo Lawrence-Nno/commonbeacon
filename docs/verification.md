@@ -183,6 +183,16 @@ OpenAPI JSON/local references and diff whitespace checks passed; the optional
 full specification validator was not installed. Upload/import remains unimplemented.
 These are local working-tree results, not remote CI or production-capacity evidence.
 
+Export-history presentation follow-up (2026-09-22): main company/personal pages
+now request only the latest job; separate history routes provide compact, paginated
+rows with one expanded detail panel. All 157 frontend tests, lint, type checking
+and production build passed. Both isolated export browser journeys passed with
+real ZIP downloads, history navigation, keyboard expansion, logout clearing and
+390px layout checks. The mobile history capture was visually inspected. An existing
+article test now awaits its field after editor navigation/reload. No backend,
+storage or retention changes; backend/persistence suites were not rerun for this UI
+change. Evidence: export-history-tests.log and export-history-browser.log.
+
 ## Query-plan evidence
 
 The [evidence directory](evidence/README.md) contains captured PostgreSQL plans for

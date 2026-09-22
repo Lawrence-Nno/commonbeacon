@@ -17,12 +17,14 @@ needed by the administrator once the operator has configured storage.
    unchecked. History includes sensitive reports, identities, decisions and notes.
 3. Read the scope preview, acknowledge the private content, then choose **Confirm
    and create export**. Confirm your current password to authorize the request.
-4. Watch **Your export history**. The screen refreshes every five seconds, with at
-   most 20 requester-owned summaries per page. **Older requests** pages backward;
-   **Newest requests** returns to the start. Counts describe the last processing
-   checkpoint, not a percentage or a finalized manifest total.
+4. Watch **Latest export**. It shows only your newest request, including running,
+   failed or cancelled attempts, and refreshes every five seconds. **View export
+   history** opens `/admin/data/history` with up to 20 compact requester-owned rows.
+   Select **View details** to expand one request. **Older requests** pages backward;
+   **Newest requests** returns to the start. Counts describe processing checkpoints,
+   not a percentage or a finalized manifest total.
 5. When ready, choose **Download archive**. A password prompt opens inside that
-   archive's history card; the download has not started until you confirm it.
+   archive's expanded card; the download has not started until you confirm it.
    The card then shows connection status and actual bytes received, with a progress
    bar and **Stop download** control. Once the complete ZIP is handed to the browser,
    the card shows its filename and asks you to check the browser's Downloads list.

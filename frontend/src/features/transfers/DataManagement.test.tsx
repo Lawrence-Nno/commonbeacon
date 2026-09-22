@@ -15,7 +15,7 @@ function Accounts() {
   const { setSession } = useAuth();
   return <><button onClick={() => void setSession({ ...admin, id: "other" })}>Switch administrator</button><button onClick={() => void setSession(null)}>End session</button></>;
 }
-function setup(role: string | null = "ADMINISTRATOR", responder?: (url: string, init?: RequestInit) => Promise<Response>, personal = false) {
+function setup(role: string | null = "ADMINISTRATOR", responder?: (url: string, init?: RequestInit) => Promise<Response>, personal = false, history = false) {
   const mock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/auth/me")) return role ? Response.json({ ...admin, role }) : new Response(null, { status: 401 });
     if (url.endsWith("/csrf")) return Response.json({ headerName: "X-CSRF-TOKEN", token: "csrf" });
@@ -24,7 +24,7 @@ function setup(role: string | null = "ADMINISTRATOR", responder?: (url: string, 
   });
   vi.stubGlobal("fetch", mock);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  render(<QueryClientProvider client={client}><MemoryRouter><AuthProvider><Accounts /><DataManagement personal={personal} /></AuthProvider></MemoryRouter></QueryClientProvider>);
+  render(<QueryClientProvider client={client}><MemoryRouter><AuthProvider><Accounts /><DataManagement personal={personal} history={history} /></AuthProvider></MemoryRouter></QueryClientProvider>);
   return { mock, client };
 }
 async function begin() {
@@ -157,18 +157,23 @@ it("shows lifecycle states and prevents expired downloads", async () => {
   const states = [job, { ...job, state: "RUNNING", processedRecords: 19 }, { ...job, state: "FAILED", errorCode: "WORK_FAILED", allowedActions: [] },
     { ...job, state: "CANCELLED", allowedActions: [] }, { ...job, state: "READY", artifactAvailable: true, allowedActions: ["DOWNLOAD"] },
     { ...job, state: "READY", expiresAt: "2000-01-01T00:00:00Z", artifactAvailable: false, allowedActions: [] }];
-  setup(undefined, async () => Response.json({ items: states.map((j, i) => ({ ...j, id: `00000000-0000-0000-0000-00000000000${i}` })), nextCursor: null }));
-  await screen.findByRole("heading", { name: "Company export — Archive expired" });
-  for (const label of ["Queued", "Running", "Failed", "Cancelled", "Ready to download"]) expect(screen.getByRole("heading", { name: `Company export — ${label}` })).toBeVisible();
-  expect(screen.getAllByRole("button", { name: "Download archive" })).toHaveLength(1);
-  expect(screen.getByText(/19 records processed at the latest checkpoint/)).toBeVisible();
+  setup(undefined, async () => Response.json({ items: states.map((j, i) => ({ ...j, id: `00000000-0000-0000-0000-00000000000${i}` })), nextCursor: null }), false, true);
+  await screen.findByRole("button", { name: /Archive expired/ });
+  for (const label of ["Queued", "Running", "Failed", "Cancelled", "Ready to download", "Archive expired"]) {
+    await userEvent.click(screen.getByRole("button", { name: new RegExp(`^${label}`) }));
+    expect(screen.getByRole("heading", { name: `Company export — ${label}` })).toBeVisible();
+    expect(screen.queryAllByRole("button", { name: "Download archive" })).toHaveLength(label === "Ready to download" ? 1 : 0);
+    if (label === "Running") expect(screen.getByText(/19 records processed at the latest checkpoint/)).toBeVisible();
+  }
   expect(screen.queryByRole("progressbar")).not.toBeInTheDocument();
 });
 it("pages bounded history and sends the reviewed version when cancelling", async () => {
-  const { mock } = setup(undefined, async url => url.endsWith("/cancel") ? Response.json({ ...job, state: "CANCELLED" }) : Response.json({ items: [job], nextCursor: url.includes("cursor=") ? null : "next" }));
+  const { mock } = setup(undefined, async url => url.endsWith("/cancel") ? Response.json({ ...job, state: "CANCELLED" }) : Response.json({ items: [job], nextCursor: url.includes("cursor=") ? null : "next" }), false, true);
+  await userEvent.click(await screen.findByRole("button", { name: /View details/ }));
   await screen.findByText(`Reference: ${job.id}`);
   await userEvent.click(screen.getByRole("button", { name: "Older requests" }));
   await waitFor(() => expect(mock.mock.calls.some(([url]) => url.includes("size=20&cursor=next"))).toBe(true));
+  await userEvent.click(await screen.findByRole("button", { name: /View details/ }));
   await screen.findByText(`Reference: ${job.id}`);
   await userEvent.click(screen.getByRole("button", { name: "Cancel export" }));
   await screen.findByText(/Cancellation recorded/);
@@ -180,7 +185,18 @@ it("hides private history when a refreshed permission check denies access", asyn
   let refused = false;
   setup(undefined, async () => refused ? Response.json({ code: "FORBIDDEN", detail: "Denied" }, { status: 403, headers: { "Content-Type": "application/problem+json" } }) : Response.json({ items: [job], nextCursor: null }));
   await screen.findByText(`Reference: ${job.id}`);
-  refused = true; await userEvent.click(screen.getByRole("button", { name: "Refresh history" }));
+  refused = true; await userEvent.click(screen.getByRole("button", { name: "Refresh status" }));
   await screen.findByRole("heading", { name: "Data management access is no longer available." });
   expect(screen.queryByText(`Reference: ${job.id}`)).not.toBeInTheDocument();
+});
+
+it.each([false, true])("shows only the latest request, including failure, for personal=%s", async personal => {
+  const latest = { ...job, kind: personal ? "PERSONAL_EXPORT" : "COMPANY_EXPORT", state: "FAILED", allowedActions: [], errorCode: "WORK_FAILED" };
+  const { mock } = setup(personal ? "MEMBER" : "ADMINISTRATOR", async () => Response.json({ items: [latest, { ...latest, id: "00000000-0000-0000-0000-000000000002", state: "READY" }], nextCursor: "older" }), personal);
+  await screen.findByText(`Reference: ${job.id}`);
+  expect(screen.getByRole("heading", { name: /export .* Failed/ })).toBeVisible();
+  expect(screen.queryByText(/Reference: 00000000-0000-0000-0000-000000000002/)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Older requests" })).not.toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "View export history" })).toHaveAttribute("href", personal ? "/account/data/history" : "/admin/data/history");
+  expect(mock.mock.calls.some(([url]) => url.endsWith("/jobs?size=1"))).toBe(true);
 });

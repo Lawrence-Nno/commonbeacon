@@ -17,6 +17,11 @@ test("members download only their personal portability profile", async ({ page }
   await page.getByRole("button", { name: "Confirm and create export" }).click(); await confirm(page);
   const card = page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: "Personal export — Ready to download" }) });
   await expect(card).toBeVisible({ timeout: 30_000 });
+  await page.getByRole("link", { name: "View export history" }).click();
+  await expect(page).toHaveURL(/\/account\/data\/history$/);
+  await expect(page.getByRole("heading", { name: "Export history", exact: true })).toBeVisible();
+  await expect(page.getByText(/Reference:/)).toHaveCount(0);
+  await page.getByRole("button", { name: /View details/ }).first().click();
   await card.getByRole("button", { name: "Download archive" }).click();
   const pending = page.waitForEvent("download"); await confirm(page);
   const download = await pending;
@@ -108,7 +113,7 @@ test("administrator retries safely, downloads a real archive, and clears private
   await expect(page.getByRole("alert")).toContainText("Simulated lost success response");
   await expect(page.getByLabel("Include account contact details")).toBeChecked();
   await page.getByRole("button", { name: "Retry export request" }).click(); await confirm(page);
-  await expect(page.getByText("Export requested. Its status appears in your history below.")).toBeVisible();
+  await expect(page.getByText("Export requested. Its status appears under Latest export below.")).toBeVisible();
   expect(new Set(keys).size).toBe(1);
   const item = page.getByRole("listitem").filter({ hasText: `Reference: ${jobId}` });
   await expect(item.getByRole("heading", { name: "Company export — Ready to download" })).toBeVisible({ timeout: 30_000 });
@@ -139,6 +144,14 @@ test("administrator retries safely, downloads a real archive, and clears private
   await expect(page.getByRole("heading", { name: "Data management", exact: true })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: testInfo.outputPath("data-management-mobile.png"), fullPage: true });
+  await page.getByRole("link", { name: "View export history" }).click();
+  await expect(page).toHaveURL(/\/admin\/data\/history$/);
+  await expect(page.getByText(/Reference:/)).toHaveCount(0);
+  await page.getByRole("button", { name: /View details/ }).first().focus();
+  await page.keyboard.press("Enter");
+  await expect(item).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("export-history-mobile.png"), fullPage: true });
   await item.getByRole("button", { name: "Download archive" }).click();
   await page.getByLabel("Current password").fill("unsent-private-value");
   await page.getByRole("button", { name: "Sign out" }).click();

@@ -66,7 +66,7 @@ it("creates a trimmed draft and keeps the slug immutable afterwards", async () =
   await userEvent.click(screen.getByRole("button", { name: "Create draft" }));
   await screen.findByRole("heading", { name: "Edit article" });
   expect(sent).toEqual({ slug: "setup-guide", title: "Private setup draft", body: "A new article body." });
-  expect(screen.getByLabelText("Article slug")).toHaveAttribute("readonly");
+  expect(await screen.findByLabelText("Article slug")).toHaveAttribute("readonly");
 });
 
 it.each([409, 500])("preserves a draft after HTTP %s and explicitly reconciles to the latest version", async (status) => {
