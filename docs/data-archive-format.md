@@ -2,8 +2,10 @@
 
 CommonBeacon includes schemas and a backend codec for portable community records.
 The [company export API](data-transfer-access.md#company-export) produces this format
-and supports protected downloads. Upload/import and personal export workflows are
-not available yet; this is not a complete migration workflow.
+and supports protected downloads. [Personal exports](personal-export.md) use the
+separate personal profile. Upload/import is not available yet; this is not a
+complete migration workflow. The company-import codec entry point rejects personal
+manifests before visiting rows; later upload/activation work must use that boundary.
 
 The [schemas](../backend/src/main/resources/data-transfer/v1/) are JSON Schema
 2020-12 documents. The [readable fixtures](../backend/src/test/resources/data-transfer/v1/)

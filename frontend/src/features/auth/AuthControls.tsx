@@ -27,6 +27,7 @@ export function AuthControls() {
       {user ? (
         <>
           <span className="member-name">{user.displayName}</span>
+          <Link className="text-link" to="/account/data">Export my data</Link>
           <Button
             className="button-secondary"
             disabled={busy}

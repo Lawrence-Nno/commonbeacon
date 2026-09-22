@@ -5,6 +5,38 @@ import { inflateRawSync } from "node:zlib";
 import { createHash } from "node:crypto";
 
 const origin = "http://127.0.0.1:4173";
+
+test("members download only their personal portability profile", async ({ page }, testInfo) => {
+  test.setTimeout(150_000);
+  await login(page, "alex.member@example.test");
+  const actor = await (await page.request.get(origin + "/api/v1/auth/me")).json();
+  await page.getByRole("link", { name: "Export my data", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Export my data", exact: true })).toBeVisible();
+  await expect(page.getByLabel("Include private moderation history")).toHaveCount(0);
+  await page.getByLabel(/I understand this archive/).check();
+  await page.getByRole("button", { name: "Confirm and create export" }).click(); await confirm(page);
+  const card = page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: "Personal export — Ready to download" }) });
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  await card.getByRole("button", { name: "Download archive" }).click();
+  const pending = page.waitForEvent("download"); await confirm(page);
+  const download = await pending;
+  const files = unzip(await readFile((await download.path())!));
+  const rows = (name: string) => files.get(name)!.toString("utf8").split("\n").filter(Boolean).map(line => JSON.parse(line));
+  const manifest = JSON.parse(files.get("manifest.json")!.toString("utf8"));
+  expect(manifest.profile).toBe("personal");expect(manifest.referencePolicy).toBe("opaque-personal-context");
+  expect(rows("users.jsonl")).toHaveLength(1);expect(rows("users.jsonl")[0].id).toBe(actor.id);
+  expect(files.has("contacts.jsonl")).toBe(false);expect(files.has("actions.jsonl")).toBe(false);
+  for (const name of ["questions.jsonl", "replies.jsonl", "articles.jsonl"]) for (const row of rows(name)) expect(row.authorId).toBe(actor.id);
+  for (const row of rows("reports.jsonl")) expect(Object.keys(row).sort()).toEqual(["createdAt", "id", "questionId", "reason", "replyId"]);
+  for (const file of manifest.files) expect(createHash("sha256").update(files.get(file.name)!).digest("hex")).toBe(file.sha256);
+  await expect(card.getByText(/Archive sent to your browser downloads/)).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("personal-export-mobile.png"), fullPage: true });
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page.getByRole("heading", { name: "Sign in to manage data." })).toBeVisible();
+  await expect(page.getByText(/Reference:/)).toHaveCount(0);
+});
 async function login(page: Page, email: string) {
   await page.goto(origin + "/login");
   for (let attempt = 0; attempt < 2; attempt++) {

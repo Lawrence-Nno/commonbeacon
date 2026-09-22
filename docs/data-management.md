@@ -71,4 +71,5 @@ is not the authorization boundary: the API and worker recheck current permission
 
 The prompt supports keyboard input and moves focus to the password field. The page
 uses native labelled checkboxes, status/error announcements, and a mobile layout.
-Personal export and import screens remain separate future work.
+For your own account data, use [Export my data](personal-export.md). Import remains
+separate future work.

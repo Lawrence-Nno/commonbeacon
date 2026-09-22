@@ -8,6 +8,8 @@ export type Job = {
 };
 export type JobPage = { items: Job[]; nextCursor: string | null };
 const root = "/api/v1/admin/data";
+const personalRoot = "/api/v1/account/data";
+const jobRoot = (job: Job) => job.kind === "PERSONAL_EXPORT" ? personalRoot : root;
 function invalid(): never { throw new ApiError("invalid-response", "The transfer service returned an unexpected response."); }
 function object(value: unknown): Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : invalid();
@@ -17,7 +19,7 @@ function count(value: unknown): number { return typeof value === "number" && Num
 export function readJob(value: unknown): Job {
   const v = object(value);
   if (typeof v.id !== "string" || !/^[0-9a-f-]{36}$/i.test(v.id)
-    || !["COMPANY_EXPORT", "COMPANY_IMPORT"].includes(String(v.kind))
+    || !["COMPANY_EXPORT", "COMPANY_IMPORT", "PERSONAL_EXPORT"].includes(String(v.kind))
     || !["QUEUED", "RUNNING", "READY", "FAILED", "CANCELLED", "UPLOADING", "UPLOADED", "VALIDATING", "REVIEW_REQUIRED", "READY_TO_COMMIT", "COMMITTING", "COMPLETED"].includes(String(v.state))
     || typeof v.artifactAvailable !== "boolean" || !(v.errorCode === null || typeof v.errorCode === "string")
     || !Array.isArray(v.allowedActions) || !v.allowedActions.every(a => a === "CANCEL" || a === "DOWNLOAD")) return invalid();
@@ -26,28 +28,32 @@ export function readJob(value: unknown): Job {
     processedRecords: count(v.processedRecords), errorCode: v.errorCode, artifactAvailable: v.artifactAvailable,
     allowedActions: v.allowedActions as string[] };
 }
-export function readPage(value: unknown): JobPage {
+export function readPage(value: unknown, personal = false): JobPage {
   const v = object(value);
   if (!Array.isArray(v.items) || v.items.length > 20 || !(v.nextCursor === null || typeof v.nextCursor === "string" && /^[A-Za-z0-9_-]{1,128}$/.test(v.nextCursor))) return invalid();
-  return { items: v.items.map(readJob), nextCursor: v.nextCursor };
+  const items = v.items.map(readJob);
+  if (items.some(job => (job.kind === "PERSONAL_EXPORT") !== personal)) return invalid();
+  return { items, nextCursor: v.nextCursor };
 }
-export const listJobs = (cursor: string | null, signal?: AbortSignal) => getJson(`${root}/jobs?size=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, readPage, signal);
+export const listJobs = (cursor: string | null, signal?: AbortSignal, personal = false) => getJson(`${personal ? personalRoot : root}/jobs?size=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ""}`, value => readPage(value, personal), signal);
 export const createExport = (options: ExportOptions, grant: string, key: string, signal?: AbortSignal) =>
   postJson(`${root}/exports`, { ...options, acknowledgedPrivateContent: true, recentAuthGrant: grant }, readJob, "POST", { signal, idempotencyKey: key });
-export const cancelJob = (job: Job, key: string, signal?: AbortSignal) => postJson(`${root}/jobs/${job.id}/cancel`,
+export const createPersonalExport = (grant: string, key: string, signal?: AbortSignal) =>
+  postJson(`${personalRoot}/exports`, { recentAuthGrant: grant }, readJob, "POST", { signal, idempotencyKey: key });
+export const cancelJob = (job: Job, key: string, signal?: AbortSignal) => postJson(`${jobRoot(job)}/jobs/${job.id}/cancel`,
   { expectedVersion: job.version }, readJob, "POST", { signal, idempotencyKey: key });
 
 /** Tickets stay in memory and travel in a header, never a URL or browser storage. */
 export async function downloadArchive(job: Job, grant: string, signal: AbortSignal,
   onProgress?: (received: number, total: number) => void): Promise<Blob> {
-  const ticket = await postJson(`${root}/jobs/${job.id}/download-ticket`, { recentAuthGrant: grant }, value => {
+  const ticket = await postJson(`${jobRoot(job)}/jobs/${job.id}/download-ticket`, { recentAuthGrant: grant }, value => {
     const v = object(value);
     return typeof v.token === "string" && /^[A-Za-z0-9_-]{43}$/.test(v.token) ? v.token : invalid();
   }, "POST", { signal });
   const timeout = AbortSignal.timeout(120_000);
   const combined = AbortSignal.any([signal, timeout]);
   try {
-    const response = await fetch(`${root}/jobs/${job.id}/download`, { credentials: "same-origin", cache: "no-store", signal: combined,
+    const response = await fetch(`${jobRoot(job)}/jobs/${job.id}/download`, { credentials: "same-origin", cache: "no-store", signal: combined,
       headers: { Accept: "application/zip", "X-Download-Ticket": ticket } });
     if (!response.ok) {
       if (response.status === 401) window.dispatchEvent(new Event("commonbeacon:session-expired"));

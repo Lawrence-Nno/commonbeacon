@@ -168,6 +168,21 @@ production image builds, inline password confirmation, ZIP checksums and mobile
 completion feedback. Controlled streams verify byte progress, interruption, stopping,
 and that only complete downloads are handed to the browser. No backend change.
 
+On 2026-09-22, Stage 8 personal exports based on `6649b5c` passed
+`scripts/verify.ps1`: 211 backend tests (35 unit and 176 integration), 155 frontend
+tests, lint, type checking and production build. All 13 isolated browser tests
+passed, including real company and personal ZIPs, checksums, requester ownership,
+report-field exclusions and logout clearing. The personal mobile capture was
+visually inspected. Integration tests cover exact multi-user projections, hidden
+content, empty accounts, snapshot consistency, revocation, forged scope/ownership,
+expired download tickets and early rejection by the company-import codec boundary.
+The existing company-export persistence suite passed backend/database restarts and
+Compose down/up against the shared worker; it is not a separate personal restart
+test. Injected-failure cleanup also passed and removed its disposable resources.
+OpenAPI JSON/local references and diff whitespace checks passed; the optional
+full specification validator was not installed. Upload/import remains unimplemented.
+These are local working-tree results, not remote CI or production-capacity evidence.
+
 ## Query-plan evidence
 
 The [evidence directory](evidence/README.md) contains captured PostgreSQL plans for

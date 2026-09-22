@@ -15,6 +15,8 @@ it("rejects unsafe identifiers, malformed states and oversized histories", () =>
   for (const value of [{ ...job, id: "../private" }, { ...job, state: "UNKNOWN" }, { ...job, version: -1 }, { ...job, createdAt: "bad" }, { ...job, allowedActions: ["DELETE"] }]) expect(() => readJob(value)).toThrow();
   expect(() => readPage({ items: Array(21).fill(job), nextCursor: null })).toThrow();
   expect(() => readPage({ items: [], nextCursor: "../../bad" })).toThrow();
+  expect(() => readPage({ items: [job], nextCursor: null }, true)).toThrow();
+  expect(() => readPage({ items: [{ ...job, kind: "PERSONAL_EXPORT" }], nextCursor: null })).toThrow();
 });
 it("downloads only complete bounded ZIP bytes with a header ticket and no-store", async () => {
   const mock = setup(() => new Response(new Uint8Array([80, 75, 3, 4]), { headers: { "Content-Type": "application/zip", "Content-Length": "4" } }));

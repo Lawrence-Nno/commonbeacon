@@ -5514,6 +5514,178 @@
           }
         }
       }
+    },
+    "/api/v1/account/data/exports": {
+      "post": {
+        "operationId": "createPersonalExport",
+        "summary": "Create an export of the signed-in account",
+        "tags": [
+          "transfers"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Requires an ACTIVE account, CSRF, a UUID Idempotency-Key and a PERSONAL_EXPORT recent-authentication grant. The authenticated requester is the only subject, including for administrators. Unknown fields, subject IDs and company options are rejected. Includes only own profile, own authored content (including hidden text), own report receipts and minimal board/opaque reference context; excludes other authors and moderation decisions. Matching retries return the original personal job without consuming another grant. Storage must be enabled. Poll /api/v1/account/data/jobs and obtain a fresh DOWNLOAD grant/ticket when READY. Personal portability cannot restore a company community. All responses use Cache-Control: no-store.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Invalid request",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in required",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF/grant/ticket",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version/state/idempotency conflict or download already active",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body or reserved transfer capacity exceeds limits",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Transfer storage unavailable",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted; original job on matching retry",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferJob"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PersonalExportRequest"
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -7413,6 +7585,19 @@
           "acknowledgedPrivateContent",
           "recentAuthGrant"
         ]
+      },
+      "PersonalExportRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "recentAuthGrant"
+        ],
+        "properties": {
+          "recentAuthGrant": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$"
+          }
+        }
       }
     }
   }

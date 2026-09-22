@@ -15,7 +15,7 @@ function Accounts() {
   const { setSession } = useAuth();
   return <><button onClick={() => void setSession({ ...admin, id: "other" })}>Switch administrator</button><button onClick={() => void setSession(null)}>End session</button></>;
 }
-function setup(role: string | null = "ADMINISTRATOR", responder?: (url: string, init?: RequestInit) => Promise<Response>) {
+function setup(role: string | null = "ADMINISTRATOR", responder?: (url: string, init?: RequestInit) => Promise<Response>, personal = false) {
   const mock = vi.fn(async (url: string, init?: RequestInit) => {
     if (url.endsWith("/auth/me")) return role ? Response.json({ ...admin, role }) : new Response(null, { status: 401 });
     if (url.endsWith("/csrf")) return Response.json({ headerName: "X-CSRF-TOKEN", token: "csrf" });
@@ -24,7 +24,7 @@ function setup(role: string | null = "ADMINISTRATOR", responder?: (url: string, 
   });
   vi.stubGlobal("fetch", mock);
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: 0 } } });
-  render(<QueryClientProvider client={client}><MemoryRouter><AuthProvider><Accounts /><DataManagement /></AuthProvider></MemoryRouter></QueryClientProvider>);
+  render(<QueryClientProvider client={client}><MemoryRouter><AuthProvider><Accounts /><DataManagement personal={personal} /></AuthProvider></MemoryRouter></QueryClientProvider>);
   return { mock, client };
 }
 async function begin() {
@@ -37,6 +37,26 @@ async function confirm() {
   await userEvent.click(screen.getByRole("button", { name: "Confirm password" }));
 }
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
+
+it.each(["MEMBER", "MODERATOR", "ADMINISTRATOR"])("keeps the %s personal workflow scoped to the account API", async role => {
+  const personalJob = { ...job, kind: "PERSONAL_EXPORT" };
+  const { mock, client } = setup(role, async url => Response.json(url.endsWith("/exports") ? personalJob : { items: [personalJob], nextCursor: null }), true);
+  await screen.findByRole("heading", { name: "Export my data" });
+  expect(screen.queryByLabelText("Include account contact details")).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Include private moderation history")).not.toBeInTheDocument();
+  expect(screen.getByText(/Personal archives cannot be used for company import/)).toBeVisible();
+  await userEvent.click(screen.getByLabelText(/I understand this archive/));
+  await userEvent.click(screen.getByRole("button", { name: "Confirm and create export" })); await confirm();
+  await screen.findByText(/Export requested/);
+  expect(mock.mock.calls.some(([url]) => url.includes("/admin/data/"))).toBe(false);
+  expect(JSON.parse(mock.mock.calls.find(([url]) => url.endsWith("/reauthentication"))![1]!.body as string).scope).toBe("PERSONAL_EXPORT");
+  const [url, init] = mock.mock.calls.find(([url]) => url.endsWith("/exports"))!;
+  expect(url).toBe("/api/v1/account/data/exports");
+  expect(Object.keys(JSON.parse(init!.body as string))).toEqual(["recentAuthGrant"]);
+  await userEvent.click(screen.getByRole("button", { name: "End session" }));
+  await screen.findByRole("heading", { name: "Sign in to manage data." });
+  expect(client.getQueryCache().findAll({ queryKey: ["personalTransfers"] })).toHaveLength(0);
+});
 
 it.each(["complete", "stop", "fail"])("keeps confirmation and download feedback in the selected card: %s", async outcome => {
   let stream!: ReadableStreamDefaultController<Uint8Array>;

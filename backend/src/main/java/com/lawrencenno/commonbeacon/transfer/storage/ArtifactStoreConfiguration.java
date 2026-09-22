@@ -15,8 +15,9 @@ public class ArtifactStoreConfiguration {
     @Bean
     @ConditionalOnProperty(name="commonbeacon.transfer.export.worker.enabled",havingValue="true",matchIfMissing=true)
     com.lawrencenno.commonbeacon.transfer.export.CompanyExportWorker companyExportWorker(TransferJobs jobs,ArtifactStore store,
-            com.lawrencenno.commonbeacon.transfer.export.CompanySnapshot snapshot) {
-        return new com.lawrencenno.commonbeacon.transfer.export.CompanyExportWorker(jobs,store,snapshot);
+            com.lawrencenno.commonbeacon.transfer.export.CompanySnapshot snapshot,
+            com.lawrencenno.commonbeacon.transfer.export.PersonalSnapshot personal) {
+        return new com.lawrencenno.commonbeacon.transfer.export.CompanyExportWorker(jobs,store,snapshot,personal);
     }
     @Bean TransferWorker transferWorker(TransferJobs jobs,ArtifactStore store) {return new TransferWorker(jobs,store);}
     @Bean ArtifactReconciler artifactReconciler(TransferJobs jobs,ArtifactStore store) {return new ArtifactReconciler(jobs,store);}

@@ -1,11 +1,31 @@
 # Data transfer permissions and downloads
 
-The API supports company export creation and generation, password confirmation,
-requester-scoped job lists/status, cancellation and protected downloads. Personal
-export creation, import upload and live import activation are not available yet.
+The API supports company and personal export creation and generation, password
+confirmation, requester-scoped job lists/status, cancellation and protected
+downloads. Import upload and live import activation are not available yet.
 Administrators can use **Data management** in the application navigation to create
 company exports, check their own history, cancel supported jobs, and download archives.
 See the [administrator guide](data-management.md).
+
+## Personal export
+
+Every ACTIVE account, including administrators, can choose **Export my data** in
+the account controls (`/account/data`). The personal profile never broadens with
+the requester's role. See the [personal export guide](personal-export.md).
+
+`POST /api/v1/account/data/exports` requires CSRF, a UUID `Idempotency-Key` and
+`{recentAuthGrant}` with scope `PERSONAL_EXPORT`. Unknown fields, including account
+IDs, profile/scope overrides and company options, are rejected. The authenticated
+requester is the only subject. Success is `202` with the existing job summary;
+matching retries return the same job without consuming another grant. Storage
+must be enabled. Status, cancellation, download tickets and downloads use the
+existing `/api/v1/account/data/jobs` routes and remain requester-owned. Company
+routes cannot access personal jobs, even for the same administrator.
+
+The shared scheduled worker selects a dedicated `PersonalSnapshot` projection;
+it never extracts a company dataset then filters it in memory. Both projection
+entry points enforce the matching job kind. Snapshot isolation, quotas, deadlines,
+fenced authority checks, private artifacts, expiry and cleanup are shared.
 
 ## Current identity and permission checks
 

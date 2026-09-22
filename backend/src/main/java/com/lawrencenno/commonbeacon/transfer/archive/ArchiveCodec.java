@@ -37,6 +37,14 @@ public final class ArchiveCodec {
         if (encoded.length > 65536) throw new IllegalArgumentException("MANIFEST_LIMIT");
         return encoded;
     }
+    /** Entry point for the upcoming company importer; personal portability is never activation input. */
+    public Result validateCompanyImport(byte[] manifestBytes, Map<String, Input> files, Consumer<Row> visitor) throws IOException {
+        if(manifestBytes.length>65536)return new Check().fail("manifest.json",0,"LIMIT_EXCEEDED");
+        var manifest=parse(manifestBytes);
+        if(manifest!=null && schemas.valid("manifest",manifest) && !"company".equals(manifest.path("profile").asText()))
+            return new Check().fail("manifest.json",0,"COMPANY_PROFILE_REQUIRED");
+        return validate(manifestBytes,files,visitor);
+    }
     public Result validate(byte[] manifestBytes, Map<String, Input> files, Consumer<Row> visitor) throws IOException {
         var check = new Check();
         if (manifestBytes.length > 65536) return check.fail("manifest.json", 0, "LIMIT_EXCEEDED");

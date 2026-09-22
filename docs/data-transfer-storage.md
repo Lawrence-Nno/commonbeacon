@@ -2,9 +2,9 @@
 
 CommonBeacon has internal durable-job and private-artifact infrastructure for data
 transfers. [Requester access and protected downloads](data-transfer-access.md) are
-implemented, including [company export creation and generation](data-transfer-access.md#company-export).
-Personal export creation, upload handling and live import activation remain future
-work. These classes
+implemented, including [company export](data-transfer-access.md#company-export)
+and [personal export](personal-export.md). Upload handling and live import activation
+remain future work. These classes
 are internal building blocks; accepting an actor UUID in a Java method is not an
 HTTP authorization mechanism.
 
@@ -25,7 +25,7 @@ a stable source-instance UUID. Import review/confirmation contracts remain later
 
 Short READ COMMITTED transactions lock the singleton coordination row, then the
 job and requester as needed. All foundation mutations use this order; file I/O
-runs outside coordination transactions; company extraction alone holds its
+runs outside coordination transactions; each export extraction holds its
 read-only database snapshot while writing the bounded intermediate file. Existing
 domain services do not acquire this
 transfer lock. Atomic live import needs an additional domain-wide write gate before
@@ -52,8 +52,9 @@ jobs and revoked roles cannot publish or advance progress. Revoked authorization
 becomes a terminal failure, not an endless retry. Queue expiry is 30 minutes;
 initial uploads expire after one hour; executing attempts have a ten-minute budget.
 Producer I/O must support cancellation/timeouts; the worker cannot forcibly stop
-arbitrary blocking third-party code. The company-export producer is registered when
-storage is enabled; its scheduled polling interval is five seconds.
+arbitrary blocking third-party code. The shared export runner selects dedicated
+company or personal projections by job kind. It is registered when storage is
+enabled; its scheduled polling interval is five seconds.
 
 The export runner commits artifact intent before asking a producer to write.
 It verifies the finalized file and atomically records availability, READY state,
@@ -116,8 +117,9 @@ The overlay enables the worker and mounts a dedicated `transfer_artifacts` volum
 at the backend-owned 0700 directory. Use both files on subsequent up/down commands;
 ordinary down retains the volume. The base Compose deployment remains storage-off.
 For other deployments, mount a durable private directory writable by the service
-identity. An ephemeral container layer is unsuitable. No transfer UI exists yet.
-Disabling `commonbeacon.transfer.export.worker.enabled` pauses automatic company
+identity. An ephemeral container layer is unsuitable. Company and personal screens
+are described in the [administrator](data-management.md) and [personal](personal-export.md) guides.
+Disabling `commonbeacon.transfer.export.worker.enabled` pauses automatic export
 processing for operator maintenance; queued jobs still obey their expiry limits.
 
 Artifact bytes are **not encrypted by this Java implementation**. Production use

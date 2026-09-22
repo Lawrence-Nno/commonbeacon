@@ -72,6 +72,11 @@ public class TransferJobs {
             .digest(("company:1:"+contacts+":"+history+":true").getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
         return create(actor,Kind.COMPANY_EXPORT,key,hash,contacts,history,authorize);
     }
+    public TransferJob createPersonalExport(UUID actor, UUID key, Runnable authorize) {
+        String hash=HexFormat.of().formatHex(com.lawrencenno.commonbeacon.transfer.archive.ArchiveCodec.sha256()
+            .digest("personal:1".getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
+        return create(actor,Kind.PERSONAL_EXPORT,key,hash,false,false,authorize);
+    }
     private TransferJob create(UUID actor,Kind kind,UUID requestKey,String payloadHash,boolean contacts,boolean history,Runnable authorize) {
         if (payloadHash == null || !payloadHash.matches("[a-f0-9]{64}")) throw new IllegalArgumentException("INVALID_REQUEST_HASH");
         Objects.requireNonNull(actor); Objects.requireNonNull(kind); Objects.requireNonNull(requestKey);
