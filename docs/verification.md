@@ -208,6 +208,26 @@ company-export reservations from 1,610,612,736 to 26,672 bytes while retaining b
 available archives. Evidence: capacity-final-verify.log, capacity-deploy.log and
 Maven XML reports. These are local results.
 
+Stage 9 quarantine upload/inspection (2026-09-22), based on `8563bd3`, passed final
+`scripts/verify.ps1`: 248 backend tests (60 unit and 188 integration), 157 frontend
+tests, lint, type checking and production build. All 14 isolated browser tests passed.
+New coverage checks hostile ZIP metadata and names, actual inflated/streamed byte
+limits, compression ratio, private-profile rejection, owner/admin/CSRF/grant checks,
+interrupted uploads, exhausted storage, cancellation, revocation, expiry and safe
+reports. Proxy tests cover the route-specific 64 MiB allowance and unchanged ordinary
+API limit. Inspection never authorizes activation or writes domain records/mappings.
+
+The expanded persistence suite retained a native company export, its quarantine
+inspection result/digest and domain fingerprints across backend/database restarts
+and Compose down/up. Injected-failure cleanup passed. Populated V13 exports/audit
+records survive V14; existing V5/V9/V11 upgrade tests pass. Old migration-count
+assertions were corrected before the final run. OpenAPI JSON/local references and
+unique operation IDs were validated; the optional full specification validator was
+not installed. Diff whitespace checks passed. Evidence: stage9-verify-final.log,
+stage9-smoke.log, stage9-persistence.log and stage9-cleanup.log. These are local
+working-tree results, not remote CI or production capacity certification. Staging,
+target-state review, activation and the upload UI remain subsequent stages.
+
 ## Query-plan evidence
 
 The [evidence directory](evidence/README.md) contains captured PostgreSQL plans for

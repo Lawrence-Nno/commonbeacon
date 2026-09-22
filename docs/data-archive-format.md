@@ -3,9 +3,9 @@
 CommonBeacon includes schemas and a backend codec for portable community records.
 The [company export API](data-transfer-access.md#company-export) produces this format
 and supports protected downloads. [Personal exports](personal-export.md) use the
-separate personal profile. Upload/import is not available yet; this is not a
-complete migration workflow. The company-import codec entry point rejects personal
-manifests before visiting rows; later upload/activation work must use that boundary.
+separate personal profile. [Quarantine upload and inspection](quarantine-upload.md)
+are available; activation is not implemented. The inspector uses the company-import
+codec entry point, which rejects personal manifests before visiting rows.
 
 The [schemas](../backend/src/main/resources/data-transfer/v1/) are JSON Schema
 2020-12 documents. The [readable fixtures](../backend/src/test/resources/data-transfer/v1/)
@@ -140,8 +140,9 @@ JSON parsing uses Jackson's
 
 This codec does not extract ZIPs, fetch URLs, authenticate users, create jobs,
 write domain tables or enforce download retention. ZIP entry types/path safety,
-compressed-size/ratio limits, disk reservations, worker deadlines and production
-heap/throughput measurements belong to the later quarantine/job integration.
+compressed-size/ratio limits, disk reservations and worker deadlines are enforced
+by the quarantine/job integration. Production heap/throughput measurements remain
+later verification work.
 The count-bounded metadata index has not been certified against the proposed
 production heap budget. Do not expose this codec directly as an upload endpoint.
 

@@ -148,3 +148,5 @@ Third-party dependencies and bundled third-party tooling retain their own licens
 and copyright notices; this declaration does not relicense them.
 
 See [data transfer access and downloads](docs/data-transfer-access.md) for the implemented job APIs and workflow limitations.
+
+Quarantine upload and inspection APIs: [operator guide](docs/quarantine-upload.md).

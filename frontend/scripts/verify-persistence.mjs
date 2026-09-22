@@ -90,6 +90,7 @@ if (process.argv.includes("--verify-failure-cleanup")) {
     } while (Date.now() < deadline);
     assert.equal(exportStatus.state, "READY", "Scheduled company export did not complete");
     assert.equal(compose(["exec", "-T", "backend", "stat", "-c", "%a", "/var/lib/commonbeacon/transfers"], true).trim(), "700");
+    let sourceArchive;
     async function archiveHash() {
       const grant = await mutate(admin, "/api/v1/account/data/reauthentication", { password: "disposable-e2e-demo-password", scope: "DOWNLOAD" });
       const ticket = await mutate(admin, exportPath + "/download-ticket", { recentAuthGrant: grant.token });
@@ -97,11 +98,35 @@ if (process.argv.includes("--verify-failure-cleanup")) {
       assert.equal(response.status(), 200); assert.equal(response.headers()["cache-control"], "no-store");
       assert.equal(response.headers()["content-type"], "application/zip");
       const bytes = await response.body(); assert.equal(bytes.subarray(0, 2).toString(), "PK");
+      sourceArchive ??= bytes;
       return createHash("sha256").update(bytes).digest("hex");
     }
     const expectedArchive = await archiveHash();
     const expectedRows = fingerprints();
+    const importGrant = await mutate(admin, "/api/v1/account/data/reauthentication", { password: "disposable-e2e-demo-password", scope: "IMPORT_UPLOAD" });
+    const imported = await mutate(admin, "/api/v1/admin/data/imports", { formatVersion: 1, recentAuthGrant: importGrant.token }, 201, "POST", { "Idempotency-Key": randomUUID() });
+    const importPath = `/api/v1/admin/data/imports/${imported.id}`;
+    const uploadCsrf = await get(admin, "/api/v1/auth/csrf");
+    const upload = await admin.put(importPath + "/archive", { data: sourceArchive, headers: { [uploadCsrf.headerName]: uploadCsrf.token, "Content-Type": "application/zip" } });
+    assert.equal(upload.status(), 200);
+    const inspectionDeadline = Date.now() + 90000;
+    let inspectionResponse;
+    do {
+      inspectionResponse = await admin.get(importPath + "/inspection");
+      if (inspectionResponse.status() === 200) break;
+      assert.equal(inspectionResponse.status(), 409);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } while (Date.now() < inspectionDeadline);
+    assert.equal(inspectionResponse.status(), 200);
+    const expectedInspection = await inspectionResponse.json();
+    assert.equal(expectedInspection.valid, true); assert.equal(expectedInspection.activationAvailable, false);
+    assert.equal(expectedInspection.archiveSha256, expectedArchive);
+
     async function assertPersisted() {
+      assert.deepEqual(await get(admin, importPath + "/inspection"), expectedInspection);
+      const importStatus = await get(admin, `/api/v1/admin/data/jobs/${imported.id}`);
+      assert.equal(importStatus.state, "REVIEW_REQUIRED"); assert.equal(importStatus.errorCode, null);
+
       assert.equal((await get(admin, exportPath)).state, "READY");
       assert.equal(await archiveHash(), expectedArchive, "Private export bytes changed across restart");
       assert.equal(fingerprints(), expectedRows, "Stored rows changed across restart");
@@ -131,7 +156,7 @@ if (process.argv.includes("--verify-failure-cleanup")) {
     compose(["up", "-d", "--wait", "--wait-timeout", "180"]);
     assert.equal((await admin.get("/api/v1/auth/me")).status(), 401);
     admin = await session("avery.admin@example.test"); await assertPersisted();
-    console.log("Compose down/up preserved reports, audit history, articles, vectors, decisions, and protected export bytes; verification passed.");
+    console.log("Compose down/up preserved reports, audit history, articles, vectors, decisions, protected export bytes, and quarantine inspection metadata; verification passed.");
   } catch (error) {
     console.error(error.message); process.exitCode = 1;
   } finally {

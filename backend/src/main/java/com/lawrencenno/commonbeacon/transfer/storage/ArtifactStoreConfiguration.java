@@ -19,6 +19,11 @@ public class ArtifactStoreConfiguration {
             com.lawrencenno.commonbeacon.transfer.export.PersonalSnapshot personal) {
         return new com.lawrencenno.commonbeacon.transfer.export.CompanyExportWorker(jobs,store,snapshot,personal);
     }
+    @Bean
+    @ConditionalOnProperty(name="commonbeacon.transfer.import.inspection.enabled",havingValue="true",matchIfMissing=true)
+    com.lawrencenno.commonbeacon.transfer.inspection.ImportInspector importInspector(TransferJobs jobs,ArtifactStore store) {
+        return new com.lawrencenno.commonbeacon.transfer.inspection.ImportInspector(jobs,store);
+    }
     @Bean TransferWorker transferWorker(TransferJobs jobs,ArtifactStore store) {return new TransferWorker(jobs,store);}
     @Bean ArtifactReconciler artifactReconciler(TransferJobs jobs,ArtifactStore store) {return new ArtifactReconciler(jobs,store);}
     @Bean ArtifactStore artifactStore(@Value("${commonbeacon.transfer.storage.directory}") String directory) throws IOException {

@@ -3,8 +3,8 @@
 CommonBeacon has internal durable-job and private-artifact infrastructure for data
 transfers. [Requester access and protected downloads](data-transfer-access.md) are
 implemented, including [company export](data-transfer-access.md#company-export)
-and [personal export](personal-export.md). Upload handling and live import activation
-remain future work. These classes
+and [personal export](personal-export.md), plus [quarantined upload and inspection](quarantine-upload.md).
+Live import activation remains future work. These classes
 are internal building blocks; accepting an actor UUID in a Java method is not an
 HTTP authorization mechanism.
 
@@ -21,7 +21,8 @@ Idempotency keys are scoped by requester and operation for 24 hours: matching
 digests return the original job, while mismatches fail. Request adapters
 calculate the digest from the canonical logical request, excluding transient
 authentication grants. V13 stores company export options alongside each job and
-a stable source-instance UUID. Import review/confirmation contracts remain later work.
+a stable source-instance UUID. V14 adds bounded inspection results and upload/inspection
+audit events. Target dry-run review and confirmation remain later work.
 
 Short READ COMMITTED transactions lock the singleton coordination row, then the
 job and requester as needed. All foundation mutations use this order; file I/O
@@ -66,9 +67,9 @@ publish after a replacement claim. Authenticated requester-only download routes 
 Download artifacts expire 24 hours after successful publication. Missing or
 corrupted artifacts retain the READY outcome with an `ARTIFACT_MISSING` diagnostic.
 
-Import state names, upload artifact purpose and mapping ownership are present for
-subsequent handlers. The export runner does not claim imports or invent an import
-workflow. COMMITTING work is never automatically replayed after expiry: it is
+The quarantine upload handler and inspector use UPLOADING, UPLOADED, VALIDATING
+and REVIEW_REQUIRED. Inspection never transitions to READY_TO_COMMIT. The export
+runner does not claim imports; inspection and uploads share its global lease. COMMITTING work is never automatically replayed after expiry: it is
 flagged for activation reconciliation. Live-domain transactions and confirmation
 must be implemented before that state can be used by a product workflow.
 

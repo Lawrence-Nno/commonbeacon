@@ -7,6 +7,9 @@ logging:
     org.hibernate.engine.jdbc.spi.SqlExceptionHelper: "OFF"
 
 spring:
+  servlet:
+    multipart:
+      enabled: false
   main:
     banner-mode: "off"
   application:
@@ -39,6 +42,7 @@ server:
         same-site: lax
         secure: true
   tomcat:
+    connection-timeout: 30s
     max-http-form-post-size: 16KB
   address: ${SERVER_ADDRESS:127.0.0.1}
   port: ${SERVER_PORT:8080}

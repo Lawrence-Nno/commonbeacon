@@ -103,6 +103,9 @@ public final class LocalArtifactStore implements ArtifactStore {
             return Optional.of(new Stored(key,count,HexFormat.of().formatHex(digest.digest())));
         });
     }
+    @Override public java.nio.channels.SeekableByteChannel openChannel(UUID key) throws IOException {
+        return locked(() -> {var file=path(key,".blob");safe(file);return Files.newByteChannel(file,Set.of(READ,LinkOption.NOFOLLOW_LINKS));});
+    }
     @Override public void delete(UUID key) throws IOException {
         locked(() -> {for(String suffix:List.of(".part",".blob")){var file=path(key,suffix);safe(file);Files.deleteIfExists(file);}return null;});
     }

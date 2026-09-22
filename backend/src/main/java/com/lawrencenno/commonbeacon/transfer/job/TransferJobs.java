@@ -102,6 +102,90 @@ public class TransferJobs {
             audit(id,Event.CREATED); return job(id);
         });
     }
+    public TransferJob createImport(UUID actor,UUID key,Runnable authorize) {
+        String hash=HexFormat.of().formatHex(com.lawrencenno.commonbeacon.transfer.archive.ArchiveCodec.sha256()
+            .digest("import:1".getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
+        return create(actor,Kind.COMPANY_IMPORT,key,hash,false,false,authorize);
+    }
+    private TransferJob ownedImport(UUID actor,UUID id) {
+        var j=owned(actor,id);if(j.kind()!=Kind.COMPANY_IMPORT)throw new IllegalStateException("JOB_NOT_FOUND");
+        if(!permitted(j))throw new IllegalStateException("FORBIDDEN");return j;
+    }
+    public record Upload(Lease lease,UUID artifact) {}
+    public Upload beginUpload(UUID actor,UUID id) {
+        return locked(()->{
+            recoverLocked();var j=ownedImport(actor,id);
+            if(j.state()!=State.UPLOADING || j.worker()!=null)throw new IllegalStateException("JOB_CONFLICT");
+            if(jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE lease_until>clock_timestamp()",Long.class)>0)
+                throw new IllegalStateException("JOB_CONFLICT");
+            if(jdbc.queryForObject("SELECT count(*) FROM transfer_artifact WHERE job_id=? AND state<>'DELETED'",Long.class,id)>=10)
+                throw new IllegalStateException("TRANSFER_QUOTA_EXCEEDED");
+            UUID token=UUID.randomUUID(),artifact=UUID.randomUUID();
+            jdbc.update("UPDATE transfer_job SET worker_id=?,lease_until=clock_timestamp()+interval '60 seconds',fence=fence+1,version=version+1,updated_at=clock_timestamp() WHERE id=?",token,id);
+            var leased=job(id);
+            jdbc.update("INSERT INTO transfer_artifact(id,job_id,fence,purpose,byte_limit,expires_at) VALUES (?,?,?,'UPLOAD',67108864,?)",artifact,id,leased.fence(),Timestamp.from(j.expiresAt()));
+            return new Upload(leased.lease(),artifact);
+        });
+    }
+    public TransferJob finishUpload(Upload upload,long bytes,String hash) {
+        return locked(()->{
+            var j=current(upload.lease());if(j==null)throw new IllegalStateException("FORBIDDEN");
+            if(j.state()!=State.UPLOADING || bytes<1 || bytes>67108864 || !hash.matches("[a-f0-9]{64}"))throw new IllegalStateException("JOB_CONFLICT");
+            if(jdbc.update("UPDATE transfer_artifact SET state='AVAILABLE',byte_count=?,sha256=? WHERE id=? AND job_id=? AND fence=? AND purpose='UPLOAD' AND state='WRITING'",bytes,hash,upload.artifact(),j.id(),j.fence())!=1)throw new IllegalStateException("JOB_CONFLICT");
+            jdbc.update("UPDATE transfer_job SET state='UPLOADED',worker_id=NULL,lease_until=NULL,version=version+1,updated_at=clock_timestamp() WHERE id=?",j.id());
+            audit(j.id(),Event.UPLOADED);return job(j.id());
+        });
+    }
+    public void abortUpload(Upload upload) {
+        locked(()->{
+            var j=job(upload.lease().jobId());
+            if(j.fence()==upload.lease().fence() && Objects.equals(j.worker(),upload.lease().worker()) && j.state()==State.UPLOADING) {
+                jdbc.update("UPDATE transfer_artifact SET state='DELETING' WHERE id=? AND state='WRITING'",upload.artifact());
+                jdbc.update("UPDATE transfer_job SET worker_id=NULL,lease_until=NULL,version=version+1,updated_at=clock_timestamp() WHERE id=?",j.id());
+            }
+            return null;
+        });
+    }
+    public Optional<TransferJob> claimInspection(UUID worker) {
+        return locked(()->{
+            recoverLocked();
+            if(jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE lease_until>clock_timestamp()",Long.class)>0)return Optional.empty();
+            var pending=jdbc.query("SELECT * FROM transfer_job WHERE kind='COMPANY_IMPORT' AND state IN ('UPLOADED','VALIDATING') AND worker_id IS NULL ORDER BY created_at,id LIMIT 10 FOR UPDATE",ROW);
+            for(var j:pending) {
+                if(!permitted(j)){fail(j,Failure.AUTHORIZATION_REVOKED);continue;}
+                if(j.attempts()>=3){fail(j,Failure.ATTEMPTS_EXHAUSTED);continue;}
+                jdbc.update("UPDATE transfer_job SET state='VALIDATING',worker_id=?,lease_until=clock_timestamp()+interval '60 seconds',fence=fence+1,attempts=attempts+1,checkpoint=0,version=version+1,updated_at=clock_timestamp() WHERE id=?",worker,j.id());
+                var claimed=job(j.id());jdbc.update("INSERT INTO transfer_attempt(job_id,fence,worker_id) VALUES (?,?,?)",j.id(),claimed.fence(),worker);
+                audit(j.id(),Event.CLAIMED);return Optional.of(claimed);
+            }
+            return Optional.empty();
+        });
+    }
+    public record Inspection(UUID jobId,String archiveSha256,boolean valid,long rowsChecked,long totalErrors,String issues,Instant inspectedAt) {}
+    public Artifact inspectionSource(Lease lease) {
+        return locked(()->{
+            var j=current(lease);if(j==null || j.state()!=State.VALIDATING)throw new IllegalStateException("JOB_CONFLICT");
+            return jdbc.query("SELECT id,job_id,state,fence,created_at,byte_count,sha256 FROM transfer_artifact WHERE job_id=? AND purpose='UPLOAD' AND state='AVAILABLE' ORDER BY created_at DESC LIMIT 1",
+                (r,n)->new Artifact(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getString(3),r.getLong(4),r.getTimestamp(5).toInstant(),r.getObject(6,Long.class),r.getString(7)),j.id()).stream().findFirst().orElseThrow(()->new IllegalStateException("ARTIFACT_EXPIRED"));
+        });
+    }
+    public boolean finishInspection(Lease lease,Artifact source,boolean valid,long rows,long errors,String issues) {
+        return locked(()->{
+            var j=current(lease);if(j==null)return false;
+            if(j.state()!=State.VALIDATING || !source.jobId().equals(j.id()))throw new IllegalStateException("JOB_CONFLICT");
+            jdbc.update("INSERT INTO transfer_inspection(job_id,artifact_id,archive_sha256,valid,rows_checked,total_errors,issues) VALUES (?,?,?,?,?,?,?::jsonb) ON CONFLICT(job_id) DO UPDATE SET artifact_id=excluded.artifact_id,archive_sha256=excluded.archive_sha256,valid=excluded.valid,rows_checked=excluded.rows_checked,total_errors=excluded.total_errors,issues=excluded.issues,inspected_at=clock_timestamp()",j.id(),source.id(),source.hash(),valid,rows,errors,issues);
+            // Inspection never authorizes activation. Stage 10 supplies dry-run staging/review.
+            jdbc.update("UPDATE transfer_job SET state='REVIEW_REQUIRED',worker_id=NULL,lease_until=NULL,checkpoint=?,version=version+1,updated_at=clock_timestamp() WHERE id=?",rows,j.id());
+            endAttempt(j.id());audit(j.id(),Event.INSPECTED);return true;
+        });
+    }
+    public Inspection inspection(UUID actor,UUID id) {
+        return locked(()->{
+            ownedImport(actor,id);
+            return jdbc.query("SELECT * FROM transfer_inspection WHERE job_id=?",(r,n)->new Inspection(id,r.getString("archive_sha256"),r.getBoolean("valid"),r.getLong("rows_checked"),r.getLong("total_errors"),r.getString("issues"),r.getTimestamp("inspected_at").toInstant()),id)
+                .stream().findFirst().orElseThrow(()->new IllegalStateException("JOB_CONFLICT"));
+        });
+    }
     public Optional<TransferJob> claim(UUID worker) {
         return claim(worker,true,false);
     }

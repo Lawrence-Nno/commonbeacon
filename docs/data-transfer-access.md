@@ -2,7 +2,8 @@
 
 The API supports company and personal export creation and generation, password
 confirmation, requester-scoped job lists/status, cancellation and protected
-downloads. Import upload and live import activation are not available yet.
+downloads. [Quarantined upload and inspection](quarantine-upload.md) are also available
+through administrator APIs. Live import activation is not implemented.
 Administrators can use **Data management** in the application navigation to create
 company exports, check their own history, cancel supported jobs, and download archives.
 See the [administrator guide](data-management.md).
