@@ -20,18 +20,24 @@ public class AppUser {
     @Id
     private UUID id;
 
-    @Column(nullable = false, length = 254)
+    @Column(length = 254)
     private String email;
 
     @Column(name = "display_name", nullable = false, length = 80)
     private String displayName;
 
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     private UserRole role;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_state", nullable = false, length = 24)
+    private AccountState accountState = AccountState.ACTIVE;
+
+    public boolean isActive() { return accountState == AccountState.ACTIVE; }
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;

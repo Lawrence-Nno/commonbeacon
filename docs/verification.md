@@ -73,7 +73,7 @@ cleanup, and failure handling.
   Real HTTP tests also cover current roles, requester isolation, CSRF, scoped
   password grants, ticket replay/expiry, cancellation retries and in-flight revocation.
   These do not yet provide end-to-end export/import workflows.
-- Deployment and migrations: clean V1-V11 migration, populated V5-to-V11 and V9-to-V11 upgrades,
+- Deployment and migrations: clean V1-V12 migration, populated V5-to-V12, V9-to-V12 and V11-to-V12 upgrades,
   repeated migration, Hibernate validation, backend/database restarts, normal
   Compose down/up, and cleanup after an intentionally injected failure.
 
@@ -121,6 +121,15 @@ additional suite. To reproduce the behavior, use the
 persistence commands above. Local screenshots and temporary logs are not durable
 release artifacts. CI artifacts have a seven-day retention period and may expire;
 the repeatable scripts and committed tests are the primary verification mechanism.
+
+On 2026-09-22, local Stage 5 imported-identity changes based on
+`7d8c1160b86cb9d04c0d3dd9b99d205308dbda7a` passed `scripts/verify.ps1`:
+184 backend tests (31 unit and 153 integration), 132 frontend tests, lint,
+type checking and build. All 11 browser smoke tests, persistence/restart/down-up
+checks, and injected-failure cleanup passed on disposable resources. Coverage
+includes inactive-author constraints, contact isolation, session/worker revocation,
+and populated V11-to-V12 upgrades preserving credentials and roles. These local
+results do not claim a CI run or a complete archive-import workflow.
 
 ## Query-plan evidence
 

@@ -21,7 +21,7 @@ class MilestoneUpgradeIT {
     private Map<String, List<String>> originalRows(JdbcTemplate jdbc) {
         var result = new LinkedHashMap<String, List<String>>();
         for (String table : List.of("app_user", "board", "question", "reply"))
-            result.put(table, jdbc.queryForList("SELECT (to_jsonb(t)-'search_vector'-'auth_revision')::text FROM " + table + " t ORDER BY id", String.class));
+            result.put(table, jdbc.queryForList("SELECT (to_jsonb(t)-'search_vector'-'auth_revision'-'account_state')::text FROM " + table + " t ORDER BY id", String.class));
         return result;
     }
     private void validatesCurrentApplication(PostgreSQLContainer db) {
@@ -30,7 +30,7 @@ class MilestoneUpgradeIT {
                 "--spring.datasource.username=" + db.getUsername(), "--spring.datasource.password=" + db.getPassword(),
                 "--commonbeacon.demo.enabled=false", "--spring.jpa.hibernate.ddl-auto=validate")) {
             assertThat(app.getBean(jakarta.persistence.EntityManagerFactory.class).isOpen()).isTrue();
-            assertThat(app.getBean(JdbcTemplate.class).queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success", Integer.class)).isEqualTo(11);
+            assertThat(app.getBean(JdbcTemplate.class).queryForObject("SELECT count(*) FROM flyway_schema_history WHERE success", Integer.class)).isEqualTo(12);
         }
     }
     @Test void cleanDatabaseMigratesAndBootsWithHibernateValidation() {
@@ -38,6 +38,23 @@ class MilestoneUpgradeIT {
             db.start();
             validatesCurrentApplication(db);
             assertThat(flyway(db, "latest").migrate().migrationsExecuted).isZero();
+        }
+    }
+    @Test void populatedV11AccountsKeepCredentialsRolesAndRevisions() {
+        try (var db = database()) {
+            db.start(); flyway(db, "11").migrate();
+            var jdbc = new JdbcTemplate(new DriverManagerDataSource(db.getJdbcUrl(), db.getUsername(), db.getPassword()));
+            for (String role : List.of("MEMBER", "MODERATOR", "ADMINISTRATOR")) {
+                jdbc.update("INSERT INTO app_user(id,email,display_name,password_hash,role,auth_revision) VALUES (?,?,?,'preserved-hash',?,7)",
+                    UUID.randomUUID(), role.toLowerCase(Locale.ROOT) + "@example.test", role, role);
+            }
+            var before = jdbc.queryForList("SELECT (to_jsonb(u)-'account_state')::text FROM app_user u ORDER BY id", String.class);
+            assertThat(flyway(db, "latest").migrate().migrationsExecuted).isEqualTo(1);
+            assertThat(jdbc.queryForList("SELECT (to_jsonb(u)-'account_state')::text FROM app_user u ORDER BY id", String.class)).isEqualTo(before);
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM app_user WHERE account_state='ACTIVE'", Integer.class)).isEqualTo(3);
+            assertThatThrownBy(() -> jdbc.update("INSERT INTO app_user(id,display_name) VALUES (?,'Missing credentials')", UUID.randomUUID()))
+                .isInstanceOf(DataIntegrityViolationException.class);
+            validatesCurrentApplication(db);
         }
     }
     @Test void populatedV9DatabaseRetainsEveryDomainTableWhenTransferTablesAreAdded() {
@@ -55,10 +72,10 @@ class MilestoneUpgradeIT {
             jdbc.update("INSERT INTO knowledge_article(id,slug,title,body,author_id) VALUES (?,'transfer-upgrade','Preserved article','Preserve article body',?)",UUID.randomUUID(),user);
             var tables=List.of("app_user","board","question","reply","content_report","moderation_action","knowledge_article");
             var before=new LinkedHashMap<String,List<String>>();
-            for(var table:tables)before.put(table,jdbc.queryForList("SELECT (to_jsonb(t)-'auth_revision')::text FROM "+table+" t ORDER BY id",String.class));
-            var upgrade=flyway(db,"latest");assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(2);upgrade.validate();
+            for(var table:tables)before.put(table,jdbc.queryForList("SELECT (to_jsonb(t)-'auth_revision'-'account_state')::text FROM "+table+" t ORDER BY id",String.class));
+            var upgrade=flyway(db,"latest");assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(3);upgrade.validate();
             validatesCurrentApplication(db);
-            for(var table:tables)assertThat(jdbc.queryForList("SELECT (to_jsonb(t)-'auth_revision')::text FROM "+table+" t ORDER BY id",String.class)).isEqualTo(before.get(table));
+            for(var table:tables)assertThat(jdbc.queryForList("SELECT (to_jsonb(t)-'auth_revision'-'account_state')::text FROM "+table+" t ORDER BY id",String.class)).isEqualTo(before.get(table));
             assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_job",Integer.class)).isZero();
         }
     }
@@ -77,7 +94,7 @@ class MilestoneUpgradeIT {
             jdbc.update("UPDATE question SET accepted_reply_id=? WHERE id=?", archivedReply, archivedQuestion);
             var before = originalRows(jdbc);
             var upgrade = flyway(db, "latest");
-            assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(6);
+            assertThat(upgrade.migrate().migrationsExecuted).isEqualTo(7);
             upgrade.validate();
             assertThat(upgrade.migrate().migrationsExecuted).isZero();
             assertThat(originalRows(jdbc)).isEqualTo(before);

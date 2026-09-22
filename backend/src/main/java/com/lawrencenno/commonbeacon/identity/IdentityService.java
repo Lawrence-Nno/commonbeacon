@@ -27,7 +27,7 @@ public class IdentityService {
         if (authentication == null || !authentication.isAuthenticated()) {
             throw new AccessDeniedException("Authentication required");
         }
-        return users.findByEmail(authentication.getName()).map(UserSummary::from)
+        return users.findByEmail(authentication.getName()).filter(AppUser::isActive).map(UserSummary::from)
                 .orElseThrow(() -> new AccessDeniedException("Account unavailable"));
     }
     /** Ownership does not grant an implicit moderator/administrator bypass. */

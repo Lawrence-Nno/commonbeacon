@@ -30,6 +30,7 @@ public class SecurityConfiguration {
     }
     @Bean UserDetailsService userDetailsService(UserRepository users) {
         return email -> users.findByEmail(email.trim().toLowerCase(Locale.ROOT))
+                .filter(AppUser::isActive)
                 .map(user -> User.withUsername(user.getEmail()).password(user.passwordHash())
                         .roles(user.getRole().name()).build())
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
@@ -88,6 +89,18 @@ public class SecurityConfiguration {
                     var password = request.getParameter("password");
                     if (email == null || email.length() > 254 || password == null || password.length() > 128) {
                         problems.write(response, 401, "INVALID_CREDENTIALS", "Email or password is incorrect.");
+                        return;
+                    }
+                }
+                var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+                if (authentication != null && authentication.isAuthenticated()
+                        && !(authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken)) {
+                    try { identity.current(authentication); }
+                    catch (org.springframework.security.access.AccessDeniedException unavailable) {
+                        var session = request.getSession(false);
+                        if (session != null) session.invalidate();
+                        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+                        problems.write(response, 401, "UNAUTHENTICATED", "Please sign in to continue.");
                         return;
                     }
                 }

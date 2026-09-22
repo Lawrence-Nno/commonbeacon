@@ -78,7 +78,10 @@ content. Personal archives are not company-import inputs. The later import bound
 must enforce the company profile before staging or activation.
 
 Company user schemas contain no email, role, password or verification state.
-Optional contacts are private provenance, not login identities. No schema carries
+Optional contacts are private provenance, not login identities. Local account state
+and authorization revisions are excluded from archives; all imported identities
+are created as inactive members. Durable source mappings and contact retention
+are described in [imported author identities](data-transfer-access.md#imported-author-identities). No schema carries
 password hashes, session tokens, deployment secrets, local concurrency versions,
 or generated search vectors. An informational role in a personal profile never
 authorizes restoring that role. Unknown properties fail in both directions.

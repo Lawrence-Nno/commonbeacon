@@ -45,7 +45,7 @@ public class TransferJobs {
         return jdbc.queryForObject("SELECT j.authorization_revision=u.auth_revision FROM transfer_job j JOIN app_user u ON u.id=j.requester_id WHERE j.id=?",Boolean.class,j.id());
     }
     private boolean permitted(UUID requester, Kind kind) {
-        var roles = jdbc.queryForList("SELECT role FROM app_user WHERE id=? FOR SHARE", String.class, requester);
+        var roles = jdbc.queryForList("SELECT role FROM app_user WHERE id=? AND account_state='ACTIVE' FOR SHARE", String.class, requester);
         return !roles.isEmpty() && (kind == Kind.PERSONAL_EXPORT || roles.getFirst().equals("ADMINISTRATOR"));
     }
     private TransferJob owned(UUID actor, UUID id) {

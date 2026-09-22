@@ -19,7 +19,7 @@ public class TransferAccess {
     public Actor current(Authentication authentication,boolean administrator) {
         if(authentication==null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken)
             throw new ApiFailure(401,"UNAUTHENTICATED","Please sign in to continue.");
-        var actors=jdbc.query("SELECT id,role,auth_revision FROM app_user WHERE email=? FOR SHARE",
+        var actors=jdbc.query("SELECT id,role,auth_revision FROM app_user WHERE email=? AND account_state='ACTIVE' FOR SHARE",
             (r,n)->new Actor(r.getObject(1,UUID.class),r.getString(2),r.getLong(3)),authentication.getName());
         if(actors.isEmpty())throw new ApiFailure(401,"UNAUTHENTICATED","Please sign in to continue.");
         var actor=actors.getFirst();
