@@ -70,12 +70,14 @@ cleanup, and failure handling.
 - Transfer foundations: versioned archive fixtures, privacy and reference validation,
   durable idempotency, competing/recreated workers, lease fencing, private filesystem
   permissions, quota admission, publication replay, corruption and cleanup recovery.
+  Real HTTP tests also cover current roles, requester isolation, CSRF, scoped
+  password grants, ticket replay/expiry, cancellation retries and in-flight revocation.
   These do not yet provide end-to-end export/import workflows.
-- Deployment and migrations: clean V1-V10 migration, populated V5-to-V10 and V9-to-V10 upgrades,
+- Deployment and migrations: clean V1-V11 migration, populated V5-to-V11 and V9-to-V11 upgrades,
   repeated migration, Hibernate validation, backend/database restarts, normal
   Compose down/up, and cleanup after an intentionally injected failure.
 
-The [OpenAPI contract](openapi.json) describes 39 application operations and 44
+The [OpenAPI contract](openapi.json) describes 50 application operations and 50
 schemas. [API documentation](api.md#checking-the-contract) gives an optional
 structural-validation command. Schema validation alone does not prove permissions,
 transaction behavior, or server-specific UTF-16 length bounds.

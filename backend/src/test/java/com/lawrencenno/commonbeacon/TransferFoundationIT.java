@@ -28,7 +28,7 @@ class TransferFoundationIT {
     UUID admin,other,member;
     ArtifactStore store;
     @BeforeEach void setup() throws IOException {
-        jdbc.execute("TRUNCATE transfer_audit,transfer_completion,transfer_mapping,transfer_artifact,transfer_attempt,transfer_request,transfer_job");
+        jdbc.execute("TRUNCATE transfer_download,transfer_audit,transfer_completion,transfer_mapping,transfer_artifact,transfer_attempt,transfer_request,transfer_job");
         admin=user("ADMINISTRATOR");other=user("ADMINISTRATOR");member=user("MEMBER");
         store=new LocalArtifactStore(directory,134217728L,0);
     }

@@ -1,8 +1,9 @@
 # Transfer jobs, private storage and recovery
 
 CommonBeacon has internal durable-job and private-artifact infrastructure for data
-transfers. Export/import endpoints, recent-authentication checks, upload handling,
-snapshot producers and live import activation are not available yet. These classes
+transfers. [Requester access and protected downloads](data-transfer-access.md) are
+implemented. Export/import creation, upload handling, snapshot producers and live
+import activation are not available yet. These classes
 are internal building blocks; accepting an actor UUID in a Java method is not an
 HTTP authorization mechanism.
 
@@ -30,8 +31,8 @@ it can be implemented. Row locking follows PostgreSQL's
 
 The internal job methods check requester ownership and current database roles.
 Company work requires ADMINISTRATOR; personal export is requester-specific.
-There is no takeover by another administrator. Full HTTP/session/CSRF/recent-auth
-enforcement remains a prerequisite for exposing these operations. When inactive
+There is no takeover by another administrator. HTTP/session/CSRF and scoped recent-authentication controls protect the implemented
+job and download routes. V11 pins worker authorization revisions to detect revocation. When inactive
 imported identities are added, the role check must also require an active account.
 
 ## Worker leases and publication
@@ -56,7 +57,7 @@ the completion ledger and audit event. `TransferJobs.publish` is the low-level
 metadata operation: callers must use the verified-store path, as the export runner
 does. Repeating a successful publication with the original lease/artifact returns
 the original result without a second completion event. An old worker cannot
-publish after a replacement claim. No public download route exists.
+publish after a replacement claim. Authenticated requester-only download routes serve existing completed artifacts.
 Download artifacts expire 24 hours after successful publication. Missing or
 corrupted artifacts retain the READY outcome with an `ARTIFACT_MISSING` diagnostic.
 
@@ -131,8 +132,8 @@ the broader retention/offboarding work adds that policy.
 
 Audit records contain a job reference, fixed event name and timestamp. Requester
 and worker attribution comes from the job and attempt records. Events distinguish
-download attempts from completed delivery; future download handlers must record
-completion only after actual delivery. Confirmation has a defined event value for
+download attempts from completed server delivery; handlers record completion only
+after writing the verified response. Active download leases delay physical cleanup. Confirmation has a defined event value for
 the later confirmation handler. Events contain no content bodies, passwords,
 authentication grants, supplied paths or raw exception messages. Reconciliation
 logs a fixed retry message on failure. This is not a tamper-proof external audit log.
@@ -144,7 +145,7 @@ lease recovery, fencing, permissions, quota admission, mappings, publication rep
 interrupted work, orphan cleanup, corruption, expiry and retried deletion using
 disposable PostgreSQL and temporary files. `LocalArtifactStoreTest` checks immutable
 publication, file permissions, quotas and unsafe-directory handling. Migration tests
-verify fresh V10 startup and preservation of populated V5 and V9 domain data.
+verify fresh V11 startup and preservation of populated V5 and V9 domain data.
 
 These are functional tests, not production throughput or power-failure benchmarks.
 Large-data, multi-host storage and end-to-end transfer verification remain necessary

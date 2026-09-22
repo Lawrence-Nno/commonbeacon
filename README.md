@@ -144,3 +144,5 @@ interaction, AGPLv3 requires offering those users access to the Corresponding
 Source of your modified version. See section 13 of the license for the exact terms.
 Third-party dependencies and bundled third-party tooling retain their own licenses
 and copyright notices; this declaration does not relicense them.
+
+See [data transfer access and downloads](docs/data-transfer-access.md) for the implemented job APIs and workflow limitations.

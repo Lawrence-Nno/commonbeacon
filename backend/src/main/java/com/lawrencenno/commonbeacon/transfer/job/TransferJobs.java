@@ -40,7 +40,10 @@ public class TransferJobs {
         return jdbc.query("SELECT * FROM transfer_job WHERE id=? FOR UPDATE", ROW, id).stream().findFirst()
             .orElseThrow(() -> new IllegalStateException("JOB_NOT_FOUND"));
     }
-    private boolean permitted(TransferJob j) { return permitted(j.requester(), j.kind()); }
+    private boolean permitted(TransferJob j) {
+        if(!permitted(j.requester(),j.kind()))return false;
+        return jdbc.queryForObject("SELECT j.authorization_revision=u.auth_revision FROM transfer_job j JOIN app_user u ON u.id=j.requester_id WHERE j.id=?",Boolean.class,j.id());
+    }
     private boolean permitted(UUID requester, Kind kind) {
         var roles = jdbc.queryForList("SELECT role FROM app_user WHERE id=? FOR SHARE", String.class, requester);
         return !roles.isEmpty() && (kind == Kind.PERSONAL_EXPORT || roles.getFirst().equals("ADMINISTRATOR"));
@@ -48,7 +51,7 @@ public class TransferJobs {
     private TransferJob owned(UUID actor, UUID id) {
         var j = job(id);
         if (!j.requester().equals(actor)) throw new IllegalStateException("JOB_NOT_FOUND");
-        if (!permitted(j)) throw new IllegalStateException("FORBIDDEN");
+        if (!permitted(j.requester(),j.kind())) throw new IllegalStateException("FORBIDDEN");
         return j;
     }
     private void audit(UUID id, Event event) {
@@ -78,8 +81,8 @@ public class TransferJobs {
             if (jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE requester_id=? AND state NOT IN ("+TERMINAL+")",Long.class,actor)>0)
                 throw new IllegalStateException("ACTIVE_JOB_EXISTS");
             UUID id=UUID.randomUUID();
-            jdbc.update("INSERT INTO transfer_job(id,requester_id,kind,state,expires_at) VALUES (?,?,?,?,clock_timestamp()+? * interval '1 minute')",
-                id,actor,kind.name(),kind==Kind.COMPANY_IMPORT?"UPLOADING":"QUEUED",kind==Kind.COMPANY_IMPORT?60:30);
+            jdbc.update("INSERT INTO transfer_job(id,requester_id,kind,state,expires_at,authorization_revision) VALUES (?,?,?,?,clock_timestamp()+? * interval '1 minute',(SELECT auth_revision FROM app_user WHERE id=?))",
+                id,actor,kind.name(),kind==Kind.COMPANY_IMPORT?"UPLOADING":"QUEUED",kind==Kind.COMPANY_IMPORT?60:30,actor);
             jdbc.update("INSERT INTO transfer_request VALUES (?,?,?,?,?,clock_timestamp()+interval '24 hours')",actor,kind.name(),requestKey,payloadHash,id);
             audit(id,Event.CREATED); return job(id);
         });
@@ -159,7 +162,7 @@ public class TransferJobs {
         if(limit<1||limit>100)throw new IllegalArgumentException("INVALID_PAGE_SIZE");
         return locked(() -> {
             var rows=jdbc.query("SELECT * FROM transfer_job WHERE requester_id=? AND (created_at,id)<(?,?) ORDER BY created_at DESC,id DESC LIMIT ?",ROW,actor,Timestamp.from(before),beforeId,limit);
-            return rows.stream().filter(this::permitted).toList();
+            return rows.stream().filter(j->permitted(j.requester(),j.kind())).toList();
         });
     }
     public UUID beginArtifact(Lease lease,String purpose,long limit) {
@@ -214,6 +217,7 @@ public class TransferJobs {
             var rows=jdbc.queryForList("SELECT * FROM transfer_artifact WHERE id=? FOR UPDATE",artifact);if(rows.isEmpty())return false;
             var a=rows.getFirst();var j=job((UUID)a.get("job_id"));String state=(String)a.get("state");
             if(state.equals("DELETED"))return false;
+            if(jdbc.queryForObject("SELECT count(*) FROM transfer_download WHERE artifact_id=? AND finished_at IS NULL AND expires_at>clock_timestamp()",Long.class,artifact)>0)return false;
             boolean expired=jdbc.queryForObject("SELECT expires_at<=clock_timestamp() FROM transfer_artifact WHERE id=?",Boolean.class,artifact);
             if(state.equals("AVAILABLE") && !fileExists) {
                 jdbc.update("UPDATE transfer_artifact SET state='MISSING' WHERE id=?",artifact);audit(j.id(),Event.FAILED);
@@ -234,6 +238,72 @@ public class TransferJobs {
         locked(() -> {
             var rows=jdbc.queryForList("SELECT job_id FROM transfer_artifact WHERE id=? AND state IN ('DELETING','MISSING') FOR UPDATE",artifact);
             if(!rows.isEmpty()) {jdbc.update("UPDATE transfer_artifact SET state='DELETED' WHERE id=?",artifact);audit((UUID)rows.getFirst().get("job_id"),Event.CLEANUP_COMPLETED);}return null;
+        });
+    }
+    public TransferJob status(UUID actor,UUID id,boolean personal) {
+        return locked(() -> {
+            var j=job(id);
+            if(!j.requester().equals(actor) || (j.kind()==Kind.PERSONAL_EXPORT)!=personal)throw new IllegalStateException("JOB_NOT_FOUND");
+            return owned(actor,id);
+        });
+    }
+    public List<TransferJob> list(UUID actor,Instant before,UUID beforeId,int limit,boolean personal) {
+        if(limit<1 || limit>100)throw new IllegalArgumentException("INVALID_PAGE_SIZE");
+        return locked(() -> {
+            if(!permitted(actor,personal?Kind.PERSONAL_EXPORT:Kind.COMPANY_EXPORT))throw new IllegalStateException("FORBIDDEN");
+            return jdbc.query("SELECT * FROM transfer_job WHERE requester_id=? AND (kind='PERSONAL_EXPORT')=? AND (created_at,id)<(?,?) ORDER BY created_at DESC,id DESC LIMIT ?",ROW,actor,personal,Timestamp.from(before),beforeId,limit+1);
+        });
+    }
+    public TransferJob cancel(UUID actor,UUID id,long version,UUID key,boolean personal) {
+        return locked(() -> {
+            var j=job(id);
+            if(!j.requester().equals(actor) || (j.kind()==Kind.PERSONAL_EXPORT)!=personal)throw new IllegalStateException("JOB_NOT_FOUND");
+            owned(actor,id);
+            jdbc.update("DELETE FROM transfer_request WHERE expires_at<=clock_timestamp()");
+            String hash=java.util.HexFormat.of().formatHex(com.lawrencenno.commonbeacon.transfer.archive.ArchiveCodec.sha256()
+                .digest((id+":"+version).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+            var prior=jdbc.queryForList("SELECT request_hash FROM transfer_request WHERE requester_id=? AND operation='CANCEL' AND request_key=?",String.class,actor,key);
+            if(!prior.isEmpty()) {
+                if(!prior.getFirst().equals(hash))throw new IllegalStateException("IDEMPOTENCY_CONFLICT");return j;
+            }
+            if(j.state()!=State.CANCELLED) {
+                if(j.version()!=version || j.terminal() || j.state()==State.COMMITTING)throw new IllegalStateException("JOB_CONFLICT");
+                jdbc.update("UPDATE transfer_job SET state='CANCELLED',version=version+1,worker_id=NULL,lease_until=NULL,updated_at=clock_timestamp() WHERE id=?",id);
+                endAttempt(id);audit(id,Event.CANCELLED);
+            }
+            jdbc.update("INSERT INTO transfer_request VALUES (?,'CANCEL',?,?,?,clock_timestamp()+interval '24 hours')",actor,key,hash,id);
+            return job(id);
+        });
+    }
+    public record Download(UUID artifact,long bytes,String hash,UUID lease) {}
+    private Download available(UUID actor,UUID id) {
+        var j=owned(actor,id);
+        if(j.state()!=State.READY)throw new IllegalStateException("JOB_CONFLICT");
+        var files=jdbc.query("SELECT a.id,a.byte_count,a.sha256 FROM transfer_completion c JOIN transfer_artifact a ON a.id=c.artifact_id WHERE c.job_id=? AND a.state='AVAILABLE' AND a.expires_at>clock_timestamp()",
+            (r,n)->new Download(r.getObject(1,UUID.class),r.getLong(2),r.getString(3),null),id);
+        if(files.isEmpty())throw new IllegalStateException("ARTIFACT_EXPIRED");return files.getFirst();
+    }
+    public boolean artifactAvailable(UUID actor,UUID id) {
+        return locked(() -> {
+            var j=owned(actor,id);if(j.state()!=State.READY)return false;
+            return jdbc.queryForObject("SELECT count(*) FROM transfer_completion c JOIN transfer_artifact a ON a.id=c.artifact_id WHERE c.job_id=? AND a.state='AVAILABLE' AND a.expires_at>clock_timestamp()",Long.class,id)>0;
+        });
+    }
+    public Download downloadInfo(UUID actor,UUID id) {return locked(() -> available(actor,id));}
+    public Download beginDownload(UUID actor,UUID id) {
+        return locked(() -> {
+            var file=available(actor,id);
+            if(jdbc.queryForObject("SELECT count(*) FROM transfer_download WHERE job_id=? AND finished_at IS NULL AND expires_at>clock_timestamp()",Long.class,id)>0)throw new IllegalStateException("DOWNLOAD_IN_PROGRESS");
+            UUID lease=UUID.randomUUID();jdbc.update("INSERT INTO transfer_download(id,job_id,artifact_id) VALUES (?,?,?)",lease,id,file.artifact());
+            audit(id,Event.DOWNLOAD_ATTEMPT);return new Download(file.artifact(),file.bytes(),file.hash(),lease);
+        });
+    }
+    public boolean downloadLive(UUID lease) {return jdbc.queryForObject("SELECT count(*) FROM transfer_download WHERE id=? AND finished_at IS NULL AND expires_at>clock_timestamp()",Long.class,lease)>0;}
+    public void finishDownload(UUID actor,UUID id,UUID lease,boolean delivered) {
+        locked(() -> {
+            var j=job(id);if(!j.requester().equals(actor))throw new IllegalStateException("JOB_NOT_FOUND");
+            int changed=jdbc.update("UPDATE transfer_download SET finished_at=clock_timestamp() WHERE id=? AND job_id=? AND finished_at IS NULL",lease,id);
+            if(changed==1 && delivered && permitted(actor,j.kind()))audit(id,Event.DOWNLOAD_COMPLETED);return null;
         });
     }
     public void releaseCleanedReservations() {

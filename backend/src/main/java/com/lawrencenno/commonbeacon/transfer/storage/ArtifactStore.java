@@ -9,6 +9,7 @@ public interface ArtifactStore {
     record Stored(UUID key,long bytes,String sha256) {}
     Stored write(UUID key,long limit,Writer writer) throws IOException;
     Optional<Stored> inspect(UUID key) throws IOException;
+    default InputStream open(UUID key) throws IOException {throw new IOException("ARTIFACT_READ_UNAVAILABLE");}
     void delete(UUID key) throws IOException;
     Set<UUID> keysOlderThan(Instant cutoff) throws IOException;
 }

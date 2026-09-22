@@ -234,7 +234,7 @@ class SearchIT {
         String schema = "search_upgrade_" + UUID.randomUUID().toString().replace("-", "");
         try {
             org.flywaydb.core.Flyway.configure().dataSource(dataSource).schemas(schema).defaultSchema(schema).target("8").load().migrate();
-            jdbc.update("INSERT INTO " + schema + ".app_user SELECT * FROM public.app_user WHERE id=?", author);
+            jdbc.update("INSERT INTO " + schema + ".app_user(id,email,display_name,password_hash,role,created_at) SELECT id,email,display_name,password_hash,role,created_at FROM public.app_user WHERE id=?", author);
             jdbc.update("INSERT INTO " + schema + ".board SELECT * FROM public.board WHERE id=?", board);
             UUID id = UUID.randomUUID();
             jdbc.update("INSERT INTO " + schema + ".question(id,board_id,author_id,title,body) VALUES (?,?,?,?,?)", id, board, author, "Earlier milestone question", "Migrating fictional telescopes safely");

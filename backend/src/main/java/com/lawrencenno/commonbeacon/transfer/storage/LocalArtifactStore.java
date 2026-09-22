@@ -106,6 +106,9 @@ public final class LocalArtifactStore implements ArtifactStore {
     @Override public void delete(UUID key) throws IOException {
         locked(() -> {for(String suffix:List.of(".part",".blob")){var file=path(key,suffix);safe(file);Files.deleteIfExists(file);}return null;});
     }
+    @Override public InputStream open(UUID key) throws IOException {
+        return locked(() -> {var file=path(key,".blob");safe(file);return Files.newInputStream(file,READ,LinkOption.NOFOLLOW_LINKS);});
+    }
     @Override public Set<UUID> keysOlderThan(Instant cutoff) throws IOException {
         return locked(() -> {
             var keys=new HashSet<UUID>();

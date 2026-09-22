@@ -49,6 +49,8 @@ public class SecurityConfiguration {
                 .requestMatchers(HttpMethod.PATCH, "/api/v1/boards/*").hasRole("ADMINISTRATOR")
                 .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**", "/api/v1/auth/csrf").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/auth/register", "/api/v1/auth/login").permitAll()
+                // Transfer controllers check authoritative database roles, including recent promotions.
+                .requestMatchers("/api/v1/admin/data/**").authenticated()
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMINISTRATOR")
                 .requestMatchers("/api/v1/moderation/**").hasAnyRole("MODERATOR", "ADMINISTRATOR")
                 .anyRequest().authenticated());

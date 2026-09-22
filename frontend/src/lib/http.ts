@@ -44,6 +44,8 @@ export async function getJson<T>(
           path === "/api/v1/reports" ||
           path.startsWith("/api/v1/moderation/") ||
           path.startsWith("/api/v1/admin/articles") ||
+          path.startsWith("/api/v1/account/data/") ||
+          path.startsWith("/api/v1/admin/data/") ||
           path.startsWith("/api/v1/articles") ||
           path.startsWith("/api/v1/search?") ||
           path.startsWith("/api/v1/boards/") ||

@@ -34,7 +34,7 @@ public solved status additionally requires that reply to be visible.
 
 V1-V5 establish the community; V6-V7 add reports and visibility history; V8 adds
 articles; V9 adds generated search vectors and partial GIN indexes; V10 adds private
-transfer metadata. Clean startup and forward upgrades from populated V5 and V9
+transfer metadata; V11 adds authorization revisions and download leases. Clean startup and forward upgrades from populated V5 and V9
 are tested with schema validation. This does
 not establish reverse migrations, old-binary compatibility, or zero-downtime upgrades.
 V9's stored-column/index work occurs during Flyway startup.
@@ -48,7 +48,8 @@ these transactions, after durable intent; a completion ledger and artifact metad
 publish atomically. Private files use generated keys outside the application tree.
 The store and reconciliation scheduler are disabled by default. See
 [storage and recovery](data-transfer-storage.md) for guarantees and limitations;
-export/import HTTP workflows remain unavailable.
+[current permissions and requester job/download APIs](data-transfer-access.md) are
+implemented. Export/import creation workflows remain unavailable.
 
 ## Moderation atomicity and concurrency
 
