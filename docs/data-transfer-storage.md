@@ -4,7 +4,7 @@ CommonBeacon has internal durable-job and private-artifact infrastructure for da
 transfers. [Requester access and protected downloads](data-transfer-access.md) are
 implemented, including [company export](data-transfer-access.md#company-export)
 and [personal export](personal-export.md), plus [quarantined upload and inspection](quarantine-upload.md).
-Live import activation remains future work. These classes
+[Bounded native activation](import-activation.md) and [transfer retention/operations](transfer-operations.md) are implemented. These classes
 are internal building blocks; accepting an actor UUID in a Java method is not an
 HTTP authorization mechanism.
 
@@ -22,15 +22,14 @@ digests return the original job, while mismatches fail. Request adapters
 calculate the digest from the canonical logical request, excluding transient
 authentication grants. V13 stores company export options alongside each job and
 a stable source-instance UUID. V14 adds bounded inspection results and upload/inspection
-audit events. V15 adds private staging, deterministic mappings and [dry-run review](import-dry-run.md). Confirmation remains later work.
+audit events. V15 adds private staging, deterministic mappings and [dry-run review](import-dry-run.md). V16 adds confirmation, atomic activation and immutable imported provenance.
 
-Short READ COMMITTED transactions lock the singleton coordination row, then the
+Short READ COMMITTED transactions acquire the shared migration gate, then lock the singleton coordination row, then the
 job and requester as needed. All foundation mutations use this order; file I/O
 runs outside coordination transactions; each export extraction holds its
 read-only database snapshot while writing the bounded intermediate file. Existing
-domain services do not acquire this
-transfer lock. Atomic live import needs an additional domain-wide write gate before
-it can be implemented. Row locking follows PostgreSQL's
+domain services acquire the shared migration gate but do not acquire this
+transfer lock. Atomic live import takes the exclusive migration gate. Row locking follows PostgreSQL's
 [transaction locking rules](https://www.postgresql.org/docs/18/applevel-consistency.html).
 
 The internal job methods check requester ownership and current database roles.
@@ -148,14 +147,16 @@ working space is released as described above. Failed staging mappings are remove
 A crash after rename but before the database publication transaction leaves an
 unavailable artifact. Recovery fences that attempt and removes the abandoned file;
 it does not infer success from the presence of a `.blob`. Completion records remain
-after artifact expiry. Retained job/audit metadata is not automatically purged yet;
-the broader retention/offboarding work adds that policy.
+after artifact expiry. Terminal audits and attempts expire after 30 days; ordinary
+job metadata is purged only after its files, request records and audit history are
+gone. Completed import receipts and provenance have a lifetime exception. See the
+[retention policy and runbooks](transfer-operations.md) for exact bounds and metrics.
 
 Audit records contain a job reference, fixed event name and timestamp. Requester
 and worker attribution comes from the job and attempt records. Events distinguish
 download attempts from completed server delivery; handlers record completion only
-after writing the verified response. Active download leases delay physical cleanup. Confirmation has a defined event value for
-the later confirmation handler. Events contain no content bodies, passwords,
+after writing the verified response. Active download and worker leases delay physical cleanup.
+Confirmation records its own event. Events contain no content bodies, passwords,
 authentication grants, supplied paths or raw exception messages. Reconciliation
 logs a structured failure event with exception types and application code locations,
 excluding raw exception messages (see [backend logging](logging.md)). This is not a tamper-proof external audit log.

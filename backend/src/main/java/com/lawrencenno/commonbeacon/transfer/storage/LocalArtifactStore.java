@@ -92,6 +92,9 @@ public final class LocalArtifactStore implements ArtifactStore {
             } catch(IOException | RuntimeException e) {Files.deleteIfExists(partial);throw e;}
         });
     }
+    @Override public Optional<Usage> usage() throws IOException {
+        return locked(()->Optional.of(new Usage(used(),quota,Files.getFileStore(root).getUsableSpace(),minimumFree)));
+    }
     @Override public Optional<Stored> inspect(UUID key) throws IOException {
         return locked(() -> {
             var file=path(key,".blob");safe(file);if(!Files.exists(file))return Optional.empty();

@@ -183,7 +183,7 @@ public class TransferJobs {
     public Inspection inspection(UUID actor,UUID id) {
         return locked(()->{
             ownedImport(actor,id);
-            return jdbc.query("SELECT * FROM transfer_inspection WHERE job_id=?",(r,n)->new Inspection(id,r.getString("archive_sha256"),r.getBoolean("valid"),r.getLong("rows_checked"),r.getLong("total_errors"),r.getString("issues"),r.getTimestamp("inspected_at").toInstant()),id)
+            return jdbc.query("SELECT i.* FROM transfer_inspection i JOIN transfer_artifact a ON a.id=i.artifact_id WHERE i.job_id=? AND a.state='AVAILABLE' AND a.expires_at>clock_timestamp()",(r,n)->new Inspection(id,r.getString("archive_sha256"),r.getBoolean("valid"),r.getLong("rows_checked"),r.getLong("total_errors"),r.getString("issues"),r.getTimestamp("inspected_at").toInstant()),id)
                 .stream().findFirst().orElseThrow(()->new IllegalStateException("JOB_CONFLICT"));
         });
     }
@@ -315,7 +315,7 @@ public class TransferJobs {
     }
     public record Artifact(UUID id,UUID jobId,String state,long fence,Instant createdAt,Long bytes,String hash) {}
     public List<Artifact> artifacts() {
-        return jdbc.query("SELECT id,job_id,state,fence,created_at,byte_count,sha256 FROM transfer_artifact WHERE state<>'DELETED' ORDER BY created_at,id LIMIT 10000",(r,n)->new Artifact(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getString(3),r.getLong(4),r.getTimestamp(5).toInstant(),r.getObject(6,Long.class),r.getString(7)));
+        return jdbc.query("SELECT id,job_id,state,fence,created_at,byte_count,sha256 FROM transfer_artifact WHERE state<>'DELETED' ORDER BY (state IN ('DELETING','MISSING') OR expires_at<=clock_timestamp()) DESC,created_at,id LIMIT 10000",(r,n)->new Artifact(r.getObject(1,UUID.class),r.getObject(2,UUID.class),r.getString(3),r.getLong(4),r.getTimestamp(5).toInstant(),r.getObject(6,Long.class),r.getString(7)));
     }
     public Set<UUID> knownArtifactKeys() {return new HashSet<>(jdbc.queryForList("SELECT id FROM transfer_artifact WHERE state<>'DELETED'",UUID.class));}
     public boolean needsCleanup(UUID artifact,boolean fileExists) {
@@ -325,6 +325,9 @@ public class TransferJobs {
             var a=rows.getFirst();var j=job((UUID)a.get("job_id"));String state=(String)a.get("state");
             if(state.equals("DELETED"))return false;
             if(jdbc.queryForObject("SELECT count(*) FROM transfer_download WHERE artifact_id=? AND finished_at IS NULL AND expires_at>clock_timestamp()",Long.class,artifact)>0)return false;
+            // Recovery fences expired jobs first. A live worker still owns its input/output.
+            if(!j.terminal() && j.worker()!=null && (state.equals("AVAILABLE") || j.fence()==((Number)a.get("fence")).longValue())
+                    && jdbc.queryForObject("SELECT lease_until>clock_timestamp() FROM transfer_job WHERE id=?",Boolean.class,j.id()))return false;
             boolean expired=jdbc.queryForObject("SELECT expires_at<=clock_timestamp() FROM transfer_artifact WHERE id=?",Boolean.class,artifact);
             if(state.equals("AVAILABLE") && !fileExists) {
                 jdbc.update("UPDATE transfer_artifact SET state='MISSING' WHERE id=?",artifact);audit(j.id(),Event.FAILED);
@@ -432,9 +435,47 @@ public class TransferJobs {
             """);
     }
     public void releaseCleanedReservations() {
-        locked(() -> {recoverLocked();jdbc.update("DELETE FROM transfer_mapping m USING transfer_job j WHERE m.job_id=j.id AND j.state IN ("+TERMINAL+")");
-            jdbc.update("DELETE FROM transfer_stage s USING transfer_job j WHERE s.job_id=j.id AND j.state IN ("+TERMINAL+")");
-            jdbc.update("DELETE FROM transfer_dry_run d USING transfer_job j WHERE d.job_id=j.id AND j.state IN ("+TERMINAL+")");
+        locked(() -> {recoverLocked();
+            var terminal=jdbc.queryForList("SELECT j.id FROM transfer_job j WHERE j.state IN ("+TERMINAL+") AND (EXISTS (SELECT 1 FROM transfer_dry_run d WHERE d.job_id=j.id) OR EXISTS (SELECT 1 FROM transfer_mapping m WHERE m.job_id=j.id) OR EXISTS (SELECT 1 FROM transfer_inspection i WHERE i.job_id=j.id)) ORDER BY j.updated_at,j.id LIMIT 100",UUID.class);
+            for(var id:terminal)for(var table:List.of("transfer_mapping","transfer_stage","transfer_dry_run","transfer_inspection"))
+                jdbc.update("DELETE FROM "+table+" WHERE job_id=?",id);
             reconcileReservationsLocked();return null;});
+    }
+
+    /** Separate metadata policy; immutable imported provenance and activation receipts survive. */
+    public void purgeExpiredMetadata() {
+        locked(()->{
+            jdbc.update("DELETE FROM transfer_request WHERE (requester_id,operation,request_key) IN (SELECT requester_id,operation,request_key FROM transfer_request WHERE expires_at<=clock_timestamp() LIMIT 1000)");
+            jdbc.update("DELETE FROM transfer_download WHERE id IN (SELECT id FROM transfer_download WHERE expires_at<=clock_timestamp() LIMIT 1000)");
+            jdbc.update("DELETE FROM transfer_audit WHERE id IN (SELECT a.id FROM transfer_audit a JOIN transfer_job j ON j.id=a.job_id WHERE j.state IN ("+TERMINAL+") AND a.created_at<clock_timestamp()-interval '30 days' LIMIT 1000)");
+            jdbc.update("DELETE FROM transfer_attempt WHERE (job_id,fence) IN (SELECT a.job_id,a.fence FROM transfer_attempt a JOIN transfer_job j ON j.id=a.job_id WHERE j.state IN ("+TERMINAL+") AND a.finished_at<clock_timestamp()-interval '30 days' LIMIT 1000)");
+            var expired=jdbc.queryForList("""
+                SELECT j.id FROM transfer_job j WHERE j.state IN ('READY','FAILED','CANCELLED')
+                  AND j.updated_at<clock_timestamp()-interval '30 days' AND j.reserved_bytes=0
+                  AND NOT EXISTS (SELECT 1 FROM transfer_artifact a WHERE a.job_id=j.id AND a.state<>'DELETED')
+                  AND NOT EXISTS (SELECT 1 FROM transfer_request r WHERE r.job_id=j.id)
+                  AND NOT EXISTS (SELECT 1 FROM transfer_download d WHERE d.job_id=j.id)
+                  AND NOT EXISTS (SELECT 1 FROM transfer_audit a WHERE a.job_id=j.id)
+                  AND NOT EXISTS (SELECT 1 FROM imported_record r WHERE r.job_id=j.id)
+                ORDER BY j.updated_at,j.id LIMIT 100
+                """,UUID.class);
+            for(var id:expired) {
+                for(var table:List.of("transfer_stage","transfer_mapping","transfer_dry_run","transfer_inspection",
+                        "transfer_activation","transfer_completion","transfer_attempt","transfer_artifact"))
+                    jdbc.update("DELETE FROM "+table+" WHERE job_id=?",id);
+                jdbc.update("DELETE FROM transfer_job WHERE id=?",id);
+            }
+            return null;
+        });
+    }
+
+    public Map<String,Long> operationalSnapshot() {
+        var result=new LinkedHashMap<String,Long>();
+        result.put("reserved_bytes",jdbc.queryForObject("SELECT coalesce(sum(reserved_bytes),0) FROM transfer_job",Long.class));
+        result.put("cleanup_backlog",jdbc.queryForObject("SELECT count(*) FROM transfer_artifact WHERE state<>'DELETED' AND (state IN ('DELETING','MISSING') OR expires_at<=clock_timestamp())",Long.class));
+        result.put("staged_bytes",jdbc.queryForObject("SELECT coalesce(sum(byte_count),0) FROM transfer_stage",Long.class));
+        result.put("stale_jobs",jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE state NOT IN ("+TERMINAL+") AND (expires_at<=clock_timestamp() OR lease_until<=clock_timestamp())",Long.class));
+        result.put("active_jobs",jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE state NOT IN ("+TERMINAL+")",Long.class));
+        return Map.copyOf(result);
     }
 }

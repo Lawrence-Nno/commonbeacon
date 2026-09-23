@@ -34,6 +34,8 @@ class LocalArtifactStoreTest {
     }
     @Test void quotaIncludesExistingFilesAndDeletionIsIdempotent() throws IOException {
         var store=new LocalArtifactStore(root,10,0);UUID key=UUID.randomUUID();store.write(key,8,o->o.write(new byte[8]));
+        var usage=store.usage().orElseThrow();assertThat(usage.usedBytes()).isEqualTo(8);
+        assertThat(usage.quotaBytes()).isEqualTo(10);assertThat(usage.usableBytes()).isPositive();assertThat(usage.minimumFreeBytes()).isZero();
         assertThatThrownBy(()->store.write(UUID.randomUUID(),3,o->o.write(1))).hasMessage("ARTIFACT_QUOTA_EXCEEDED");
         store.delete(key);store.delete(key);assertThat(store.inspect(key)).isEmpty();
     }
@@ -51,6 +53,8 @@ class LocalArtifactStoreTest {
         assertThatThrownBy(()->new LocalArtifactStore(Path.of("").toAbsolutePath().resolve("public"),10000,0)).hasMessage("ARTIFACT_ROOT_MUST_BE_EXTERNAL");
         var store=new LocalArtifactStore(root,10000,0);UUID key=UUID.randomUUID();Files.createDirectory(root.resolve(key+".blob"));
         assertThatThrownBy(()->store.inspect(key)).hasMessage("UNSAFE_ARTIFACT_PATH");
+        assertThatThrownBy(()->store.delete(key)).hasMessage("UNSAFE_ARTIFACT_PATH");
+        assertThat(root.resolve(key+".blob")).isDirectory();
     }
     @Test void refusesTakingOverAnUnrelatedDirectory() throws IOException {
         Files.writeString(root.resolve("important.txt"),"keep");

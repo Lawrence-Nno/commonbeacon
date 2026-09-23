@@ -47,6 +47,11 @@ emit `transfer.reconciliation_failed`; download I/O failures emit
 state and audit history remain authoritative for cancellation, recovery and
 terminal outcomes.
 
+Cleanup also emits per-job `transfer.cleanup_failed`, root/orphan scan failure
+events, and a numeric `transfer.storage_snapshot` after database housekeeping.
+See [transfer operations](transfer-operations.md) for retention, Micrometer gauges,
+failure retry behavior and disk-pressure/missing-artifact/stuck-job runbooks.
+
 ## Boundaries and remaining production work
 
 This is an application logging foundation, not complete production observability.

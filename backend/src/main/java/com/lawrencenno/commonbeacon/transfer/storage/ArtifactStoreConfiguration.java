@@ -30,7 +30,7 @@ public class ArtifactStoreConfiguration {
         return new com.lawrencenno.commonbeacon.transfer.inspection.ImportDryRunWorker(jobs,store,dryRuns);
     }
     @Bean TransferWorker transferWorker(TransferJobs jobs,ArtifactStore store) {return new TransferWorker(jobs,store);}
-    @Bean ArtifactReconciler artifactReconciler(TransferJobs jobs,ArtifactStore store) {return new ArtifactReconciler(jobs,store);}
+    @Bean ArtifactReconciler artifactReconciler(TransferJobs jobs,ArtifactStore store,io.micrometer.core.instrument.MeterRegistry registry) {return new ArtifactReconciler(jobs,store,registry);}
     @Bean ArtifactStore artifactStore(@Value("${commonbeacon.transfer.storage.directory}") String directory) throws IOException {
         return new LocalArtifactStore(Path.of(directory),2147483648L,1073741824L);
     }

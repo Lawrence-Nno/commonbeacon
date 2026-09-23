@@ -7,6 +7,8 @@ import java.util.*;
 public interface ArtifactStore {
     @FunctionalInterface interface Writer { void write(OutputStream output) throws IOException; }
     record Stored(UUID key,long bytes,String sha256) {}
+    record Usage(long usedBytes,long quotaBytes,long usableBytes,long minimumFreeBytes) {}
+    default Optional<Usage> usage() throws IOException {return Optional.empty();}
     Stored write(UUID key,long limit,Writer writer) throws IOException;
     Optional<Stored> inspect(UUID key) throws IOException;
     default InputStream open(UUID key) throws IOException {throw new IOException("ARTIFACT_READ_UNAVAILABLE");}

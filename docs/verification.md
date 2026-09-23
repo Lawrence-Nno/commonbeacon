@@ -228,6 +228,23 @@ stage9-smoke.log, stage9-persistence.log and stage9-cleanup.log. These are local
 working-tree results, not remote CI or production capacity certification. Staging,
 target-state review, activation and the upload UI remain subsequent stages.
 
+On 2026-09-23, local transfer-retention changes based on pushed `c08c638` passed
+`scripts/verify.ps1`: 297 backend tests (60 unit and 237 integration), 164 frontend
+tests, lint, type checking and production build. All 16 browser tests passed,
+including fresh-target native activation. Persistence across backend/database
+restarts and Compose down/up retained archive bytes, import inspection, staged
+payloads, review fingerprints and community data. Injected-failure cleanup passed.
+
+New coverage verifies failed deletion without blocking other jobs, expired details
+denied before sweeping, download/worker lease protection, publication races,
+thirty-day metadata retention and durable imported provenance/reconciliation.
+Cleanup during the exclusive activation gate cannot remove its input or staging.
+Filesystem tests check measured usage and refusal to delete nonregular paths.
+See [transfer operations](transfer-operations.md) for policy and metrics. Tests used
+disposable resources; development volumes and running services were preserved.
+These are working-tree results, not exact-revision remote CI or production capacity
+certification. No Stage 13 development deployment or schema migration was performed.
+
 ## Query-plan evidence
 
 The [evidence directory](evidence/README.md) contains captured PostgreSQL plans for

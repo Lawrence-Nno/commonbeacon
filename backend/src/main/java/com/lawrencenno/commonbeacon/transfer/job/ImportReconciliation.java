@@ -26,7 +26,7 @@ public class ImportReconciliation {
             jobs.recoverLocked();var job=jobs.ownedImport(actor,id);if(!job.terminal())throw new IllegalStateException("JOB_CONFLICT");
             boolean complete=job.state()==TransferJob.State.COMPLETED;
             var receipts=jdbc.queryForList("SELECT review::text FROM transfer_activation WHERE job_id=?",String.class,id);
-            if(!complete && receipts.isEmpty())receipts=jdbc.queryForList("SELECT report::text FROM transfer_dry_run WHERE job_id=? AND report IS NOT NULL",String.class,id);
+            if(!complete && receipts.isEmpty())receipts=jdbc.queryForList("SELECT report::text FROM transfer_dry_run WHERE job_id=? AND report IS NOT NULL AND expires_at>clock_timestamp()",String.class,id);
             if(complete && receipts.isEmpty())throw new com.lawrencenno.commonbeacon.shared.ApiFailure(503,"TRANSFER_UNAVAILABLE","The activation receipt is unavailable. Retry reconciliation later.");
             if(complete && jdbc.queryForObject("SELECT count(*) FROM transfer_completion WHERE job_id=? AND fence=? AND artifact_id IS NULL",Long.class,id,job.fence())!=1)throw new IllegalStateException("JOB_CONFLICT");
             var result=JSON.createObjectNode().put("jobId",id.toString()).put("state",job.state().name()).put("detailsAvailable",!receipts.isEmpty());

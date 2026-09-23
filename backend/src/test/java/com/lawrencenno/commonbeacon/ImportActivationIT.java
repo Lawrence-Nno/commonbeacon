@@ -207,6 +207,10 @@ class ImportActivationIT {
             var worker=pool.submit(()->activation.runOnce());assertThat(entered.await(10,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
             try {
                 assertThat(count("board")).isZero();assertThat(count("question")).isZero();
+                long staged=count("transfer_stage");
+                assertThatThrownBy(()->new ArtifactReconciler(jobs,store).reconcile()).isInstanceOf(com.lawrencenno.commonbeacon.shared.ApiFailure.class);
+                assertThat(count("transfer_stage")).isEqualTo(staged);
+                assertThat(store.inspect(jdbc.queryForObject("SELECT artifact_id FROM transfer_dry_run WHERE job_id=?",UUID.class,id))).isPresent();
                 try(var reader=new Browser(null)) {
                     var response=reader.get("/api/v1/search?q=accepted");assertThat(response.statusCode()).isEqualTo(200);
                     assertThat(json.readTree(response.body()).path("totalElements").asLong()).isZero();assertThat(json.readTree(reader.get("/api/v1/boards").body()).size()).isZero();
@@ -275,6 +279,31 @@ class ImportActivationIT {
         UUID id=confirmed();var claim=activation.claim().orElseThrow();activation.activate(claim.lease());
         jdbc.update("UPDATE transfer_job SET state='COMMITTING',worker_id=?,lease_until=clock_timestamp()-interval '1 second' WHERE id=?",claim.worker(),id);
         assertThat(activation.runOnce()).isFalse();assertThat(jobs.status(admin,id).state()).isEqualTo(TransferJob.State.COMPLETED);assertThat(count("imported_record")).isEqualTo(19);assertThat(count("transfer_completion")).isEqualTo(1);
+    }
+    @Test void retentionNeverDeletesActivatedDomainDataOrDurableReconciliation()throws Exception {
+        UUID id=confirmed();activation.runOnce();String before=domain();
+        jdbc.update("UPDATE transfer_job SET updated_at=clock_timestamp()-interval '31 days' WHERE id=?",id);
+        jdbc.update("UPDATE transfer_audit SET created_at=clock_timestamp()-interval '31 days' WHERE job_id=?",id);
+        jdbc.update("UPDATE transfer_attempt SET finished_at=clock_timestamp()-interval '31 days' WHERE job_id=?",id);
+        jdbc.update("UPDATE transfer_request SET expires_at=clock_timestamp()-interval '1 second' WHERE job_id=?",id);
+        jobs.releaseCleanedReservations();jobs.purgeExpiredMetadata();
+        assertThat(domain()).isEqualTo(before);assertThat(count("imported_record")).isEqualTo(19);
+        assertThat(count("transfer_stage")).isZero();assertThat(count("transfer_inspection")).isZero();
+        assertThat(count("transfer_audit")).isZero();assertThat(count("transfer_attempt")).isZero();
+        assertThat(new ImportReconciliation(jobs,jdbc).report(admin,id,null).path("state").asText()).isEqualTo("COMPLETED");
+        assertThat(count("transfer_activation")).isEqualTo(1);assertThat(count("transfer_completion")).isEqualTo(1);
+    }
+    @Test void expiredInspectionAndUnconfirmedReviewAreDeniedBeforeSweep()throws Exception {
+        UUID id=inspected(fixture("company-full"));reviewed(id);
+        var j=jobs.status(admin,id);jobs.cancel(admin,id,j.version());
+        jdbc.update("UPDATE transfer_artifact SET expires_at=clock_timestamp()-interval '1 second' WHERE job_id=?",id);
+        jdbc.update("UPDATE transfer_dry_run SET expires_at=clock_timestamp()-interval '1 second' WHERE job_id=?",id);
+        assertThat(count("transfer_inspection")).isEqualTo(1);assertThat(count("transfer_stage")).isPositive();
+        assertThatThrownBy(()->jobs.inspection(admin,id)).hasMessage("JOB_CONFLICT");
+        assertThat(reconciliation.report(admin,id,null).path("detailsAvailable").asBoolean()).isFalse();
+        new ArtifactReconciler(jobs,store).reconcile();
+        assertThat(count("transfer_inspection")).isZero();assertThat(count("transfer_stage")).isZero();
+        assertThat(count("board")).isZero();
     }
     @Test void statementTimeoutRollsBackPublishedGroups()throws Exception {
         UUID id=confirmed();String before=domain();PHASE.set(p->{if(p.equals("questions"))jdbc.execute("SELECT pg_sleep(26)");});

@@ -227,4 +227,87 @@ class TransferFoundationIT {
         assertThat(store.inspect(key)).isEmpty();assertThat(jobs.status(admin,j.id()).state()).isEqualTo(State.READY);
         assertThat(jobs.claim(UUID.randomUUID())).isEmpty();
     }
+    class DelegatingStore implements ArtifactStore {
+        public Stored write(UUID k,long limit,Writer w)throws IOException{return store.write(k,limit,w);}
+        public Optional<Stored> inspect(UUID k)throws IOException{return store.inspect(k);}
+        public void delete(UUID k)throws IOException{store.delete(k);}
+        public Set<UUID> keysOlderThan(Instant t)throws IOException{return store.keysOlderThan(t);}
+        public Optional<Usage> usage()throws IOException{return store.usage();}
+    }
+    UUID exported(UUID actor) {
+        var job=create(actor);new TransferWorker(jobs,store).runExportOnce((j,out,progress)->out.write(1));return job.id();
+    }
+    UUID artifact(UUID id){return jdbc.queryForObject("SELECT artifact_id FROM transfer_completion WHERE job_id=?",UUID.class,id);}
+    @Test void failedDeletionDoesNotBlockOtherFilesOrMetadataAndMetricsRecoverAfterRestart()throws Exception {
+        UUID first=exported(admin),second=exported(other),broken=artifact(first),healthy=artifact(second);
+        jdbc.update("UPDATE transfer_artifact SET expires_at=clock_timestamp()-interval '1 second'");
+        jdbc.update("UPDATE transfer_request SET expires_at=clock_timestamp()-interval '1 second'");
+        var registry=new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+        var reconciler=new ArtifactReconciler(jobs,new DelegatingStore(){
+            @Override public Optional<Stored> inspect(UUID k)throws IOException{if(k.equals(broken))throw new IOException("private path");return super.inspect(k);}
+            @Override public void delete(UUID k)throws IOException{if(k.equals(broken))throw new IOException("private path");super.delete(k);}
+        },registry);
+        assertThatThrownBy(reconciler::reconcile).isInstanceOf(IOException.class);
+        assertThat(store.inspect(healthy)).isEmpty();assertThat(store.inspect(broken)).isPresent();
+        assertThatThrownBy(()->jobs.beginDownload(admin,first)).hasMessage("ARTIFACT_EXPIRED");
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_request",Long.class)).isZero();
+        assertThat(registry.get("commonbeacon.transfer.cleanup_backlog").gauge().value()).isEqualTo(1);
+        assertThat(registry.get("commonbeacon.transfer.cleanup_failures").gauge().value()).isEqualTo(1);
+        assertThat(registry.get("commonbeacon.transfer.cleanup_last_success_seconds").gauge().value()).isZero();
+        var restarted=new ArtifactReconciler(new TransferJobs(jdbc,transactions),store,new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+        restarted.reconcile();assertThat(store.inspect(broken)).isEmpty();assertThat(reserved(first)).isZero();
+        assertThat(jobs.status(admin,first).state()).isEqualTo(State.READY);
+    }
+    @Test void cleanupHonorsDownloadLeaseThenReclaimsExpiredArchive()throws Exception {
+        UUID id=exported(admin),key=artifact(id);var download=jobs.beginDownload(admin,id);
+        jdbc.update("UPDATE transfer_artifact SET expires_at=clock_timestamp()-interval '1 second' WHERE id=?",key);
+        new ArtifactReconciler(jobs,store).reconcile();assertThat(store.inspect(key)).isPresent();
+        assertThatThrownBy(()->jobs.beginDownload(admin,id)).hasMessage("ARTIFACT_EXPIRED");
+        jdbc.update("UPDATE transfer_download SET expires_at=clock_timestamp()-interval '1 second' WHERE id=?",download.lease());
+        new ArtifactReconciler(jobs,store).reconcile();assertThat(store.inspect(key)).isEmpty();
+        jobs.finishDownload(admin,id,download.lease(),false);
+    }
+    @Test void liveWorkerInputSurvivesArtifactExpiryUntilJobIsFenced()throws Exception {
+        var id=create(admin).id();var lease=jobs.claim(UUID.randomUUID()).orElseThrow().lease();
+        var key=jobs.beginArtifact(lease,"INTERMEDIATE",100);store.write(key,100,out->out.write(1));
+        jdbc.update("UPDATE transfer_artifact SET expires_at=clock_timestamp()-interval '1 second' WHERE id=?",key);
+        new ArtifactReconciler(jobs,store).reconcile();assertThat(store.inspect(key)).isPresent();
+        jdbc.update("UPDATE transfer_job SET expires_at=clock_timestamp()-interval '1 second' WHERE id=?",id);
+        new ArtifactReconciler(jobs,store).reconcile();assertThat(store.inspect(key)).isEmpty();
+        assertThatThrownBy(()->jobs.beginArtifact(lease,"DOWNLOAD",100)).hasMessage("STALE_LEASE");
+    }
+    @Test void writingSnapshotCannotMisdiagnoseConcurrentPublication()throws Exception {
+        var id=create(admin).id();var lease=jobs.claim(UUID.randomUUID()).orElseThrow().lease();
+        var key=jobs.beginArtifact(lease,"DOWNLOAD",100);var file=store.write(key,100,out->out.write(1));
+        var racingJobs=new TransferJobs(jdbc,transactions){
+            @Override public List<Artifact> artifacts(){var snapshot=super.artifacts();jobs.publish(lease,key,file.bytes(),file.sha256());return snapshot;}
+        };
+        new ArtifactReconciler(racingJobs,new DelegatingStore(){
+            @Override public Optional<Stored> inspect(UUID k){throw new AssertionError("WRITING snapshot must not inspect publication");}
+        }).reconcile();
+        assertThat(store.inspect(key)).isPresent();assertThat(jobs.downloadInfo(admin,id).artifact()).isEqualTo(key);
+    }
+    @Test void thirtyDayMetadataPurgeIsBoundedAndPreservesRecentAndActiveJobs()throws Exception {
+        var old=create(admin);jobs.cancel(admin,old.id(),old.version());
+        var recent=create(admin);jobs.cancel(admin,recent.id(),recent.version());var active=create(other);
+        jdbc.update("UPDATE transfer_job SET updated_at=clock_timestamp()-interval '31 days' WHERE id=?",old.id());
+        jdbc.update("UPDATE transfer_audit SET created_at=clock_timestamp()-interval '31 days' WHERE job_id=?",old.id());
+        jdbc.update("UPDATE transfer_request SET expires_at=clock_timestamp()-interval '1 second' WHERE job_id=?",old.id());
+        new ArtifactReconciler(jobs,store).reconcile();
+        assertThatThrownBy(()->jobs.status(admin,old.id())).hasMessage("JOB_NOT_FOUND");
+        assertThat(jobs.status(admin,recent.id()).state()).isEqualTo(State.CANCELLED);
+        assertThat(jobs.status(other,active.id()).state()).isEqualTo(State.QUEUED);
+        assertThat(events(recent.id(),"CANCELLED")).isEqualTo(1);
+    }
+    @Test void oldJobWithUnremovedArtifactIsNeverPurged()throws Exception {
+        UUID id=exported(admin),key=artifact(id);
+        jdbc.update("UPDATE transfer_job SET updated_at=clock_timestamp()-interval '31 days' WHERE id=?",id);
+        jdbc.update("UPDATE transfer_audit SET created_at=clock_timestamp()-interval '31 days' WHERE job_id=?",id);
+        jdbc.update("UPDATE transfer_request SET expires_at=clock_timestamp()-interval '1 second' WHERE job_id=?",id);
+        jdbc.update("UPDATE transfer_artifact SET expires_at=clock_timestamp()-interval '1 second' WHERE id=?",key);
+        assertThatThrownBy(()->new ArtifactReconciler(jobs,new DelegatingStore(){
+            @Override public void delete(UUID k)throws IOException{throw new IOException("busy");}
+        }).reconcile()).isInstanceOf(IOException.class);
+        assertThat(jobs.status(admin,id).state()).isEqualTo(State.READY);assertThat(reserved(id)).isPositive();
+    }
 }
