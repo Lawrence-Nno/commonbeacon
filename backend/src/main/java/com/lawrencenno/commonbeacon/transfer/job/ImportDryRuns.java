@@ -182,6 +182,8 @@ public class ImportDryRuns {
             var target=target();report.set("target",target);report.put("targetGeneration",target.path("generation").asLong());
             if(!target.path("eligible").asBoolean())error.accept(new ArchiveFormat.Issue("target",0,"TARGET_NOT_EMPTY_BOOTSTRAP"));
             var warnings=report.putArray("warnings");var acknowledgements=report.putArray("requiredAcknowledgements");
+            if(jobs.job(id).provider()==Provider.DISCOURSE)
+                com.lawrencenno.commonbeacon.transfer.inspection.DiscourseArchive.WARNINGS.forEach(warnings::add);
             if(counts.path("users").asLong()>0){warnings.add("IMPORTED_AUTHORS_INACTIVE");acknowledgements.add("IMPORTED_AUTHORS_INACTIVE");}
             acknowledgements.add("PRIVATE_CONTENT");
             if(manifest!=null) {

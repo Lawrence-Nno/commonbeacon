@@ -96,6 +96,7 @@ See the [onboarding walkthrough](docs/demo-walkthrough.md) and
 - [Isolated browser tests](docs/browser-testing.md)
 - [Atomic native import activation](docs/import-activation.md)
 - [Import screens and reconciliation](docs/import-ui.md)
+- [Discourse 3.5.0 adapter compatibility and export helper](docs/discourse-import.md)
 - [Transfer retention, metrics and recovery runbooks](docs/transfer-operations.md)
 - [REST API examples](docs/api.md) and [OpenAPI contract](docs/openapi.json)
 - [Architecture decisions](docs/architecture.md)

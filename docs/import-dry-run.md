@@ -38,12 +38,19 @@ and report digests; older reviews require a new dry run.
 
 ## Validation and identity rules
 
-The worker rehashes the private ZIP and repeats strict native-v1 schema, file-set,
+The worker rehashes the private upload. NATIVE repeats strict native-v1 schema, file-set,
 integrity and full graph validation. Checks include required authors/references,
 acceptances belonging to the right question and a visible reply, unique slugs,
 article publication lifecycle, report targets/resolution, timestamp ordering and
 unique effective origins within each entity. Unsupported archive entries, including
 attachments, are rejected. Native import does not silently discard records.
+
+DISCOURSE first repeats strict bundle validation and deterministic conversion,
+then uses the same native schema/relationship checks and staging methods. The
+original uploaded JSON hash remains the confirmation/activation input hash.
+The adapter's fixed loss warnings are added to the saved review and required
+acknowledgements; they cannot be removed by omitting source-supplied warnings.
+See [Discourse compatibility](discourse-import.md) for its explicit scope.
 
 Local IDs are deterministic for job/entity/source ID. A different job receives
 separate mappings. Existing local ID collisions block review. Matching source IDs

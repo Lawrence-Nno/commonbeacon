@@ -5,7 +5,8 @@ import java.util.UUID;
 
 public record TransferJob(UUID id, UUID requester, Kind kind, State state, long version,
         long fence, int attempts, UUID worker, Instant leaseUntil, long checkpoint,
-        Instant createdAt, Instant updatedAt, Instant expiresAt, Failure errorCode) {
+        Instant createdAt, Instant updatedAt, Instant expiresAt, Failure errorCode, Provider provider) {
+    public enum Provider { NATIVE, DISCOURSE }
     public enum Kind { COMPANY_EXPORT, PERSONAL_EXPORT, COMPANY_IMPORT }
     public enum State { QUEUED, RUNNING, READY, FAILED, CANCELLED, UPLOADING, UPLOADED,
         VALIDATING, REVIEW_REQUIRED, READY_TO_COMMIT, COMMITTING, COMPLETED }

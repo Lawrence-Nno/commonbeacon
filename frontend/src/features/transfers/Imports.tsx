@@ -17,6 +17,11 @@ const terminal = (j: Job) => ["COMPLETED", "FAILED", "CANCELLED"].includes(j.sta
 const denied = (e: unknown) => e instanceof ApiError && (e.status === 401 || e.status === 403 && e.code !== "RECENT_AUTH_REQUIRED");
 const message = (e: unknown) => e instanceof Error ? e.message : "Import unavailable. Check status before continuing.";
 const warningText: Record<string, string> = {
+  DISCOURSE_PLAIN_TEXT: "Discourse markup is preserved as literal text; formatting, mentions and embeds are not rendered.",
+  DISCOURSE_FLATTENED_THREADS: "Subcategories become separate boards and nested replies become flat replies.",
+  DISCOURSE_ATTACHMENTS_EXCLUDED: "Attachment files are not copied. Source references remain text and may become unavailable.",
+  DISCOURSE_FEATURES_EXCLUDED: "Accepted answers, tags, votes, polls, revisions, closed/archive state and plugin data are excluded.",
+  DISCOURSE_PUBLIC_CATEGORIES_ONLY: "Only selected public categories are included; private messages, deleted content and category description topics are excluded.",
   IMPORTED_AUTHORS_INACTIVE: "Imported authors remain inactive and cannot sign in.",
   IMPORTED_HISTORY_PROVENANCE: "Moderation history is imported source history; historical roles grant no local permissions.",
   IDENTITIES_REMAIN_SEPARATE: "Matching names, source IDs or contact emails do not merge accounts or prove ownership.",
@@ -40,6 +45,7 @@ type Prompt = { kind: "upload" } | { kind: "activate"; job: Job; review: Review;
 function ImportScreen({ actorId, id, history, onDenied }: { actorId: string; id?: string; history: boolean; onDenied: () => void }) {
   const client = useQueryClient(), navigate = useNavigate();
   const [created, setCreated] = useState<Job>(); const selected = id ?? created?.id;
+  const [provider, setProvider] = useState<"NATIVE" | "DISCOURSE">("NATIVE");
   const [file, setFile] = useState<File>(); const [fileVersion, setFileVersion] = useState(0);
   const [busy, setBusy] = useState(false), [uploading, setUploading] = useState(false), [sent, setSent] = useState(0);
   const [error, setError] = useState(""), [notice, setNotice] = useState("");
@@ -81,6 +87,8 @@ function ImportScreen({ actorId, id, history, onDenied }: { actorId: string; id?
       } catch (e) { if (!signal.aborted && denied(e)) onDenied(); throw e; }
     }, gcTime: 0, retry: false, refetchInterval: busy || prompt ? false : 5000, refetchOnWindowFocus: !busy && !prompt });
   const job = detail.data?.job ?? created, review = detail.data?.review;
+  const selectedProvider = job?.provider ?? provider;
+  const discourse = selectedProvider === "DISCOURSE";
   const safe = !!review && review.fresh && review.eligible && review.activationAvailable && review.validationVersion === 2 && !!review.sourceOptions
     && Date.parse(review.expiresAt) > now && job?.state === "READY_TO_COMMIT" && !detail.isError;
   const required = ["PRIVATE_CONTENT", "INACTIVE_AUTHORS", ...(review?.warnings ?? [])];
@@ -92,13 +100,13 @@ function ImportScreen({ actorId, id, history, onDenied }: { actorId: string; id?
     window.setTimeout(() => { URL.revokeObjectURL(url); current.urls.delete(url); }, 1000);
   }
   function choose(next?: File) {
-    setError(""); if (next && (!next.name.toLowerCase().endsWith(".zip") || next.size < 1 || next.size > 67108864)) { setFile(undefined); setFileVersion(v => v + 1); setError("Choose a nonempty .zip file no larger than 64 MiB."); return; }
+    setError(""); if (next && (!next.name.toLowerCase().endsWith(discourse ? ".json" : ".zip") || next.size < 1 || next.size > (discourse ? 8388608 : 67108864))) { setFile(undefined); setFileVersion(v => v + 1); setError(discourse ? "Choose a nonempty .json bundle no larger than 8 MiB." : "Choose a nonempty .zip file no larger than 64 MiB."); return; }
     setFile(next);
   }
   async function sendFile(target: Job, input: File, current: typeof life.current) {
     if (target.state !== "UPLOADING") { if (current.active) navigate(`${base}/${target.id}`, { replace: true }); return; }
     upload.current = new AbortController(); setUploading(true); setSent(0);
-    try { await uploadImport(target.id, input, AbortSignal.any([current.controller.signal, upload.current.signal]), n => { if (current.active) setSent(n); });
+    try { await uploadImport(target.id, input, AbortSignal.any([current.controller.signal, upload.current.signal]), n => { if (current.active) setSent(n); }, target.provider ?? "NATIVE");
       if (current.active) { setFile(undefined); setFileVersion(v => v + 1); navigate(`${base}/${target.id}`, { replace: true }); setNotice("Complete archive uploaded. Waiting for inspection."); }
     } finally { if (current.active) setUploading(false); }
   }
@@ -109,7 +117,7 @@ function ImportScreen({ actorId, id, history, onDenied }: { actorId: string; id?
       if (Date.parse(grant.expiresAt) <= Date.now()) throw new ApiError("http", "Password confirmation expired. Confirm again.", 403, undefined, undefined, "RECENT_AUTH_REQUIRED");
       if (action.kind === "upload") {
         if (!file) return;
-        const target = await createImport(grant.token, creationKey.current, current.controller.signal); if (!current.active) return;
+        const target = await createImport(grant.token, creationKey.current, current.controller.signal, selectedProvider); if (!current.active) return;
         setCreated(target); await sendFile(target, file, current);
       } else {
         await activateImport(action.job, action.review, grant.token, action.key, current.controller.signal);
@@ -137,14 +145,15 @@ function ImportScreen({ actorId, id, history, onDenied }: { actorId: string; id?
     <p className="eyebrow">ADMINISTRATION</p><h1 ref={heading} tabIndex={-1}>{history ? "Import history" : "Import company data"}</h1>
     <nav className="article-actions" aria-label="Data transfer navigation"><Link to="/admin/data">Data management</Link>{!history && <Link to={`${base}/history`}>View import history</Link>}{selected && <Link to={base}>Start another import</Link>}{history && <Link to={base}>New import</Link>}</nav>
     {!history && <div className="transfer-warning"><strong>Import only into an empty community.</strong><p>The target must contain only active bootstrap administrators, with demo seeding disabled. Imported authors cannot sign in, regain roles, or claim matching accounts. Hidden content and unpublished articles remain private.</p>
-      <p>Only CommonBeacon native company archive v1 is supported. Personal archives, attachments and external-platform exports cannot be activated. Limits: ZIP 64 MiB; 40,000 records total; 16 MiB staged JSON for activation. The atomic commit has a 30-second deadline.</p>
+      <p>Supported formats: CommonBeacon company archive v1 and CommonBeacon Discourse bundle v1 from Discourse 3.5.0. Personal archives and attachment files cannot be activated. Limits: native ZIP 64 MiB; Discourse JSON 8 MiB; 40,000 records total; 16 MiB staged JSON for activation. The atomic commit has a 30-second deadline.</p>
       <details><summary>Entity limits and omitted fields</summary><p>2,000 authors, 100 boards, 5,000 questions, 20,000 replies, 5,000 acceptances, 1,000 articles, 2,000 contacts, 5,000 reports and 5,000 actions, within the total limit.</p><p>Credentials, local permissions, sessions, grants, transfer bookkeeping and attachments are not restored. Search vectors rebuild and local edit versions restart at zero. Contacts and moderation history can only be included if selected in the original export; change those options by making a new source export.</p></details>
     </div>}
     {error && <p className="form-error" role="alert">{error}</p>}{notice && <p role="status">{notice}</p>}
     {uncertain && <div className="transfer-warning"><p>The response was interrupted. The server may have accepted the request. Check its outcome before retrying. Activation is never resubmitted automatically.</p><Button disabled={busy} onClick={() => void refresh()}>Check outcome</Button></div>}
-    {!history && (!selected || job?.state === "UPLOADING") && <section className="transfer-panel" aria-labelledby="upload-title"><h2 id="upload-title">Upload native archive</h2>
-      <label htmlFor="import-format">Archive format</label><select id="import-format" disabled={busy || !!prompt} defaultValue="native"><option value="native">CommonBeacon company archive v1 (.zip)</option></select>
-      <label htmlFor="import-file">Archive file</label><input key={fileVersion} id="import-file" type="file" accept=".zip,application/zip" disabled={busy || !!prompt} onChange={e => choose(e.target.files?.[0])} />
+    {!history && (!selected || job?.state === "UPLOADING") && <section className="transfer-panel" aria-labelledby="upload-title"><h2 id="upload-title">Upload archive</h2>
+      <label htmlFor="import-format">Archive format</label><select id="import-format" disabled={busy || !!prompt || !!selected || uncertain} value={selectedProvider} onChange={e => { setProvider(e.target.value as "NATIVE" | "DISCOURSE"); setFile(undefined); setFileVersion(v => v + 1); creationKey.current = crypto.randomUUID(); setError(""); }}><option value="NATIVE">CommonBeacon company archive v1 (.zip)</option><option value="DISCOURSE">Discourse 3.5.0 bundle v1 (.json)</option></select>
+      {discourse && <p>Use scripts/discourse/export_commonbeacon.rb on Discourse 3.5.0. Bare category JSON and database backups are unsupported. Public categories only; review all conversion losses before activation.</p>}
+      <label htmlFor="import-file">Archive file</label><input key={fileVersion} id="import-file" type="file" accept={discourse ? ".json,application/json" : ".zip,application/zip"} disabled={busy || !!prompt} onChange={e => choose(e.target.files?.[0])} />
       {file && <p>{file.name} — {(file.size / 1048576).toFixed(2)} MiB. The file stays in memory only.</p>}
       <p>Interrupted uploads restart the whole file. After navigation or refresh, reselect it only if the job still needs an upload. Private staging can resume on the server; live activation is one transaction.</p>
       <Button disabled={!file || busy || !!prompt || uncertain} onClick={() => job ? void mutate("upload") : setPrompt({ kind: "upload" })}>{job ? "Upload complete file" : "Confirm password and upload"}</Button>
@@ -160,7 +169,7 @@ function ImportScreen({ actorId, id, history, onDenied }: { actorId: string; id?
         {job.state === "COMMITTING" && <p>Confirmation is durable. Do not submit another import. Refresh or return to this URL to see the authoritative result.</p>}
         {job.allowedActions.includes("CANCEL") && <Button disabled={busy || !!prompt} onClick={() => void mutate("cancel")}>Cancel import</Button>}
         {!terminal(job) && job.state !== "COMMITTING" && <p>Cancellation is available until confirmation is accepted and the job becomes COMMITTING.</p>}
-        {detail.data?.inspection && <div><p>{detail.data.inspection.valid ? "Native inspection passed. Run the dry run to review target eligibility and mappings." : "Archive inspection failed. Cancel this request and choose a corrected native archive."}</p><ul>{detail.data.inspection.issues.map((i, n) => <li key={n}>{i.file}, line {i.line}: {i.code}</li>)}</ul></div>}
+        {detail.data?.inspection && <div><p>{detail.data.inspection.valid ? "Archive inspection passed. Run the dry run to review target eligibility and mappings." : "Archive inspection failed. Cancel this request and choose a corrected archive."}</p><ul>{detail.data.inspection.issues.map((i, n) => <li key={n}>{i.file}, line {i.line}: {i.code}</li>)}</ul></div>}
         {["REVIEW_REQUIRED", "READY_TO_COMMIT"].includes(job.state) && <Button disabled={busy || !!prompt || uncertain || detail.isFetching} onClick={() => void mutate("review")}>{review ? "Run a fresh dry run" : "Run dry run"}</Button>}
       </>}
     </section>}
@@ -178,13 +187,13 @@ function ImportScreen({ actorId, id, history, onDenied }: { actorId: string; id?
       <ul>{review.warnings.map(w => <li key={w}>{warningText[w] ?? w}</li>)}</ul>
       <div className="import-counts">{entities.map(e => <p key={e}><strong>{e}</strong><span>{review.counts[e]} staged</span></p>)}</div>
       <h3>Validation errors ({review.totalErrors})</h3>{review.totalErrors === 0 ? <p>No validation errors.</p> : <><ol>{review.errors.slice(issuePage * 20, (issuePage + 1) * 20).map((e, n) => <li key={n}>{e.file}, line {e.line}: {e.code}</li>)}</ol><p>Showing up to 20 errors per page; the report retains at most 1,000.</p><Button disabled={!issuePage} onClick={() => setIssuePage(v => v - 1)}>Previous errors</Button><Button disabled={(issuePage + 1) * 20 >= review.errors.length} onClick={() => setIssuePage(v => v + 1)}>Next errors</Button></>}
-      <details><summary>Source-to-local mapping preview (up to 100)</summary><Mappings rows={review.mappingPreview} /></details>
+      <details><summary>Source-to-local mapping preview (up to 100)</summary><Mappings rows={review.mappingPreview} discourse={discourse} /></details>
       <Button onClick={() => download(review, "review")}>Download review and errors JSON</Button>
       <fieldset disabled={!safe || busy || !!prompt || uncertain}><legend>Final acknowledgements</legend>
         {required.map(code => <label className="transfer-check" key={code}><input type="checkbox" checked={ackDigest === review.reviewDigest && !!acks[code]} onChange={e => { setAcks(previous => ({ ...(ackDigest === review.reviewDigest ? previous : {}), [code]: e.target.checked })); setAckDigest(review.reviewDigest); }} />{code === "PRIVATE_CONTENT" ? "I understand hidden content, drafts and private fields will be imported with their source visibility." : code === "INACTIVE_AUTHORS" ? "I understand imported authors cannot sign in or regain access." : warningText[code] ?? `I acknowledge: ${code}`}</label>)}
       </fieldset><Button disabled={!safe || !acknowledged || busy || !!prompt || uncertain} onClick={beginActivation}>Confirm reviewed import</Button>
     </section>}
-    {detail.data?.result && <Result value={detail.data.result} download={() => download(detail.data!.result, "reconciliation-page")} next={() => setMappingAfter(detail.data!.result!.nextCursor)} first={() => setMappingAfter(null)} hasPrevious={!!mappingAfter} />}
+    {detail.data?.result && <Result discourse={discourse} value={detail.data.result} download={() => download(detail.data!.result, "reconciliation-page")} next={() => setMappingAfter(detail.data!.result!.nextCursor)} first={() => setMappingAfter(null)} hasPrevious={!!mappingAfter} />}
     {!selected && <section className="transfer-panel"><h2>{history ? "Your import requests" : "Latest import"}</h2><p>Only your requests are shown. Open a request to resume or reconcile it. Status refreshes every five seconds.</p>
       {listing.isError && <p role="alert">{message(listing.error)}</p>}{listing.isPending && <p role="status">Loading requests...</p>}
       {listing.data?.items.length === 0 && <p>No import requests yet.</p>}
@@ -193,13 +202,13 @@ function ImportScreen({ actorId, id, history, onDenied }: { actorId: string; id?
     </section>}
   </section>;
 }
-function Mappings({ rows }: { rows: Mapping[] }) { return <ul className="import-mappings">{rows.map(m => <li key={`${m.entity}:${m.sourceId}`}><strong>{m.entity}</strong><span>Source: {m.sourceId}</span><span>Local: {m.localId}</span></li>)}</ul>; }
-function Result({ value, download, next, first, hasPrevious }: { value: Reconciliation; download: () => void; next: () => void; first: () => void; hasPrevious: boolean }) {
+function Mappings({ rows, discourse = false }: { rows: Mapping[]; discourse?: boolean }) { return <ul className="import-mappings">{rows.map(m => <li key={`${m.entity}:${m.sourceId}`}><strong>{m.entity}</strong><span>Source: {m.sourceId}{discourse && ` (Discourse ${({ users: "user", boards: "category", questions: "topic", replies: "post" } as Record<string, string>)[m.entity] ?? m.entity} #${parseInt(m.sourceId.slice(-8), 16)})`}</span><span>Local: {m.localId}</span></li>)}</ul>; }
+function Result({ value, download, next, first, hasPrevious, discourse }: { discourse: boolean; value: Reconciliation; download: () => void; next: () => void; first: () => void; hasPrevious: boolean }) {
   return <section className="transfer-panel" aria-labelledby="reconcile-title"><h2 id="reconcile-title">Import reconciliation</h2><p>{value.state === "COMPLETED" ? "The complete reviewed dataset was committed atomically. These are historical creation counts, not counts of records that may have been edited later." : "No imported records became live. Cancelled records are counted as skipped; failed records as rejected/uncommitted."}</p>
     <p>Expected counts refer to reviewed/staged records. No successful import silently skips records. Excluded source fields were never part of these counts.</p>
     {!value.detailsAvailable && <p>Detailed review data has expired or was never produced. Unknown counts are shown as unavailable; created counts remain zero.</p>}
     <div className="import-counts">{entities.map(e => { const c = value.counts[e]; return <div key={e}><h3>{e}</h3><dl><dt>Expected</dt><dd>{c.expected ?? "Unavailable"}</dd><dt>Created</dt><dd>{c.created}</dd><dt>Skipped</dt><dd>{c.skipped ?? "Unavailable"}</dd><dt>Rejected</dt><dd>{c.rejected ?? "Unavailable"}</dd></dl></div>; })}</div>
     <Button onClick={download}>Download reconciliation JSON (this mapping page)</Button>
-    <details><summary>Authorized source-to-local references (100 per page)</summary><Mappings rows={value.mappings} /><Button disabled={!hasPrevious} onClick={first}>First mapping page</Button><Button disabled={!value.nextCursor} onClick={next}>Next mapping page</Button></details>
+    <details><summary>Authorized source-to-local references (100 per page)</summary><Mappings rows={value.mappings} discourse={discourse} /><Button disabled={!hasPrevious} onClick={first}>First mapping page</Button><Button disabled={!value.nextCursor} onClick={next}>Next mapping page</Button></details>
   </section>;
 }

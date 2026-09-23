@@ -61,7 +61,7 @@ export const importHistory = (after: string | null, signal?: AbortSignal) => get
   const page = readPage(v); if (page.items.some(j => j.kind !== "COMPANY_IMPORT")) return bad(); return page;
 }, signal);
 export const importStatus = (id: string, signal?: AbortSignal) => getJson(`/api/v1/admin/data/jobs/${uuid(id)}`, v => { const j = readJob(v); return j.kind === "COMPANY_IMPORT" && j.id === id ? j : bad(); }, signal);
-export const createImport = (grant: string, key: string, signal: AbortSignal) => postJson(root, { formatVersion: 1, recentAuthGrant: grant }, readJob, "POST", { signal, idempotencyKey: key });
+export const createImport = (grant: string, key: string, signal: AbortSignal, provider: "NATIVE" | "DISCOURSE" = "NATIVE") => postJson(root, { formatVersion: 1, recentAuthGrant: grant, provider }, readJob, "POST", { signal, idempotencyKey: key });
 export const dryRun = (job: Job, key: string, signal: AbortSignal) => postJson(`${root}/${uuid(job.id)}/dry-run`, { expectedVersion: job.version }, readJob, "POST", { signal, idempotencyKey: key });
 export const reviewImport = (id: string, signal: AbortSignal) => getJson(`${root}/${uuid(id)}/review`, v => { const r = readReview(v); return r.jobId === id ? r : bad(); }, signal, 15_000);
 export const reconcileImport = (id: string, after: string | null, signal: AbortSignal) => getJson(`${root}/${uuid(id)}/reconciliation${after ? `?cursor=${encodeURIComponent(after)}` : ""}`, v => { const r = readReconciliation(v); return r.jobId === id ? r : bad(); }, signal);
@@ -75,8 +75,8 @@ export const activateImport = (job: Job, review: Review, grant: string, key: str
 }, readJob, "POST", { signal, idempotencyKey: key });
 
 /** Browser-owned File, streamed by XHR for real upload progress; never persisted. */
-export async function uploadImport(id: string, file: File, signal: AbortSignal, progress: (bytes: number) => void): Promise<Job> {
-  if (file.size < 1 || file.size > 67108864) throw new ApiError("http", "Choose a nonempty ZIP no larger than 64 MiB.");
+export async function uploadImport(id: string, file: File, signal: AbortSignal, progress: (bytes: number) => void, provider: "NATIVE" | "DISCOURSE" = "NATIVE"): Promise<Job> {
+  if (file.size < 1 || file.size > (provider === "DISCOURSE" ? 8388608 : 67108864)) throw new ApiError("http", "Choose a nonempty archive within the selected format limit.");
   const csrf = await getJson("/api/v1/auth/csrf", v => { const c = obj(v); return c.headerName === "X-CSRF-TOKEN" ? { header: c.headerName, token: str(c.token, 1024) } : bad(); }, signal);
   signal.throwIfAborted();
   return new Promise((resolve, reject) => {
@@ -84,7 +84,7 @@ export async function uploadImport(id: string, file: File, signal: AbortSignal, 
     const abort = () => { xhr.abort(); reject(new DOMException("Upload stopped", "AbortError")); };
     const cleanup = () => signal.removeEventListener("abort", abort);
     xhr.open("PUT", `${root}/${uuid(id)}/archive`); xhr.withCredentials = true; xhr.timeout = 120_000;
-    xhr.setRequestHeader("Content-Type", "application/zip"); xhr.setRequestHeader(csrf.header, csrf.token); xhr.setRequestHeader("Accept", "application/json");
+    xhr.setRequestHeader("Content-Type", provider === "DISCOURSE" ? "application/json" : "application/zip"); xhr.setRequestHeader(csrf.header, csrf.token); xhr.setRequestHeader("Accept", "application/json");
     xhr.upload.onprogress = e => { if (!signal.aborted) progress(Math.min(e.loaded, file.size)); };
     xhr.onload = () => { cleanup(); if (signal.aborted) return reject(signal.reason);
       if (xhr.status === 401) window.dispatchEvent(new Event("commonbeacon:session-expired"));

@@ -1,4 +1,4 @@
-# Native import and reconciliation
+# Import and reconciliation
 
 Administrators open **Data management → Import company data** at
 `/admin/data/imports`. `/admin/data/imports/history` lists only their import
@@ -7,7 +7,9 @@ requests, 20 per page. Export history remains separate. A request has a stable
 
 ## Upload and review
 
-Choose a native company v1 ZIP and confirm your password. The page reports bytes
+Choose a native company v1 ZIP or a [Discourse 3.5.0 bundle](discourse-import.md)
+and confirm your password. The selected provider is bound to the request and cannot
+change during retries. The page reports bytes
 sent and then waits for server verification. A complete upload enters private
 inspection; run the dry run after inspection passes. Personal archives cannot
 be activated. Archives and filenames are kept only in browser memory, never
@@ -26,7 +28,7 @@ Activation requires an empty target containing only active bootstrap
 administrators, with demo seeding disabled. The seeded development community
 will fail this check. See [activation](import-activation.md) for the 40,000-record,
 16 MiB staged JSON and 30-second transaction envelope and deployment measurements.
-The ZIP upload ceiling is separately 64 MiB.
+The native ZIP upload ceiling is separately 64 MiB; Discourse JSON is limited to 8 MiB.
 
 Imported authors remain inactive and cannot sign in or acquire permissions.
 Contacts and private moderation history follow the source export options;

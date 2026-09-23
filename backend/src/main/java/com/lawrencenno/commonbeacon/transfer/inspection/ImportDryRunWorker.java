@@ -32,7 +32,7 @@ public final class ImportDryRunWorker {
                     if(count>67108864)throw new QuarantineZip.Rejected("ARCHIVE_SIZE_LIMIT");digest.update(buffer.array(),0,n);}
                 if(count!=source.bytes() || !HexFormat.of().formatHex(digest.digest()).equals(source.hash()))throw new QuarantineZip.Rejected("ARCHIVE_DIGEST_MISMATCH");
                 var batch=new ArrayList<ArchiveFormat.Row>();long[] batchBytes={0};
-                result=new QuarantineZip(channel,check).inspect(row->{
+                result=ImportArchives.inspect(job.provider(),channel,check,row->{
                     rows[0]++;int size=row.data().toString().getBytes(java.nio.charset.StandardCharsets.UTF_8).length;
                     if(!batch.isEmpty() && (batch.size()>=64 || batchBytes[0]+size>1048576)){dryRuns.stage(job.lease(),batch);batch.clear();batchBytes[0]=0;}
                     batch.add(row);batchBytes[0]+=size;

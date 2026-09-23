@@ -74,6 +74,25 @@ it("uses the new job version after reading a stale review before requesting anot
   expect(JSON.parse(mock.mock.calls.find(([url]) => url.endsWith("/dry-run"))![1]!.body as string)).toEqual({ expectedVersion: 6 });
   expect(mock.mock.calls.some(([url]) => url.endsWith("/confirm"))).toBe(false);
 });
+it("selects Discourse, resets incompatible files and enforces its JSON limit", async () => {
+  setup(undefined, "/admin/data/imports");
+  await userEvent.upload(await screen.findByLabelText("Archive file"), new File(["zip"], "source.zip", { type: "application/zip" }));
+  await userEvent.selectOptions(screen.getByLabelText("Archive format"), "DISCOURSE");
+  expect(screen.getByRole("button", { name: "Confirm password and upload" })).toBeDisabled();
+  expect(screen.getByLabelText("Archive file")).toHaveAttribute("accept", ".json,application/json");
+  await userEvent.setup({ applyAccept: false }).upload(screen.getByLabelText("Archive file"), new File(["zip"], "source.zip"));
+  await screen.findByText("Choose a nonempty .json bundle no larger than 8 MiB.");
+  await userEvent.upload(screen.getByLabelText("Archive file"), new File(["{}"], "discourse.json", { type: "application/json" }));
+  expect(screen.getByRole("button", { name: "Confirm password and upload" })).toBeEnabled();
+});
+it("retains the Discourse provider on resume and displays required conversion losses", async () => {
+  setup(async url => Response.json(url.endsWith("/review") ? { ...review, warnings: [...review.warnings, "DISCOURSE_PLAIN_TEXT", "DISCOURSE_FLATTENED_THREADS", "DISCOURSE_ATTACHMENTS_EXCLUDED"] } : { ...job, provider: "DISCOURSE" }));
+  await screen.findByRole("heading", { name: "Review before activation" });
+  expect(screen.getByRole("checkbox", { name: /markup is preserved as literal text/ })).not.toBeChecked();
+  expect(screen.getByRole("checkbox", { name: /nested replies become flat/ })).not.toBeChecked();
+  expect(screen.getByRole("checkbox", { name: /Attachment files are not copied/ })).not.toBeChecked();
+  expect(screen.getByRole("button", { name: "Confirm reviewed import" })).toBeDisabled();
+});
 it("clears private files, password and cached reviews on account changes", async () => {
   const { client } = setup(undefined, "/admin/data/imports");
   const input = await screen.findByLabelText("Archive file");

@@ -31,7 +31,7 @@ public final class ImportInspector {
                 while(true) {check.run();buffer.clear();int n=channel.read(buffer);if(n<0)break;count+=n;
                     if(count>67108864)throw new QuarantineZip.Rejected("ARCHIVE_SIZE_LIMIT");digest.update(buffer.array(),0,n);}
                 if(count!=source.bytes() || !HexFormat.of().formatHex(digest.digest()).equals(source.hash()))throw new QuarantineZip.Rejected("ARCHIVE_DIGEST_MISMATCH");
-                result=new QuarantineZip(channel,check).inspect(row->{rows[0]++;});
+                result=ImportArchives.inspect(job.provider(),channel,check,row->{rows[0]++;});
             } catch(QuarantineZip.Rejected e) {result=new ArchiveFormat.Result(null,List.of(new ArchiveFormat.Issue("archive",0,e.code)),1,rows[0]);}
               catch(java.util.zip.ZipException | EOFException e) {result=new ArchiveFormat.Result(null,List.of(new ArchiveFormat.Issue("archive",0,"INVALID_ZIP")),1,rows[0]);}
             check.run();jobs.finishInspection(job.lease(),source,result.valid(),result.rows(),result.totalErrors(),JsonMapper.builder().build().writeValueAsString(result.issues()));

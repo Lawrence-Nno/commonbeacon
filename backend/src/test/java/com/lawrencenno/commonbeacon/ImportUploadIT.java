@@ -88,6 +88,21 @@ class ImportUploadIT {
             assertThat(domain()).isEqualTo(before);assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_mapping",Long.class)).isZero();
         }
     }
+    @Test void discourseProviderIsBoundToRequestAndMediaType()throws Exception {
+        try(var a=new Browser(admin)) {
+            UUID key=UUID.randomUUID();String grant=a.grant("IMPORT_UPLOAD");
+            var body=Map.of("formatVersion",1,"recentAuthGrant",grant,"provider","DISCOURSE");
+            var response=a.post("/api/v1/admin/data/imports",body,key);assertThat(response.statusCode()).isEqualTo(201);
+            UUID id=UUID.fromString(json.readTree(response.body()).path("id").asText());
+            assertThat(json.readTree(response.body()).path("provider").asText()).isEqualTo("DISCOURSE");
+            assertThat(a.post("/api/v1/admin/data/imports",Map.of("formatVersion",1,"recentAuthGrant",grant,"provider","NATIVE"),key).statusCode()).isEqualTo(409);
+            var data=Files.readAllBytes(Path.of("src/test/resources/data-transfer/discourse-3.5.0/bundle.json"));
+            assertThat(a.put(path(id)+"/archive",data,true,"application/zip").statusCode()).isEqualTo(415);
+            assertThat(jobs.status(admin,id).state()).isEqualTo(TransferJob.State.UPLOADING);
+            assertThat(a.put(path(id)+"/archive",data,true,"application/json").statusCode()).isEqualTo(200);
+            assertThat(new ImportInspector(jobs,store).runOnce()).isTrue();assertThat(jobs.inspection(admin,id).valid()).isTrue();
+        }
+    }
     @Test void uploadAndInspectionRemainOwnerAdminCsrfAndGrantScoped()throws Exception {
         try(var a=new Browser(admin);var b=new Browser(other);var m=new Browser(member);var anon=new Browser(null)) {
             assertThat(anon.post("/api/v1/admin/data/imports",Map.of("formatVersion",1,"recentAuthGrant","a".repeat(43)),UUID.randomUUID()).statusCode()).isEqualTo(401);
@@ -145,20 +160,23 @@ class ImportUploadIT {
             assertThat(jdbc.queryForObject("SELECT error_code FROM transfer_job WHERE id=?",String.class,id)).isEqualTo("AUTHORIZATION_REVOKED");
         }
     }
-    @Test void chunkedUploadEnforcesActualByteLimitWithoutBufferingTheArchive()throws Exception {
-        var intent=jobs.createImport(admin,UUID.randomUUID(),()->{});
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(TransferJob.Provider.class)
+    void chunkedUploadEnforcesActualByteLimitWithoutBufferingTheArchive(TransferJob.Provider provider)throws Exception {
+        var intent=jobs.createImport(admin,UUID.randomUUID(),provider,()->{});
         var request=org.mockito.Mockito.mock(jakarta.servlet.http.HttpServletRequest.class);
         when(request.getContentLengthLong()).thenReturn(-1L);
+        when(request.getContentType()).thenReturn(provider==TransferJob.Provider.DISCOURSE?"application/json":"application/zip");
         when(request.getSession(false)).thenReturn(org.mockito.Mockito.mock(jakarta.servlet.http.HttpSession.class));
         when(request.getInputStream()).thenReturn(new jakarta.servlet.ServletInputStream() {
-            long left=67108865L;
+            long left=provider==TransferJob.Provider.DISCOURSE?8388609L:67108865L;
             public int read(){return left-->0?1:-1;}
             public int read(byte[] b,int off,int len){if(left<=0)return -1;int n=(int)Math.min(left,len);Arrays.fill(b,off,off+n,(byte)1);left-=n;return n;}
             public boolean isFinished(){return left<=0;}public boolean isReady(){return true;}
             public void setReadListener(jakarta.servlet.ReadListener listener){throw new UnsupportedOperationException();}
         });
         var authentication=org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(admin+"@example.test","unused",List.of());
-        assertThatThrownBy(()->controller.upload(authentication,request,intent.id())).isInstanceOf(com.lawrencenno.commonbeacon.shared.ApiFailure.class).hasMessageContaining("64 MiB");
+        assertThatThrownBy(()->controller.upload(authentication,request,intent.id())).isInstanceOf(com.lawrencenno.commonbeacon.shared.ApiFailure.class).hasMessageContaining(provider==TransferJob.Provider.DISCOURSE?"8 MiB":"64 MiB");
         assertThat(jobs.status(admin,intent.id()).state()).isEqualTo(TransferJob.State.UPLOADING);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_artifact WHERE state<>'DELETED'",Long.class)).isZero();
     }

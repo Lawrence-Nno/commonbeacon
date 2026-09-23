@@ -73,7 +73,7 @@ function saveLogs(group) {
   writeFileSync(new URL(`../test-results/${group}/backend-compose.log`, import.meta.url), (logs.stdout ?? "") + (logs.stderr ?? ""));
 }
 const selectors = process.argv.slice(2).filter(arg => arg.includes(".spec"));
-const groups = selectors.length ? [...new Set(selectors.map(arg => arg.includes("import-activation.spec") ? "imports" : "community"))] : ["community", "imports"];
+const groups = selectors.length ? [...new Set(selectors.map(arg => arg.includes("discourse-import.spec") ? "discourse" : arg.includes("import-activation.spec") ? "imports" : "community"))] : ["community", "imports", "discourse"];
 let code = 0, currentGroup = groups[0];
 try {
   for (const [index, group] of groups.entries()) {
@@ -83,9 +83,11 @@ try {
       // Exercise real production limits without carrying another suite's quotas.
       const reset = docker(["down", "--remove-orphans"]);
       if (reset.error || reset.status !== 0) throw new Error("Disposable source reset failed.");
+      const resetTarget = targetDocker(["down", "--remove-orphans"]);
+      if (resetTarget.error || resetTarget.status !== 0) throw new Error("Disposable import target reset failed.");
     }
     startSource();
-    if (group === "imports") startTarget();
+    if (group === "imports" || group === "discourse") startTarget();
     code = Math.max(code, run(group));
     saveLogs(group);
   }

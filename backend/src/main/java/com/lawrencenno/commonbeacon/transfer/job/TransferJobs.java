@@ -22,7 +22,7 @@ public class TransferJobs {
         State.valueOf(r.getString("state")),r.getLong("version"),r.getLong("fence"),r.getInt("attempts"),
         r.getObject("worker_id",UUID.class),r.getTimestamp("lease_until") == null ? null : r.getTimestamp("lease_until").toInstant(),r.getLong("checkpoint"),
         r.getTimestamp("created_at").toInstant(),r.getTimestamp("updated_at").toInstant(),r.getTimestamp("expires_at").toInstant(),
-        r.getString("error_code")==null ? null : Failure.valueOf(r.getString("error_code")));
+        r.getString("error_code")==null ? null : Failure.valueOf(r.getString("error_code")),Provider.valueOf(r.getString("import_provider")));
     public TransferJobs(JdbcTemplate jdbc, PlatformTransactionManager manager) {
         this.jdbc = jdbc; transaction = new TransactionTemplate(manager);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -79,6 +79,9 @@ public class TransferJobs {
         return create(actor,Kind.PERSONAL_EXPORT,key,hash,false,false,authorize);
     }
     private TransferJob create(UUID actor,Kind kind,UUID requestKey,String payloadHash,boolean contacts,boolean history,Runnable authorize) {
+        return create(actor,kind,requestKey,payloadHash,contacts,history,Provider.NATIVE,authorize);
+    }
+    private TransferJob create(UUID actor,Kind kind,UUID requestKey,String payloadHash,boolean contacts,boolean history,Provider provider,Runnable authorize) {
         if (payloadHash == null || !payloadHash.matches("[a-f0-9]{64}")) throw new IllegalArgumentException("INVALID_REQUEST_HASH");
         Objects.requireNonNull(actor); Objects.requireNonNull(kind); Objects.requireNonNull(requestKey);
         return locked(() -> {
@@ -97,16 +100,20 @@ public class TransferJobs {
                 throw new IllegalStateException("ACTIVE_JOB_EXISTS");
             authorize.run();
             UUID id=UUID.randomUUID();
-            jdbc.update("INSERT INTO transfer_job(id,requester_id,kind,state,expires_at,authorization_revision,include_contacts,include_moderation_history) VALUES (?,?,?,?,clock_timestamp()+? * interval '1 minute',(SELECT auth_revision FROM app_user WHERE id=?),?,?)",
-                id,actor,kind.name(),kind==Kind.COMPANY_IMPORT?"UPLOADING":"QUEUED",kind==Kind.COMPANY_IMPORT?60:30,actor,contacts,history);
+            jdbc.update("INSERT INTO transfer_job(id,requester_id,kind,state,expires_at,authorization_revision,include_contacts,include_moderation_history,import_provider) VALUES (?,?,?,?,clock_timestamp()+? * interval '1 minute',(SELECT auth_revision FROM app_user WHERE id=?),?,?,?)",
+                id,actor,kind.name(),kind==Kind.COMPANY_IMPORT?"UPLOADING":"QUEUED",kind==Kind.COMPANY_IMPORT?60:30,actor,contacts,history,provider.name());
             jdbc.update("INSERT INTO transfer_request VALUES (?,?,?,?,?,clock_timestamp()+interval '24 hours')",actor,kind.name(),requestKey,payloadHash,id);
             audit(id,Event.CREATED); return job(id);
         });
     }
     public TransferJob createImport(UUID actor,UUID key,Runnable authorize) {
+        return createImport(actor,key,Provider.NATIVE,authorize);
+    }
+    public TransferJob createImport(UUID actor,UUID key,Provider provider,Runnable authorize) {
+        Objects.requireNonNull(provider);
         String hash=HexFormat.of().formatHex(com.lawrencenno.commonbeacon.transfer.archive.ArchiveCodec.sha256()
-            .digest("import:1".getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
-        return create(actor,Kind.COMPANY_IMPORT,key,hash,false,false,authorize);
+            .digest((provider==Provider.NATIVE?"import:1":"import:discourse:1").getBytes(java.nio.charset.StandardCharsets.US_ASCII)));
+        return create(actor,Kind.COMPANY_IMPORT,key,hash,false,false,provider,authorize);
     }
     TransferJob ownedImport(UUID actor,UUID id) {
         var j=owned(actor,id);if(j.kind()!=Kind.COMPANY_IMPORT)throw new IllegalStateException("JOB_NOT_FOUND");

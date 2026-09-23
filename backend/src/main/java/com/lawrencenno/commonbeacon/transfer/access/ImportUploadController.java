@@ -21,7 +21,7 @@ import tools.jackson.databind.json.JsonMapper;
 @RequestMapping("/api/v1/admin/data/imports")
 public class ImportUploadController {
     public record Request(@NotNull @Min(1) @Max(1) Integer formatVersion,
-            @NotBlank @Pattern(regexp="[A-Za-z0-9_-]{43}") String recentAuthGrant) {
+            @NotBlank @Pattern(regexp="[A-Za-z0-9_-]{43}") String recentAuthGrant, TransferJob.Provider provider) {
         @com.fasterxml.jackson.annotation.JsonAnySetter public void unknown(String name,Object value){throw new IllegalArgumentException("UNKNOWN_FIELD");}
         @Override public String toString(){return "ImportRequest[redacted]";}
     }
@@ -33,19 +33,25 @@ public class ImportUploadController {
     public ResponseEntity<TransferController.Summary> create(Authentication authentication,HttpServletRequest request,
             @RequestHeader("Idempotency-Key") UUID key,@Valid @RequestBody Request body) {
         var actor=access.current(authentication,true);store();
-        var job=TransferController.run(()->jobs.createImport(actor.id(),key,()->recent.consume(access.current(authentication,true),request.getSession(),RecentAuthentication.Scope.IMPORT_UPLOAD,body.recentAuthGrant())));
+        var job=TransferController.run(()->jobs.createImport(actor.id(),key,body.provider()==null?TransferJob.Provider.NATIVE:body.provider(),()->recent.consume(access.current(authentication,true),request.getSession(),RecentAuthentication.Scope.IMPORT_UPLOAD,body.recentAuthGrant())));
         return ResponseEntity.status(201).body(TransferController.summary(job,false));
     }
-    @PutMapping(value="/{id}/archive",consumes="application/zip")
+    @PutMapping(value="/{id}/archive",consumes={"application/zip","application/json"})
     public TransferController.Summary upload(Authentication authentication,HttpServletRequest request,@PathVariable UUID id)throws IOException {
         var actor=access.current(authentication,true);var store=store();
-        if(request.getContentLengthLong()>67108864L)throw new ApiFailure(413,"TRANSFER_LIMIT_EXCEEDED","Archive uploads are limited to 64 MiB.");
+        var current=TransferController.run(()->jobs.status(actor.id(),id));
+        String expected=current.provider()==TransferJob.Provider.DISCOURSE?"application/json":"application/zip";
+        if(request.getContentType()==null || !org.springframework.http.MediaType.parseMediaType(request.getContentType()).isCompatibleWith(org.springframework.http.MediaType.parseMediaType(expected)))
+            throw new ApiFailure(415,"UNSUPPORTED_MEDIA_TYPE","Upload the format selected for this import.");
+        long limit=current.provider()==TransferJob.Provider.DISCOURSE?8388608L:67108864L;
+        String limitMessage=current.provider()==TransferJob.Provider.DISCOURSE?"Discourse uploads are limited to 8 MiB.":"Archive uploads are limited to 64 MiB.";
+        if(request.getContentLengthLong()>limit)throw new ApiFailure(413,"TRANSFER_LIMIT_EXCEEDED",limitMessage);
         var upload=TransferController.run(()->jobs.beginUpload(actor.id(),id));
         var live=new AtomicBoolean(true);long deadline=System.nanoTime()+600_000_000_000L;boolean complete=false;
         try(var heartbeat=Executors.newSingleThreadScheduledExecutor()) {
             heartbeat.scheduleAtFixedRate(()->{try{if(System.nanoTime()>deadline || !jobs.heartbeat(upload.lease()))live.set(false);}catch(RuntimeException e){live.set(false);}},15,15,TimeUnit.SECONDS);
             try {
-                var saved=store.write(upload.artifact(),67108864L,out->{
+                var saved=store.write(upload.artifact(),limit,out->{
                     byte[] buffer=new byte[65536];long bytes=0;int n;
                     try(var input=request.getInputStream()) {
                         while((n=input.read(buffer))!=-1) {
@@ -62,7 +68,7 @@ public class ImportUploadController {
                 return TransferController.summary(job,false);
             } finally {heartbeat.shutdownNow();}
         } catch(IOException e) {
-            if("ARTIFACT_LIMIT_EXCEEDED".equals(e.getMessage()))throw new ApiFailure(413,"TRANSFER_LIMIT_EXCEEDED","Archive uploads are limited to 64 MiB.");
+            if("ARTIFACT_LIMIT_EXCEEDED".equals(e.getMessage()))throw new ApiFailure(413,"TRANSFER_LIMIT_EXCEEDED",limitMessage);
             if("ARTIFACT_QUOTA_EXCEEDED".equals(e.getMessage()))throw new ApiFailure(503,"TRANSFER_UNAVAILABLE","Private transfer storage has insufficient free capacity. Try again later.");
             throw new ApiFailure(400,"UPLOAD_INTERRUPTED","The upload did not complete. Restart the entire archive upload.");
         } finally {

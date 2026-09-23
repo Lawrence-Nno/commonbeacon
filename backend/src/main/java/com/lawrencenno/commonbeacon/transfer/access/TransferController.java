@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping({"/api/v1/admin/data/jobs","/api/v1/account/data/jobs"})
 public class TransferController {
     public record Summary(UUID id,TransferJob.Kind kind,TransferJob.State state,long version,Instant createdAt,
-        Instant updatedAt,Instant expiresAt,long processedRecords,TransferJob.Failure errorCode,boolean artifactAvailable,List<String> allowedActions) {}
+        Instant updatedAt,Instant expiresAt,long processedRecords,TransferJob.Failure errorCode,boolean artifactAvailable,List<String> allowedActions,TransferJob.Provider provider) {}
     public record Page(List<Summary> items,String nextCursor) {}
     public record Cancellation(@NotNull @PositiveOrZero Long expectedVersion) {}
     public record TicketRequest(@NotBlank @Pattern(regexp="[A-Za-z0-9_-]{43}") String recentAuthGrant) {
@@ -54,7 +54,7 @@ public class TransferController {
         var actions=new ArrayList<String>();
         if(!j.terminal() && j.state()!=TransferJob.State.COMMITTING)actions.add("CANCEL");
         if(available)actions.add("DOWNLOAD");
-        return new Summary(j.id(),j.kind(),j.state(),j.version(),j.createdAt(),j.updatedAt(),j.expiresAt(),j.checkpoint(),j.errorCode(),available,List.copyOf(actions));
+        return new Summary(j.id(),j.kind(),j.state(),j.version(),j.createdAt(),j.updatedAt(),j.expiresAt(),j.checkpoint(),j.errorCode(),available,List.copyOf(actions),j.provider());
     }
     @GetMapping public Page list(Authentication authentication,HttpServletRequest request,
             @RequestParam(defaultValue="20") int size,@RequestParam(required=false) String cursor,@RequestParam(required=false) TransferJob.Kind kind) {

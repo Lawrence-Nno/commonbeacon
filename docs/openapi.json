@@ -5715,7 +5715,7 @@
     "/api/v1/admin/data/imports": {
       "post": {
         "operationId": "createCompanyImport",
-        "summary": "Initiate a quarantined native company archive upload",
+        "summary": "Initiate a quarantined native or Discourse company import",
         "tags": [
           "transfers"
         ],
@@ -5724,7 +5724,7 @@
             "session": []
           }
         ],
-        "description": "Requires an ACTIVE ADMINISTRATOR, CSRF, UUID Idempotency-Key and IMPORT_UPLOAD grant. Only formatVersion=1 and recentAuthGrant are accepted. Creates UPLOADING; matching retries return the original job. Uploads expire after one hour. No domain data is changed. All responses use Cache-Control: no-store.",
+        "description": "Requires an ACTIVE ADMINISTRATOR, CSRF, UUID Idempotency-Key and IMPORT_UPLOAD grant. Accepts formatVersion=1, recentAuthGrant and optional provider NATIVE (default) or DISCOURSE. Provider is bound into request idempotency. Creates UPLOADING; matching retries return the original job. Uploads expire after one hour. No domain data is changed. All responses use Cache-Control: no-store.",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -5896,7 +5896,7 @@
             "session": []
           }
         ],
-        "description": "Requester-only UPLOADING import, ACTIVE ADMINISTRATOR and CSRF required. Raw application/zip only, maximum actual body 64 MiB including chunked bodies. No multipart, filename, path or URL. Ten-minute deadline and 30-second idle timeout. Successful complete upload stores SHA-256 and moves to UPLOADED; a worker automatically inspects it. Interrupted uploads return to UPLOADING and may restart in full; cancelled/expired jobs require new initiation. Another active upload/worker or retry after completion returns 409. Proxy failures may have non-ProblemDetail bodies. No domain data is written.",
+        "description": "Requester-only UPLOADING import, ACTIVE ADMINISTRATOR and CSRF required. Raw application/zip for NATIVE (64 MiB) or application/json for DISCOURSE (8 MiB), including chunked bodies. Media type must match the immutable provider. No multipart, filename, path or URL. Ten-minute deadline and 30-second idle timeout. Successful complete upload stores SHA-256 and moves to UPLOADED; a worker automatically inspects it. Interrupted uploads return to UPLOADING and may restart in full; cancelled/expired jobs require new initiation. Another active upload/worker or retry after completion returns 409. Proxy failures may have non-ProblemDetail bodies. No domain data is written.",
         "parameters": [
           {
             "in": "path",
@@ -6088,6 +6088,13 @@
                 "type": "string",
                 "format": "binary",
                 "maxLength": 67108864
+              }
+            },
+            "application/json": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "description": "CommonBeacon Discourse bundle v1; strict source version, shape and count checks."
               }
             }
           }
@@ -8808,6 +8815,15 @@
                 "DOWNLOAD"
               ]
             }
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "NATIVE",
+              "DISCOURSE"
+            ],
+            "default": "NATIVE",
+            "description": "Immutable import provider. Discourse accepts only CommonBeacon bundle v1 from pinned Discourse 3.5.0."
           }
         },
         "required": [
@@ -8908,6 +8924,15 @@
           "recentAuthGrant": {
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{43}$"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "NATIVE",
+              "DISCOURSE"
+            ],
+            "default": "NATIVE",
+            "description": "Immutable import provider. Discourse accepts only CommonBeacon bundle v1 from pinned Discourse 3.5.0."
           }
         }
       },

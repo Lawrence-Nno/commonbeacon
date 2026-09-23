@@ -289,3 +289,30 @@ full graph/state errors, timestamp order, duplicate origins, identity/local-ID
 collisions, stale target/mapping/payload reviews, extra staged rows, all warning
 acknowledgements, cancellation/expiry cleanup and reservation release. Activation,
 its exclusive migration gate and measured production capacity remain later work.
+
+
+## Discourse adapter verification (2026-09-23)
+
+Stage 14, based on pushed `a65c385`, passed `scripts/verify.ps1`: 78 backend unit
+and 241 PostgreSQL integration tests (319 total), 166 frontend tests, lint,
+type checking and production build. Fresh and populated-V16 upgrade cases verify
+V17 provider defaults and preservation of existing jobs.
+
+The complete browser command passed 14 community/export, 2 native import and
+1 Discourse import test using independent disposable bootstrap targets. The
+Discourse test covers provider selection, source IDs, required conversion-loss
+acknowledgements, keyboard/mobile layout, activation and reload reconciliation.
+Its input is an actual export from the pinned Discourse 3.5.0 source with synthetic
+content; fixture provenance and expected counts are checked in beside the JSON.
+The mobile review screenshot was inspected. OpenAPI validates 59 operations and
+58 schemas; `git diff --check` passes.
+
+The disposable persistence check passed across backend restart, database restart
+and Compose down/up, preserving domain rows, private archive bytes, inspection,
+staged records and review fingerprints. The injected-failure check returned the
+expected failure and removed only its own test containers, network and volumes.
+Original development database/artifact mounts remained intact and services healthy.
+
+See [Discourse compatibility](discourse-import.md) for the exact supported subset
+and losses. This evidence does not certify other Discourse releases, other
+platforms, production capacity or preservation of excluded source features.

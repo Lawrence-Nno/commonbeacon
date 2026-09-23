@@ -80,6 +80,30 @@ class ImportActivationIT {
         activation.confirm(admin,id,UUID.randomUUID(),confirmation(id,r),()->{});return id;
     }
     long count(String table){return jdbc.queryForObject("SELECT count(*) FROM "+table,Long.class);}
+    @Test void discourseUsesReviewedNativeActivationAndRetainsSourceMappings()throws Exception {
+        var key=UUID.randomUUID();var job=jobs.createImport(admin,key,TransferJob.Provider.DISCOURSE,()->{});
+        assertThat(jobs.createImport(admin,key,TransferJob.Provider.DISCOURSE,()->{throw new AssertionError("Replay");}).id()).isEqualTo(job.id());
+        assertThatThrownBy(()->jobs.createImport(admin,key,()->{})).hasMessage("IDEMPOTENCY_CONFLICT");
+        var upload=jobs.beginUpload(admin,job.id());var bytes=Files.readAllBytes(Path.of("src/test/resources/data-transfer/discourse-3.5.0/bundle.json"));
+        var saved=store.write(upload.artifact(),8388608,out->out.write(bytes));jobs.finishUpload(upload,saved.bytes(),saved.sha256());
+        assertThat(new ImportInspector(jobs,store).runOnce()).isTrue();assertThat(jobs.inspection(admin,job.id()).valid()).isTrue();
+        assertThat(count("question")).isZero();var review=reviewed(job.id());
+        assertThat(review.path("eligible").asBoolean()).as(review.toString()).isTrue();
+        assertThat(review.path("counts").path("users").asInt()).isEqualTo(2);assertThat(review.path("counts").path("replies").asInt()).isEqualTo(2);
+        for(String warning:DiscourseArchive.WARNINGS)assertThat(review.path("warnings").toString()).contains(warning);
+        var consent=confirmation(job.id(),review);
+        var missing=new HashSet<>(consent.acknowledgedWarnings());missing.remove(DiscourseArchive.WARNINGS.getFirst());
+        assertThatThrownBy(()->activation.confirm(admin,job.id(),UUID.randomUUID(),new ImportActivation.Confirmation(consent.expectedVersion(),consent.reviewDigest(),consent.archiveDigest(),consent.targetGeneration(),true,true,missing),()->{})).isInstanceOf(RuntimeException.class);
+        activation.confirm(admin,job.id(),UUID.randomUUID(),consent,()->{});assertThat(activation.runOnce()).isTrue();
+        assertThat(jobs.status(admin,job.id()).state()).isEqualTo(TransferJob.State.COMPLETED);
+        assertThat(count("board")).isEqualTo(2);assertThat(count("question")).isEqualTo(2);assertThat(count("reply")).isEqualTo(2);assertThat(count("imported_record")).isEqualTo(8);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM question WHERE visibility='HIDDEN'",Long.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM reply WHERE visibility='HIDDEN'",Long.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM app_user WHERE account_state='IMPORTED_INACTIVE' AND role='MEMBER' AND email IS NULL AND password_hash IS NULL",Long.class)).isEqualTo(2);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM question WHERE accepted_reply_id IS NOT NULL",Long.class)).isZero();
+        assertThat(jdbc.queryForList("SELECT body FROM question",String.class)).anySatisfy(body->assertThat(body).contains("**this Markdown**","<b>literal HTML</b>"));
+        assertThat(reconciliation.report(admin,job.id(),null).toString()).contains("COMPLETED");
+    }
     @Test void publishesAllGroupsAndRetainsLedgerAfterCleanup()throws Exception {
         UUID id=inspected(fixture("company-full"));var r=reviewed(id);var body=confirmation(id,r);var key=UUID.randomUUID();
         var j=activation.confirm(admin,id,key,body,()->{});assertThat(j.state()).isEqualTo(TransferJob.State.COMMITTING);

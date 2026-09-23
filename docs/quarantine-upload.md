@@ -1,7 +1,7 @@
-# Quarantined native archive upload
+# Quarantined archive upload
 
-Stage 9 provides backend upload and inspection APIs for ACTIVE administrators. There
-is no upload screen yet. Inspection never inserts users, content, moderation records
+Upload and inspection APIs require ACTIVE administrators; the [import screen](import-ui.md)
+provides the browser workflow. Inspection never inserts users, content, moderation records
 or staging mappings, and never permits activation. Target eligibility, staging and
 dry-run review are implemented separately in [Stage 10](import-dry-run.md); activation belongs to Stage 11.
 
@@ -11,9 +11,13 @@ Use same-origin authenticated cookies and CSRF headers. Confirm the current pass
 at `/api/v1/account/data/reauthentication` with scope `IMPORT_UPLOAD`. Then:
 
 1. POST `/api/v1/admin/data/imports` with a UUID `Idempotency-Key` and JSON
-   `{formatVersion:1,recentAuthGrant:token}`. Only these fields are accepted.
-   The 201 result is an owner-scoped UPLOADING job. Matching retries reuse it.
+   `{formatVersion:1,recentAuthGrant:token,provider:"NATIVE"}`. Provider is optional
+   and defaults to NATIVE; DISCOURSE selects the [versioned Discourse bundle](discourse-import.md).
+   Other fields are rejected. Provider participates in request idempotency and
+   cannot change after creation. The 201 result is an owner-scoped UPLOADING job.
+   Matching retries reuse it.
 2. PUT `/api/v1/admin/data/imports/{id}/archive` with raw `application/zip` bytes
+   for NATIVE or `application/json` for DISCOURSE, matching the selected provider,
    and CSRF. No multipart, source URL, path or client filename is accepted. A fully
    received, durably stored archive receives a SHA-256 and 200 UPLOADED response.
    Partial uploads never become inspection input. On interruption, restart the whole
@@ -26,7 +30,7 @@ at `/api/v1/account/data/reauthentication` with scope `IMPORT_UPLOAD`. Then:
    rows checked, error count, inspection timestamp and up to 1,000 file/line/code
    issues. Pending inspection returns 409. `activationAvailable` is always false.
    No raw record values, content samples, filenames supplied by an attacker or private
-   storage paths are included. There is no confirm/activation endpoint in Stage 9.
+   storage paths are included. Activation requires the separate reviewed workflow.
 
 Other administrators cannot upload into, inspect, cancel or download your jobs.
 Each read/write/worker phase rechecks ownership and current account authority;
@@ -36,6 +40,12 @@ are no-store. Upload completion and inspection have durable audit events; worker
 logs carry job IDs and safe diagnostics, never source content.
 
 ## Limits and supported ZIP subset
+
+The Discourse provider has a separate 8 MiB actual-upload limit and strict JSON
+bundle reader (duplicate keys, UTF-8, depth, fields, version, IDs and source counts).
+It creates bounded native records and runs the same schema/relationship validator.
+The ZIP subset below applies to NATIVE only. Both providers use the same private
+storage, ownership, recent-authentication, worker fencing and cleanup machinery.
 
 The upload reader and route-specific Nginx allowance both cap actual archive bytes
 at 64 MiB. The ordinary API retains its 1 MiB proxy cap. Request buffering is disabled

@@ -101,5 +101,14 @@ fails. The legacy development-volume check is not invoked by these commands.
 
 ## Recorded results
 
+The runner executes community/export, native import, and Discourse import groups
+separately. Each import group gets a fresh disposable bootstrap target; a completed
+native import cannot contaminate Discourse target eligibility. The Discourse test
+uploads the real synthetic 3.5.0 exporter fixture, checks provider selection,
+loss acknowledgements, numeric source mappings, keyboard/mobile layout, activation,
+counts and reload reconciliation. Run it alone with
+`npm run test:smoke -- discourse-import.spec.ts`. Its screenshot and logs are in
+`frontend/test-results/discourse/`; all test projects use isolated data.
+
 See [verification](verification.md) for repeatable commands, coverage, recorded
 results, and current limitations.

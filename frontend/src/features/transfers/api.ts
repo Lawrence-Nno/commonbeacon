@@ -4,7 +4,7 @@ export type ExportOptions = { includeContacts: boolean; includeModerationHistory
 export type Job = {
   id: string; kind: string; state: string; version: number; createdAt: string;
   updatedAt: string; expiresAt: string; processedRecords: number; errorCode: string | null;
-  artifactAvailable: boolean; allowedActions: string[];
+  artifactAvailable: boolean; allowedActions: string[]; provider?: "NATIVE" | "DISCOURSE";
 };
 export type JobPage = { items: Job[]; nextCursor: string | null };
 const root = "/api/v1/admin/data";
@@ -18,6 +18,7 @@ function timestamp(value: unknown): string { return typeof value === "string" &&
 function count(value: unknown): number { return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : invalid(); }
 export function readJob(value: unknown): Job {
   const v = object(value);
+  if (v.provider !== undefined && v.provider !== "NATIVE" && v.provider !== "DISCOURSE") return invalid();
   if (typeof v.id !== "string" || !/^[0-9a-f-]{36}$/i.test(v.id)
     || !["COMPANY_EXPORT", "COMPANY_IMPORT", "PERSONAL_EXPORT"].includes(String(v.kind))
     || !["QUEUED", "RUNNING", "READY", "FAILED", "CANCELLED", "UPLOADING", "UPLOADED", "VALIDATING", "REVIEW_REQUIRED", "READY_TO_COMMIT", "COMMITTING", "COMPLETED"].includes(String(v.state))
@@ -26,7 +27,7 @@ export function readJob(value: unknown): Job {
   return { id: v.id, kind: v.kind as string, state: v.state as string, version: count(v.version),
     createdAt: timestamp(v.createdAt), updatedAt: timestamp(v.updatedAt), expiresAt: timestamp(v.expiresAt),
     processedRecords: count(v.processedRecords), errorCode: v.errorCode, artifactAvailable: v.artifactAvailable,
-    allowedActions: v.allowedActions as string[] };
+    allowedActions: v.allowedActions as string[], ...(v.provider === undefined ? {} : { provider: v.provider }) };
 }
 export function readPage(value: unknown, personal = false): JobPage {
   const v = object(value);
