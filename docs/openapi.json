@@ -3622,6 +3622,19 @@
               "type": "string",
               "maxLength": 128
             }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "description": "Filter within this namespace; omitted retains existing mixed history behavior.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "COMPANY_EXPORT",
+                "COMPANY_IMPORT"
+              ]
+            }
           }
         ],
         "responses": {
@@ -4498,6 +4511,18 @@
             "schema": {
               "type": "string",
               "maxLength": 128
+            }
+          },
+          {
+            "name": "kind",
+            "in": "query",
+            "required": false,
+            "description": "Filter within this namespace; omitted retains existing mixed history behavior.",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "PERSONAL_EXPORT"
+              ]
             }
           }
         ],
@@ -6445,7 +6470,7 @@
             }
           }
         ],
-        "description": "Owner-only ACTIVE administrator. Returns 409 while pending and 410 after termination/expiry. Rechecks target generation and state, mapping/staging fingerprints and source metadata; changed inputs mark the review stale. Reports no raw source values. READY_TO_COMMIT means validation and bootstrap-target checks passed, not permission to activate. A fresh eligible review exposes activationAvailable=true; confirmation still requires the separate protected endpoint.",
+        "description": "Owner-only ACTIVE administrator. Returns 409 while pending and 410 after termination/expiry. Rechecks target generation and state, mapping/staging fingerprints and source metadata; changed inputs mark the review stale. Reports bounded manifest metadata, counts and error codes, not row payloads or contact values. READY_TO_COMMIT means validation and bootstrap-target checks passed, not permission to activate. A fresh eligible review exposes activationAvailable=true; confirmation still requires the separate protected endpoint.",
         "responses": {
           "400": {
             "description": "Invalid request",
@@ -6787,6 +6812,169 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/ImportConfirmationRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/data/imports/{id}/reconciliation": {
+      "get": {
+        "operationId": "getImportReconciliation",
+        "summary": "Reconcile a terminal native import",
+        "tags": [
+          "transfers"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          }
+        ],
+        "description": "Owner-only current ACTIVE administrator. Historical counts use the activation receipt; mappings page over the durable provenance ledger. Missing unconfirmed review details yield null expected/skipped/rejected counts and zero created. A completed job without a receipt is unavailable, never reported as zero. No raw source data. All responses are no-store.",
+        "responses": {
+          "400": {
+            "description": "Invalid request",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in required",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF/grant/ticket",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found or not owned",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version/state/idempotency conflict or download already active",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Transfer storage unavailable",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Historical counts and up to 100 authorized source/local references",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportReconciliation"
+                }
               }
             }
           }
@@ -8991,6 +9179,41 @@
           "manifestDigest": {
             "type": "string",
             "description": "SHA-256 of the canonical reviewed manifest; empty if no manifest could be validated, absent on legacy version-1 stale reports."
+          },
+          "productVersion": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "sourceOptions": {
+            "type": "object",
+            "required": [
+              "includeContacts",
+              "includeModerationHistory"
+            ],
+            "properties": {
+              "includeContacts": {
+                "type": "boolean"
+              },
+              "includeModerationHistory": {
+                "type": "boolean"
+              }
+            }
+          },
+          "exclusions": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            }
+          },
+          "sourceWarnings": {
+            "type": "array",
+            "maxItems": 30,
+            "items": {
+              "type": "string",
+              "maxLength": 200
+            }
           }
         }
       },
@@ -9045,6 +9268,426 @@
             "type": "string",
             "pattern": "^[A-Za-z0-9_-]{43}$",
             "writeOnly": true
+          }
+        }
+      },
+      "ImportReconciliation": {
+        "type": "object",
+        "required": [
+          "jobId",
+          "state",
+          "detailsAvailable",
+          "review",
+          "counts",
+          "mappings",
+          "nextCursor"
+        ],
+        "properties": {
+          "jobId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "state": {
+            "enum": [
+              "COMPLETED",
+              "FAILED",
+              "CANCELLED"
+            ]
+          },
+          "detailsAvailable": {
+            "type": "boolean"
+          },
+          "review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImportReview"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "counts": {
+            "type": "object",
+            "required": [
+              "users",
+              "boards",
+              "questions",
+              "replies",
+              "acceptances",
+              "articles",
+              "contacts",
+              "reports",
+              "actions"
+            ],
+            "properties": {
+              "users": {
+                "type": "object",
+                "required": [
+                  "expected",
+                  "created",
+                  "skipped",
+                  "rejected"
+                ],
+                "properties": {
+                  "expected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "created": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "skipped": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "rejected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                }
+              },
+              "boards": {
+                "type": "object",
+                "required": [
+                  "expected",
+                  "created",
+                  "skipped",
+                  "rejected"
+                ],
+                "properties": {
+                  "expected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "created": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "skipped": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "rejected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                }
+              },
+              "questions": {
+                "type": "object",
+                "required": [
+                  "expected",
+                  "created",
+                  "skipped",
+                  "rejected"
+                ],
+                "properties": {
+                  "expected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "created": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "skipped": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "rejected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                }
+              },
+              "replies": {
+                "type": "object",
+                "required": [
+                  "expected",
+                  "created",
+                  "skipped",
+                  "rejected"
+                ],
+                "properties": {
+                  "expected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "created": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "skipped": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "rejected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                }
+              },
+              "acceptances": {
+                "type": "object",
+                "required": [
+                  "expected",
+                  "created",
+                  "skipped",
+                  "rejected"
+                ],
+                "properties": {
+                  "expected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "created": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "skipped": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "rejected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                }
+              },
+              "articles": {
+                "type": "object",
+                "required": [
+                  "expected",
+                  "created",
+                  "skipped",
+                  "rejected"
+                ],
+                "properties": {
+                  "expected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "created": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "skipped": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "rejected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                }
+              },
+              "contacts": {
+                "type": "object",
+                "required": [
+                  "expected",
+                  "created",
+                  "skipped",
+                  "rejected"
+                ],
+                "properties": {
+                  "expected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "created": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "skipped": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "rejected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                }
+              },
+              "reports": {
+                "type": "object",
+                "required": [
+                  "expected",
+                  "created",
+                  "skipped",
+                  "rejected"
+                ],
+                "properties": {
+                  "expected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "created": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "skipped": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "rejected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                }
+              },
+              "actions": {
+                "type": "object",
+                "required": [
+                  "expected",
+                  "created",
+                  "skipped",
+                  "rejected"
+                ],
+                "properties": {
+                  "expected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "created": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "skipped": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  },
+                  "rejected": {
+                    "type": [
+                      "integer",
+                      "null"
+                    ],
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "mappings": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "object",
+              "required": [
+                "entity",
+                "sourceId",
+                "localId",
+                "sourceInstanceId",
+                "originSourceId"
+              ],
+              "properties": {
+                "entity": {
+                  "type": "string"
+                },
+                "sourceId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "localId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "sourceInstanceId": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "originSourceId": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          "nextCursor": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 128
           }
         }
       }

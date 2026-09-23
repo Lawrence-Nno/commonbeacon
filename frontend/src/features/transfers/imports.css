@@ -1,0 +1,13 @@
+.import-screen { min-width: 0; }
+.import-screen input[type="file"], .import-screen select { display: block; max-width: 100%; margin-block: .6rem 1rem; }
+.import-reference, .import-mappings { overflow-wrap: anywhere; }
+.import-counts { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 1rem; margin-block: 1rem; }
+.import-counts > * { padding: 1rem; border: 1px solid #d4dcd5; border-radius: .6rem; margin: 0; }
+.import-counts span, .import-mappings span { display: block; }
+.import-counts dl { display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; }
+.import-counts dd { margin: 0; text-align: right; }
+.import-mappings li, .import-history li { margin-block: 1rem; }
+.import-screen details { margin-block: 1rem; }
+.import-screen summary { cursor: pointer; font-weight: 600; }
+.import-screen progress { width: min(100%, 32rem); display: block; margin-block: 1rem; }
+.import-screen .button { margin: .25rem; }

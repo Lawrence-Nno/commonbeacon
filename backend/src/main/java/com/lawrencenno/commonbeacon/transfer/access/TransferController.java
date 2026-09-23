@@ -57,8 +57,9 @@ public class TransferController {
         return new Summary(j.id(),j.kind(),j.state(),j.version(),j.createdAt(),j.updatedAt(),j.expiresAt(),j.checkpoint(),j.errorCode(),available,List.copyOf(actions));
     }
     @GetMapping public Page list(Authentication authentication,HttpServletRequest request,
-            @RequestParam(defaultValue="20") int size,@RequestParam(required=false) String cursor) {
+            @RequestParam(defaultValue="20") int size,@RequestParam(required=false) String cursor,@RequestParam(required=false) TransferJob.Kind kind) {
         boolean personal=personal(request);var actor=access.current(authentication,!personal);
+        if(kind!=null && (kind==TransferJob.Kind.PERSONAL_EXPORT)!=personal)throw new ApiFailure(400,"INVALID_REQUEST","Choose a transfer kind from this namespace.");
         if(size<1 || size>100)throw new ApiFailure(400,"INVALID_REQUEST","Page size must be between 1 and 100.");
         Instant before=Instant.parse("9999-12-31T23:59:59Z");UUID beforeId=UUID.fromString("ffffffff-ffff-ffff-ffff-ffffffffffff");
         if(cursor!=null) {
@@ -70,7 +71,7 @@ public class TransferController {
             }catch(RuntimeException e){throw new ApiFailure(400,"INVALID_REQUEST","The page cursor is invalid.");}
         }
         Instant finalBefore=before;UUID finalId=beforeId;
-        var rows=run(()->jobs.list(actor.id(),finalBefore,finalId,size,personal));boolean more=rows.size()>size;
+        var rows=run(()->jobs.list(actor.id(),finalBefore,finalId,size,personal,kind));boolean more=rows.size()>size;
         var page=rows.subList(0,Math.min(size,rows.size()));String next=null;
         if(more){var last=page.getLast();next=Base64.getUrlEncoder().withoutPadding().encodeToString((last.createdAt()+"|"+last.id()).getBytes(StandardCharsets.US_ASCII));}
         return new Page(page.stream().map(this::summary).toList(),next);

@@ -95,6 +95,7 @@ See the [onboarding walkthrough](docs/demo-walkthrough.md) and
 - [Host tool setup](docs/development-setup.md) and [host backend](docs/backend-setup.md)
 - [Isolated browser tests](docs/browser-testing.md)
 - [Atomic native import activation](docs/import-activation.md)
+- [Import screens and reconciliation](docs/import-ui.md)
 - [REST API examples](docs/api.md) and [OpenAPI contract](docs/openapi.json)
 - [Architecture decisions](docs/architecture.md)
 - [Testing, verification results, and limitations](docs/verification.md)

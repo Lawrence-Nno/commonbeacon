@@ -30,6 +30,7 @@ import tools.jackson.databind.*;
 @org.springframework.test.context.ActiveProfiles("local")
 class ImportActivationIT {
     @Autowired ImportActivation activation;
+    @Autowired ImportReconciliation reconciliation;
     @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
     @Autowired com.lawrencenno.commonbeacon.transfer.export.CompanySnapshot snapshots;
     @Autowired com.lawrencenno.commonbeacon.identity.IdentityService identities;
@@ -119,8 +120,56 @@ class ImportActivationIT {
         }
         assertThat(new com.lawrencenno.commonbeacon.transfer.archive.ArchiveCodec().validateCompanyImport(dataset.manifest(),exportedFiles,row->{}).valid()).isTrue();
         jobs.releaseCleanedReservations();assertThat(count("transfer_stage")).isZero();assertThat(count("imported_record")).isEqualTo(19);
+        var receipt=reconciliation.report(admin,id,null);
+        assertThat(receipt.path("detailsAvailable").asBoolean()).isTrue();
+        assertThat(receipt.path("counts").path("users").path("created").asLong()).isEqualTo(4);
+        assertThat(receipt.path("counts").path("acceptances").path("created").asLong()).isEqualTo(2);
+        assertThat(receipt.path("mappings").size()).isEqualTo(19);
+        assertThat(receipt.path("review").path("sourceOptions").path("includeContacts").asBoolean()).isTrue();
+        try(var a=new Browser(admin);var b=new Browser(other);var anon=new Browser(null)) {
+            var response=a.get(path(id)+"/reconciliation");assertThat(response.statusCode()).isEqualTo(200);
+            assertThat(response.headers().firstValue("Cache-Control").orElse("")).contains("no-store");
+            assertThat(b.get(path(id)+"/reconciliation").statusCode()).isEqualTo(404);
+            assertThat(anon.get(path(id)+"/reconciliation").statusCode()).isEqualTo(401);
+            assertThat(a.get(path(id)+"/reconciliation?cursor=bad").statusCode()).isEqualTo(400);
+            var exports=json.readTree(a.get("/api/v1/admin/data/jobs?kind=COMPANY_EXPORT").body()).path("items");
+            assertThat(exports.size()).isEqualTo(1);assertThat(exports.get(0).path("id").asText()).isEqualTo(export.id().toString());
+            var imports=json.readTree(a.get("/api/v1/admin/data/jobs?kind=COMPANY_IMPORT").body()).path("items");
+            assertThat(imports.size()).isEqualTo(1);assertThat(imports.get(0).path("id").asText()).isEqualTo(id.toString());
+        }
         assertThat(activation.confirm(admin,id,key,body,()->{throw new AssertionError("Replay consumed grant");}).state()).isEqualTo(TransferJob.State.COMPLETED);
         assertThat(count("app_user")).isEqualTo(6);assertThat(activation.runOnce()).isFalse();
+    }
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans={false,true})
+    void reconcilesCancelledOrFailedWithoutInventingExpiredCounts(boolean fail)throws Exception {
+        UUID id=inspected(fixture("company-full"));var review=reviewed(id);
+        if(fail){activation.confirm(admin,id,UUID.randomUUID(),confirmation(id,review),()->{});PHASE.set(p->{throw new IllegalStateException("INJECTED");});activation.runOnce();}
+        else jobs.cancel(admin,id,jobs.status(admin,id).version());
+        var result=reconciliation.report(admin,id,null);
+        assertThat(result.path("counts").path("users").path("created").asLong()).isZero();
+        assertThat(result.path("counts").path("users").path(fail?"rejected":"skipped").asLong()).isEqualTo(4);
+        assertThat(result.path("mappings").isEmpty()).isTrue();
+        jobs.releaseCleanedReservations();result=reconciliation.report(admin,id,null);
+        assertThat(result.path("detailsAvailable").asBoolean()).isEqualTo(fail);
+        if(!fail)assertThat(result.path("counts").path("users").path("expected").isNull()).isTrue();
+    }
+    @Test void pagesDurableMappingsAndKeepsHistoricalCountsAfterLiveEdits()throws Exception {
+        var files=fixture("company-empty");var output=new ByteArrayOutputStream();
+        var template=(tools.jackson.databind.node.ObjectNode)json.readTree(new String(fixture("company-full").get("users.jsonl"),java.nio.charset.StandardCharsets.UTF_8).lines().findFirst().orElseThrow());
+        var codec=new com.lawrencenno.commonbeacon.transfer.archive.ArchiveCodec();
+        for(int i=0;i<105;i++){var row=template.deepCopy();row.put("id",new UUID(0,1000+i).toString());row.remove("origin");output.write(codec.encodeRow(com.lawrencenno.commonbeacon.transfer.archive.ArchiveFormat.Profile.company,com.lawrencenno.commonbeacon.transfer.archive.ArchiveFormat.Entity.users,row));}
+        var bytes=output.toByteArray();files.put("users.jsonl",bytes);var manifest=(tools.jackson.databind.node.ObjectNode)json.readTree(files.get("manifest.json"));
+        for(var f:manifest.path("files"))if(f.path("name").asText().equals("users.jsonl"))((tools.jackson.databind.node.ObjectNode)f).put("count",105).put("uncompressedBytes",bytes.length).put("sha256",HexFormat.of().formatHex(com.lawrencenno.commonbeacon.transfer.archive.ArchiveCodec.sha256().digest(bytes)));
+        files.put("manifest.json",codec.encodeManifest(manifest));var id=inspected(files);var r=reviewed(id);assertThat(r.path("eligible").asBoolean()).as(r.toString()).isTrue();
+        activation.confirm(admin,id,UUID.randomUUID(),confirmation(id,r),()->{});activation.runOnce();jobs.releaseCleanedReservations();
+        var first=reconciliation.report(admin,id,null);assertThat(first.path("mappings").size()).isEqualTo(100);
+        var second=reconciliation.report(admin,id,first.path("nextCursor").asText());assertThat(second.path("mappings").size()).isEqualTo(5);assertThat(second.path("nextCursor").isNull()).isTrue();
+        var ids=new HashSet<String>();first.path("mappings").forEach(m->ids.add(m.path("sourceId").asText()));second.path("mappings").forEach(m->ids.add(m.path("sourceId").asText()));assertThat(ids).hasSize(105);
+        jdbc.update("UPDATE app_user SET display_name='Edited after import' WHERE account_state='IMPORTED_INACTIVE'");
+        assertThat(reconciliation.report(admin,id,null).path("counts").path("users").path("created").asLong()).isEqualTo(105);
+        jdbc.update("DELETE FROM transfer_activation WHERE job_id=?",id);
+        assertThatThrownBy(()->reconciliation.report(admin,id,null)).isInstanceOf(com.lawrencenno.commonbeacon.shared.ApiFailure.class).hasMessageContaining("receipt");
     }
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings={"validated","users","boards","questions","replies","acceptances","articles","reports","actions","provenance","completion"})

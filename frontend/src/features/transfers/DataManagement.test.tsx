@@ -172,7 +172,7 @@ it("pages bounded history and sends the reviewed version when cancelling", async
   await userEvent.click(await screen.findByRole("button", { name: /View details/ }));
   await screen.findByText(`Reference: ${job.id}`);
   await userEvent.click(screen.getByRole("button", { name: "Older requests" }));
-  await waitFor(() => expect(mock.mock.calls.some(([url]) => url.includes("size=20&cursor=next"))).toBe(true));
+  await waitFor(() => expect(mock.mock.calls.some(([url]) => url.includes("size=20&kind=COMPANY_EXPORT&cursor=next"))).toBe(true));
   await userEvent.click(await screen.findByRole("button", { name: /View details/ }));
   await screen.findByText(`Reference: ${job.id}`);
   await userEvent.click(screen.getByRole("button", { name: "Cancel export" }));
@@ -198,5 +198,5 @@ it.each([false, true])("shows only the latest request, including failure, for pe
   expect(screen.queryByText(/Reference: 00000000-0000-0000-0000-000000000002/)).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: "Older requests" })).not.toBeInTheDocument();
   expect(screen.getByRole("link", { name: "View export history" })).toHaveAttribute("href", personal ? "/account/data/history" : "/admin/data/history");
-  expect(mock.mock.calls.some(([url]) => url.endsWith("/jobs?size=1"))).toBe(true);
+  expect(mock.mock.calls.some(([url]) => url.endsWith(`/jobs?size=1${personal ? "" : "&kind=COMPANY_EXPORT"}`))).toBe(true);
 });

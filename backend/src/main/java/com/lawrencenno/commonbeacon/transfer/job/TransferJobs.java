@@ -357,10 +357,13 @@ public class TransferJobs {
         });
     }
     public List<TransferJob> list(UUID actor,Instant before,UUID beforeId,int limit,boolean personal) {
+        return list(actor,before,beforeId,limit,personal,null);
+    }
+    public List<TransferJob> list(UUID actor,Instant before,UUID beforeId,int limit,boolean personal,Kind kind) {
         if(limit<1 || limit>100)throw new IllegalArgumentException("INVALID_PAGE_SIZE");
         return locked(() -> {
             if(!permitted(actor,personal?Kind.PERSONAL_EXPORT:Kind.COMPANY_EXPORT))throw new IllegalStateException("FORBIDDEN");
-            return jdbc.query("SELECT * FROM transfer_job WHERE requester_id=? AND (kind='PERSONAL_EXPORT')=? AND (created_at,id)<(?,?) ORDER BY created_at DESC,id DESC LIMIT ?",ROW,actor,personal,Timestamp.from(before),beforeId,limit+1);
+            return jdbc.query("SELECT * FROM transfer_job WHERE requester_id=? AND (kind='PERSONAL_EXPORT')=? AND (?::text IS NULL OR kind=?) AND (created_at,id)<(?,?) ORDER BY created_at DESC,id DESC LIMIT ?",ROW,actor,personal,kind==null?null:kind.name(),kind==null?null:kind.name(),Timestamp.from(before),beforeId,limit+1);
         });
     }
     public TransferJob cancel(UUID actor,UUID id,long version,UUID key,boolean personal) {

@@ -153,6 +153,9 @@ public class ImportDryRuns {
             if(validation.valid() && (stagedRows!=validation.rows() || mappedRows!=expectedMappings))error.accept(new ArchiveFormat.Issue("archive",0,"STAGING_COUNT_MISMATCH"));
             var manifest=validation.manifest();
             if(manifest!=null) {
+                report.set("sourceOptions",manifest.path("options"));report.set("exclusions",manifest.path("exclusions"));
+                report.set("productVersion",manifest.path("productVersion"));
+                report.set("sourceWarnings",manifest.path("warnings"));
                 report.set("profile",manifest.get("profile"));report.set("formatVersion",manifest.get("formatVersion"));report.set("sourceInstanceId",manifest.get("sourceInstanceId"));
                 String instance=manifest.path("sourceInstanceId").asText();
                 var origins=new HashSet<String>();

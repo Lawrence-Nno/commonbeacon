@@ -1,0 +1,8 @@
+# Only used with compose.e2e.yaml in a separately named disposable project.
+services:
+  backend:
+    environment:
+      DEMO_SEED_ENABLED: "false"
+  frontend:
+    ports: !override
+      - "127.0.0.1:4176:8080"
