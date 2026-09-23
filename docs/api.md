@@ -170,7 +170,7 @@ report reasons, or identifiers. See [the overview behavior](moderation.md#operat
 
 ## Checking the contract
 
-`docs/openapi.json` is OpenAPI 3.1, with 51 implemented operations and 51 schemas.
+`docs/openapi.json` is OpenAPI 3.1, with 58 implemented operations and 57 schemas.
 It covers the application API; Nginx and Actuator health probes are separate.
 OpenAPI-compatible validators and clients can load the file directly. An optional
 Python validator can run without changing application dependencies:

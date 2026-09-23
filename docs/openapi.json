@@ -6092,7 +6092,7 @@
             }
           }
         ],
-        "description": "Requester-only ACTIVE ADMINISTRATOR. Returns 409 until an inspection is available. Results have at most 1000 file/line/code issues and no raw source values. valid means native archive inspection passed, not eligibility to activate. Both valid and rejected archives move to REVIEW_REQUIRED; activationAvailable is always false. Request the separate dry-run endpoint for private staging and target review; activation remains unavailable.",
+        "description": "Requester-only ACTIVE ADMINISTRATOR. Returns 409 until an inspection is available. Results have at most 1000 file/line/code issues and no raw source values. valid means native archive inspection passed, not eligibility to activate. Both valid and rejected archives move to REVIEW_REQUIRED; activationAvailable is always false. Request the separate dry-run endpoint for private staging and target review; confirmation requires a fresh eligible dry-run review.",
         "responses": {
           "400": {
             "description": "Invalid request",
@@ -6445,7 +6445,7 @@
             }
           }
         ],
-        "description": "Owner-only ACTIVE administrator. Returns 409 while pending and 410 after termination/expiry. Rechecks target generation and state, mapping/staging fingerprints and source metadata; changed inputs mark the review stale. Reports no raw source values. READY_TO_COMMIT means validation and bootstrap-target checks passed, not permission to activate. activationAvailable is always false; activation is not implemented.",
+        "description": "Owner-only ACTIVE administrator. Returns 409 while pending and 410 after termination/expiry. Rechecks target generation and state, mapping/staging fingerprints and source metadata; changed inputs mark the review stale. Reports no raw source values. READY_TO_COMMIT means validation and bootstrap-target checks passed, not permission to activate. A fresh eligible review exposes activationAvailable=true; confirmation still requires the separate protected endpoint.",
         "responses": {
           "400": {
             "description": "Invalid request",
@@ -6588,6 +6588,205 @@
                 "schema": {
                   "$ref": "#/components/schemas/Problem"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/data/imports/{id}/confirm": {
+      "post": {
+        "operationId": "confirmNativeImport",
+        "summary": "Confirm bounded atomic native activation",
+        "tags": [
+          "transfers"
+        ],
+        "security": [
+          {
+            "session": []
+          }
+        ],
+        "description": "Requester-only ACTIVE administrator with unchanged authorization revision, CSRF and single-use IMPORT_COMMIT password grant. Binds the reviewed version, digests, target generation and every warning. Returns 202 COMMITTING before worker activation; cancellation is then refused. Same key and confirmation body replays authoritative state without consuming another grant, including after completion. The worker rechecks inputs under an exclusive migration gate and commits live rows, provenance and completion together within 30 seconds. Gate conflicts return 409 IMPORT_IN_PROGRESS. At most 40,000 rows and 16 MiB staged JSON; populated targets cannot activate.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Invalid request",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in required",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or invalid CSRF/grant/ticket",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found (also another requester or wrong namespace)",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Version/state/idempotency conflict or download already active",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Request body or activation capacity limit exceeded",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Transfer storage unavailable",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Success",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TransferJob"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ImportConfirmationRequest"
               }
             }
           }
@@ -8701,7 +8900,8 @@
             "type": "boolean"
           },
           "activationAvailable": {
-            "const": false
+            "type": "boolean",
+            "description": "True only for an eligible fresh review. Confirmation still requires authorization and final revalidation."
           },
           "staleReason": {
             "const": "REVIEW_INPUT_CHANGED"
@@ -8786,7 +8986,65 @@
           },
           "budget": {
             "type": "object",
-            "description": "Enforced record/byte/batch limits, staged bytes and productionCapacityCertified=false. Real production capacity requires measurement before activation."
+            "description": "Staging limits, maxActivationBytes=16777216 and productionCapacityCertified=false. The final transaction has an enforced 30-second deadline; local envelope measurement is not production certification."
+          },
+          "manifestDigest": {
+            "type": "string",
+            "description": "SHA-256 of the canonical reviewed manifest; empty if no manifest could be validated, absent on legacy version-1 stale reports."
+          }
+        }
+      },
+      "ImportConfirmationRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "expectedVersion",
+          "reviewDigest",
+          "archiveDigest",
+          "targetGeneration",
+          "acknowledgedPrivateContent",
+          "acknowledgedInactiveAuthors",
+          "acknowledgedWarnings",
+          "recentAuthGrant"
+        ],
+        "properties": {
+          "expectedVersion": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reviewDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "archiveDigest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "targetGeneration": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "acknowledgedPrivateContent": {
+            "const": true
+          },
+          "acknowledgedInactiveAuthors": {
+            "const": true
+          },
+          "acknowledgedWarnings": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 32,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "description": "Exactly the warning codes returned in the fresh review."
+          },
+          "recentAuthGrant": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{43}$",
+            "writeOnly": true
           }
         }
       }

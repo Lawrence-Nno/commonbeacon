@@ -189,7 +189,7 @@ class ImportUploadIT {
         assertThatThrownBy(()->dryRuns.request(admin,id,j.version()+1,key)).hasMessage("IDEMPOTENCY_CONFLICT");
         assertThat(new ImportDryRunWorker(jobs,store,dryRuns).runOnce()).isTrue();var report=dryRuns.review(admin,id);
         assertThat(report.path("eligible").asBoolean()).as(report.toString()).isTrue();assertThat(report.path("fresh").asBoolean()).isTrue();
-        assertThat(report.path("activationAvailable").asBoolean()).isFalse();assertThat(report.path("counts").path("users").asInt()).isEqualTo(4);
+        assertThat(report.path("activationAvailable").asBoolean()).isTrue();assertThat(report.path("counts").path("users").asInt()).isEqualTo(4);
         assertThat(jobs.status(admin,id).state()).isEqualTo(TransferJob.State.READY_TO_COMMIT);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_stage WHERE job_id=?",Long.class,id)).isEqualTo(22);
         var mappings=jdbc.queryForList("SELECT entity,source_id,local_id FROM transfer_mapping WHERE job_id=? ORDER BY entity,source_id",id);

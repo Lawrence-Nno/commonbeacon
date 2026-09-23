@@ -13,7 +13,7 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 import static com.lawrencenno.commonbeacon.transfer.job.TransferJob.*;
 
-/** Private staging only. A reviewed import cannot activate until the later commit protocol exists. */
+/** Private staging only. Activation separately revalidates this review under the migration gate. */
 @Service
 public class ImportDryRuns {
     private static final JsonMapper JSON=JsonMapper.builder().build();
@@ -52,7 +52,7 @@ public class ImportDryRuns {
     public Optional<TransferJob> claim(UUID worker) {
         return jobs.locked(()->{
             jobs.recoverLocked();
-            if(jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE lease_until>clock_timestamp()",Long.class)>0)return Optional.empty();
+            if(jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE lease_until>clock_timestamp() OR state='COMMITTING'",Long.class)>0)return Optional.empty();
             var pending=jdbc.query("SELECT j.* FROM transfer_job j JOIN transfer_dry_run d ON d.job_id=j.id WHERE j.state='VALIDATING' AND j.worker_id IS NULL AND d.status='PENDING' ORDER BY j.created_at,j.id LIMIT 10 FOR UPDATE OF j",TransferJobs.ROW);
             for(var j:pending) {
                 if(!jobs.permitted(j)){jobs.fail(j,Failure.AUTHORIZATION_REVOKED);continue;}
@@ -93,7 +93,7 @@ public class ImportDryRuns {
             jdbc.update("UPDATE transfer_job SET checkpoint=?,version=version+1,updated_at=clock_timestamp() WHERE id=?",count,lease.jobId());return null;
         });
     }
-    private ObjectNode target() {
+    ObjectNode target() {
         var result=JSON.createObjectNode();result.put("generation",jdbc.queryForObject("SELECT last_value FROM transfer_target_generation",Long.class));
         boolean eligible=!demo;var counts=result.putObject("counts");
         for(var entry:new TreeMap<>(TABLES).entrySet()) {
@@ -102,13 +102,25 @@ public class ImportDryRuns {
         }
         long disallowed=jdbc.queryForObject("SELECT count(*) FROM app_user WHERE role<>'ADMINISTRATOR' OR account_state<>'ACTIVE'",Long.class);
         if(disallowed!=0 || counts.path("users").asLong()>2000)eligible=false;
+        long importedAuthors=jdbc.queryForObject("SELECT count(*) FROM imported_author",Long.class);
+        long importedRecords=jdbc.queryForObject("SELECT count(*) FROM imported_record",Long.class);
+        eligible=eligible && importedAuthors==0 && importedRecords==0;
+        result.put("importedAuthors",importedAuthors);result.put("importedRecords",importedRecords);
         result.put("ineligibleAccounts",disallowed);result.put("demoSeedingEnabled",demo);result.put("eligible",eligible);
         // Include identity state as well as the sequence: a transaction may increment the sequence before committing.
         var identities=jdbc.queryForList("SELECT id,display_name,email,role,account_state,auth_revision,created_at FROM app_user ORDER BY id LIMIT 2001");
         result.put("identityDigest",hash(JSON.writeValueAsString(identities)));
         result.put("digest",hash(result.toString()));return result;
     }
-    private String stagingDigest(UUID id) {
+    String reviewDigest(JsonNode report) {
+        var copy=(ObjectNode)report.deepCopy();copy.remove("reviewDigest");
+        return hash(jdbc.queryForObject("SELECT (?::jsonb)::text",String.class,copy.toString()));
+    }
+    String manifestDigest(UUID id) {
+        String manifest=jdbc.queryForObject("SELECT manifest::text FROM transfer_dry_run WHERE job_id=?",String.class,id);
+        return manifest==null?"":hash(manifest);
+    }
+    String stagingDigest(UUID id) {
         var digest=ArchiveCodec.sha256();
         // Fixed metadata only, at most 40,000 records. Raw body fields never accumulate here.
         jdbc.query(c->{var ps=c.prepareStatement("SELECT s.entity,s.source_id,s.payload_sha256,s.payload::text,m.local_id FROM transfer_stage s LEFT JOIN transfer_mapping m ON m.job_id=s.job_id AND m.entity=s.entity AND m.source_id=s.source_id WHERE s.job_id=? ORDER BY s.entity,s.source_id");ps.setObject(1,id);ps.setFetchSize(16);return ps;},(org.springframework.jdbc.core.RowCallbackHandler)r->{
@@ -126,7 +138,7 @@ public class ImportDryRuns {
             var run=jdbc.queryForMap("SELECT * FROM transfer_dry_run WHERE job_id=?",id);
             if(!source.id().equals(run.get("artifact_id")) || !source.hash().equals(run.get("archive_sha256")))throw new IllegalStateException("STAGING_CONFLICT");
             var report=JSON.createObjectNode();report.put("jobId",id.toString());report.put("archiveDigest",source.hash());
-            report.put("validationVersion",1);report.put("mappingVersion",1);report.put("mappingRevision",((Number)run.get("revision")).longValue());
+            report.put("validationVersion",2);report.put("mappingVersion",1);report.put("mappingRevision",((Number)run.get("revision")).longValue());
             report.put("activationAvailable",false);report.put("expiresAt",((Timestamp)run.get("expires_at")).toInstant().toString());
             var counts=report.putObject("counts");var checkpoints=report.putObject("checkpoints");
             for(var entity:ArchiveFormat.Entity.values()) {
@@ -162,6 +174,8 @@ public class ImportDryRuns {
             budget.put("maxRecords",40000);budget.put("maxStagedBytes",268435456);budget.put("batchRows",64);budget.put("batchBytes",1048576);
             budget.put("stagedBytes",jdbc.queryForObject("SELECT coalesce(sum(byte_count),0) FROM transfer_stage WHERE job_id=?",Long.class,id));
             budget.put("productionCapacityCertified",false);
+            budget.put("maxActivationBytes",ImportActivation.MAX_BYTES);
+            if(budget.path("stagedBytes").asLong()>ImportActivation.MAX_BYTES)error.accept(new ArchiveFormat.Issue("archive",0,"ACTIVATION_BUDGET_EXCEEDED"));
             var target=target();report.set("target",target);report.put("targetGeneration",target.path("generation").asLong());
             if(!target.path("eligible").asBoolean())error.accept(new ArchiveFormat.Issue("target",0,"TARGET_NOT_EMPTY_BOOTSTRAP"));
             var warnings=report.putArray("warnings");var acknowledgements=report.putArray("requiredAcknowledgements");
@@ -180,8 +194,10 @@ public class ImportDryRuns {
             var preview=report.putArray("mappingPreview");
             jdbc.query("SELECT entity,source_id,local_id FROM transfer_mapping WHERE job_id=? ORDER BY entity,source_id LIMIT 100",r->{var m=preview.addObject();m.put("entity",r.getString(1));m.put("sourceId",r.getString(2));m.put("localId",r.getString(3));},id);
             report.put("mappingPreviewLimit",100);report.put("stagingDigest",stagingDigest(id));report.put("totalErrors",errors[0]);report.put("fresh",true);report.put("eligible",errors[0]==0);
-            report.put("reviewDigest",hash(report.toString()));
-            jdbc.update("UPDATE transfer_dry_run SET status='REVIEWED',manifest=?::jsonb,report=?::jsonb WHERE job_id=?",manifest==null?null:manifest.toString(),report.toString(),id);
+            report.put("manifestDigest",manifest==null?"":hash(jdbc.queryForObject("SELECT (?::jsonb)::text",String.class,manifest.toString())));
+            report.put("activationAvailable",errors[0]==0);
+            report.put("reviewDigest",reviewDigest(report));
+            jdbc.update("UPDATE transfer_dry_run SET status='REVIEWED',validation_version=2,manifest=?::jsonb,report=?::jsonb WHERE job_id=?",manifest==null?null:manifest.toString(),report.toString(),id);
             jdbc.update("UPDATE transfer_job SET state=?,worker_id=NULL,lease_until=NULL,version=version+1,updated_at=clock_timestamp() WHERE id=?",errors[0]==0?"READY_TO_COMMIT":"REVIEW_REQUIRED",id);
             jobs.endAttempt(id);jobs.audit(id,Event.INSPECTED);return null;
         });
@@ -194,9 +210,11 @@ public class ImportDryRuns {
             if(rows.isEmpty() || rows.getFirst()==null)throw new IllegalStateException("JOB_CONFLICT");
             var report=(ObjectNode)JSON.readTree(rows.getFirst());
             boolean sourceLive=jdbc.queryForObject("SELECT count(*) FROM transfer_dry_run d JOIN transfer_artifact a ON a.id=d.artifact_id WHERE d.job_id=? AND a.state='AVAILABLE' AND a.sha256=d.archive_sha256 AND a.expires_at>clock_timestamp()",Long.class,id)==1;
-            boolean fresh=report.path("fresh").asBoolean() && sourceLive && report.path("validationVersion").asInt()==1 && report.path("mappingVersion").asInt()==1 && report.path("target").path("digest").asText().equals(target().path("digest").asText()) && report.path("stagingDigest").asText().equals(stagingDigest(id));
+            boolean fresh=report.path("fresh").asBoolean() && sourceLive && report.path("validationVersion").asInt()==2 && report.path("mappingVersion").asInt()==1 && report.path("target").path("digest").asText().equals(target().path("digest").asText()) && report.path("stagingDigest").asText().equals(stagingDigest(id));
+            fresh=fresh && report.path("reviewDigest").asText().equals(reviewDigest(report))
+                && report.path("manifestDigest").asText().equals(manifestDigest(id));
             if(!fresh) {
-                report.put("fresh",false);report.put("eligible",false);report.put("staleReason","REVIEW_INPUT_CHANGED");
+                report.put("fresh",false);report.put("eligible",false);report.put("activationAvailable",false);report.put("staleReason","REVIEW_INPUT_CHANGED");
                 jdbc.update("UPDATE transfer_dry_run SET status='STALE',report=?::jsonb WHERE job_id=?",report.toString(),id);
                 if(job.state()==State.READY_TO_COMMIT)jdbc.update("UPDATE transfer_job SET state='REVIEW_REQUIRED',version=version+1,updated_at=clock_timestamp() WHERE id=?",id);
             }

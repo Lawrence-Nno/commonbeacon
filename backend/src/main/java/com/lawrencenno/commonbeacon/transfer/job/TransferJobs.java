@@ -11,7 +11,7 @@ import org.springframework.transaction.*;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /** Internal persistence boundary, not an HTTP authorization or recent-authentication API.
- * Short transactions lock control -> job -> requester. Work/file I/O always happens outside. */
+ * Short transactions lock migration gate -> control -> job -> requester. Work/file I/O always happens outside. */
 @Service
 public class TransferJobs {
     private final JdbcTemplate jdbc;
@@ -31,6 +31,7 @@ public class TransferJobs {
     }
     <T> T locked(Supplier<T> action) {
         return transaction.execute(status -> {
+            com.lawrencenno.commonbeacon.shared.MigrationGate.shared(jdbc);
             jdbc.execute("SET LOCAL lock_timeout='5s'");
             jdbc.queryForObject("SELECT id FROM transfer_control WHERE id=1 FOR UPDATE", Integer.class);
             return action.get();
@@ -116,7 +117,7 @@ public class TransferJobs {
         return locked(()->{
             recoverLocked();var j=ownedImport(actor,id);
             if(j.state()!=State.UPLOADING || j.worker()!=null)throw new IllegalStateException("JOB_CONFLICT");
-            if(jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE lease_until>clock_timestamp()",Long.class)>0)
+            if(jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE lease_until>clock_timestamp() OR state='COMMITTING'",Long.class)>0)
                 throw new IllegalStateException("JOB_CONFLICT");
             if(jdbc.queryForObject("SELECT count(*) FROM transfer_artifact WHERE job_id=? AND state<>'DELETED'",Long.class,id)>=10)
                 throw new IllegalStateException("TRANSFER_QUOTA_EXCEEDED");
@@ -149,7 +150,7 @@ public class TransferJobs {
     public Optional<TransferJob> claimInspection(UUID worker) {
         return locked(()->{
             recoverLocked();
-            if(jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE lease_until>clock_timestamp()",Long.class)>0)return Optional.empty();
+            if(jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE lease_until>clock_timestamp() OR state='COMMITTING'",Long.class)>0)return Optional.empty();
             var pending=jdbc.query("SELECT * FROM transfer_job WHERE kind='COMPANY_IMPORT' AND state IN ('UPLOADED','VALIDATING') AND NOT EXISTS (SELECT 1 FROM transfer_dry_run d WHERE d.job_id=transfer_job.id) AND worker_id IS NULL ORDER BY created_at,id LIMIT 10 FOR UPDATE",ROW);
             for(var j:pending) {
                 if(!permitted(j)){fail(j,Failure.AUTHORIZATION_REVOKED);continue;}
@@ -197,7 +198,7 @@ public class TransferJobs {
         Objects.requireNonNull(worker);
         return locked(() -> {
             recoverLocked();
-            if (jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE lease_until>clock_timestamp()",Long.class)>0) return Optional.empty();
+            if (jdbc.queryForObject("SELECT count(*) FROM transfer_job WHERE lease_until>clock_timestamp() OR state='COMMITTING'",Long.class)>0) return Optional.empty();
             var candidates=jdbc.query("SELECT * FROM transfer_job WHERE state IN ('QUEUED','RUNNING','VALIDATING') AND worker_id IS NULL AND NOT EXISTS (SELECT 1 FROM transfer_dry_run d WHERE d.job_id=transfer_job.id) AND (? OR kind<>'COMPANY_IMPORT') AND (NOT ? OR kind='COMPANY_EXPORT') ORDER BY created_at,id LIMIT 10 FOR UPDATE",ROW,includeImports,companyOnly);
             for (var j:candidates) {
                 if (!permitted(j)) { fail(j,Failure.AUTHORIZATION_REVOKED); continue; }
@@ -212,7 +213,13 @@ public class TransferJobs {
     }
     void recoverLocked() {
         for (var j:jdbc.query("SELECT * FROM transfer_job WHERE state NOT IN ("+TERMINAL+") AND (expires_at<=clock_timestamp() OR lease_until<=clock_timestamp()) FOR UPDATE",ROW)) {
-            if (j.state()==State.COMMITTING) { fail(j,Failure.ACTIVATION_RECONCILIATION_REQUIRED); continue; }
+            if (j.state()==State.COMMITTING) {
+                if(jdbc.queryForObject("SELECT count(*) FROM transfer_completion WHERE job_id=? AND fence=? AND artifact_id IS NULL",Long.class,j.id(),j.fence())==1) {
+                    jdbc.update("UPDATE transfer_job SET state='COMPLETED',worker_id=NULL,lease_until=NULL,error_code=NULL,version=version+1,updated_at=clock_timestamp() WHERE id=?",j.id());
+                    endAttempt(j.id());audit(j.id(),Event.COMPLETED);
+                } else fail(j,Failure.ACTIVATION_RECONCILIATION_REQUIRED);
+                continue;
+            }
             boolean expired=jdbc.queryForObject("SELECT expires_at<=clock_timestamp() FROM transfer_job WHERE id=?",Boolean.class,j.id());
             if (expired) { audit(j.id(),Event.EXPIRED); fail(j,Failure.JOB_EXPIRED); continue; }
             endAttempt(j.id()); audit(j.id(),Event.LEASE_EXPIRED);

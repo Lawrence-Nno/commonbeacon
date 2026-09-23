@@ -94,6 +94,7 @@ See the [onboarding walkthrough](docs/demo-walkthrough.md) and
 - [Compose startup, persistence, troubleshooting](docs/compose.md)
 - [Host tool setup](docs/development-setup.md) and [host backend](docs/backend-setup.md)
 - [Isolated browser tests](docs/browser-testing.md)
+- [Atomic native import activation](docs/import-activation.md)
 - [REST API examples](docs/api.md) and [OpenAPI contract](docs/openapi.json)
 - [Architecture decisions](docs/architecture.md)
 - [Testing, verification results, and limitations](docs/verification.md)

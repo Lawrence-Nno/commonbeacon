@@ -1,8 +1,8 @@
 # Import staging and dry-run review
 
-Stage 10 adds backend-only native import staging. It does not activate data or add
-an import screen (Stages 11 and 12). Upload and inspection follow the
-[quarantine guide](quarantine-upload.md). Neither stage writes community records,
+Stage 10 adds backend-only native import staging. Stage 11 adds the separate
+[atomic activation protocol](import-activation.md); the import screen remains Stage 12. Upload and inspection follow the
+[quarantine guide](quarantine-upload.md). Inspection and dry-run staging never write community records,
 active accounts, imported-author identities, roles, sessions or moderation history.
 
 ## API workflow
@@ -30,10 +30,11 @@ All responses are `Cache-Control: no-store`. The report includes:
   fingerprint, and a review fingerprint binding those inputs and the warnings.
 
 An error-free review on an eligible target becomes READY_TO_COMMIT; other reviews
-remain REVIEW_REQUIRED. `activationAvailable` is always false. There is no confirm
-endpoint in Stage 10. A later activation must check the reviewed digest, accept all
-required acknowledgements, and revalidate under the Stage 11 exclusive migration
-gate. Never treat READY_TO_COMMIT alone as authority to insert data.
+remain REVIEW_REQUIRED. A fresh eligible review has `activationAvailable=true`.
+POST `/{id}/confirm` must bind the reviewed digest, accept every acknowledgement,
+and revalidate under the exclusive migration gate. Never treat READY_TO_COMMIT
+alone as authority to insert data. Validation version 2 binds the canonical manifest
+and report digests; older reviews require a new dry run.
 
 ## Validation and identity rules
 
@@ -64,8 +65,10 @@ record, 40,000 total records, 256 MiB total staged payload and native entity lim
 The worker shares the deployment-wide transfer lease, heartbeats during reads, has
 a ten-minute read/validation deadline and at most three claims per dry-run attempt.
 Final database checks use short ten-second transactions; unsupported workloads fail
-closed. Production transaction, WAL, index and throughput capacity is **not certified**
-by these configured ceilings and must be measured before enabling activation.
+closed. Activation has a stricter 16 MiB serialized staged-payload cap. Exceeding it adds
+ACTIVATION_BUDGET_EXCEEDED during review, before confirmation. The
+[activation guide](import-activation.md) records local transaction/WAL/index measurements;
+production capacity remains **not certified** by these local checks.
 
 Recovery replays the immutable archive from the start and checks each existing
 payload and mapping rather than inserting duplicates. Per-entity staged line

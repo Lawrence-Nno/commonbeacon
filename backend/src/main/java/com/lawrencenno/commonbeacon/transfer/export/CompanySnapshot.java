@@ -40,7 +40,7 @@ public class CompanySnapshot {
         snapshot.setReadOnly(true);snapshot.setTimeout(120);
     }
     private Projection projection(Entity entity) {
-        return switch(entity) {
+        var projection=switch(entity) {
             case users -> new Projection("app_user u LEFT JOIN imported_author i ON i.local_user_id=u.id",
                 "u.id,u.display_name,u.created_at,i.source_instance_id,i.source_user_id","u.id","true");
             case boards -> new Projection("board","id,slug,name,description,archived,created_at","id","true");
@@ -53,6 +53,10 @@ public class CompanySnapshot {
             case reports -> new Projection("content_report","id,reporter_id,question_id,reply_id,reason,status,created_at,updated_at,resolver_id,resolved_at,resolution_decision,resolution_note","id","true");
             case actions -> new Projection("moderation_action","id,actor_id,question_id,reply_id,action,reason,created_at","id","true");
         };
+        if(entity==Entity.users || entity==Entity.contacts || entity==Entity.acceptances)return projection;
+        return new Projection("(SELECT t.*,i.source_instance_id,i.origin_source_id AS source_user_id FROM "+projection.from()
+            +" t LEFT JOIN imported_record i ON i.entity='"+entity.name()+"' AND i.local_id=t.id) exported",
+            projection.fields()+",source_instance_id,source_user_id",projection.key(),projection.predicate());
     }
     private static String camel(String name) {
         StringBuilder result=new StringBuilder();boolean upper=false;
