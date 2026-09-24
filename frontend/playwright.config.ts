@@ -7,8 +7,8 @@ if (process.env.COMMONBEACON_E2E !== "isolated")
 export default defineConfig({
   workers: 1,
   testDir: "./e2e",
-  testMatch: process.env.COMMONBEACON_E2E_GROUP === "imports" ? "**/import-activation.spec.ts" : process.env.COMMONBEACON_E2E_GROUP === "discourse" ? "**/discourse-import.spec.ts" : undefined,
-  testIgnore: process.env.COMMONBEACON_E2E_GROUP === "community" ? ["**/import-activation.spec.ts", "**/discourse-import.spec.ts"] : undefined,
+  testMatch: process.env.COMMONBEACON_E2E_GROUP === "erasure" ? "**/erasure.spec.ts" : process.env.COMMONBEACON_E2E_GROUP === "imports" ? "**/import-activation.spec.ts" : process.env.COMMONBEACON_E2E_GROUP === "discourse" ? "**/discourse-import.spec.ts" : undefined,
+  testIgnore: process.env.COMMONBEACON_E2E_GROUP === "community" ? ["**/import-activation.spec.ts", "**/discourse-import.spec.ts", "**/erasure.spec.ts"] : undefined,
   fullyParallel: false,
   retries: 0,
   reporter: [["list"], ["html", { open: "never" }]],

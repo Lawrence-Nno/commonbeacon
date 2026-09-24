@@ -118,5 +118,5 @@ test("invalid archive shows bounded inspection errors and can be cancelled", asy
   await expect(page.getByText(/Archive inspection failed/)).toBeVisible({ timeout: 30000 });
   await page.getByRole("button", { name: "Cancel import" }).click();
   await expect(page.getByRole("heading", { name: "Import reconciliation" })).toBeVisible();
-  await expect(page.getByText(/Detailed review data has expired or was never produced/)).toBeVisible();
+  await expect(page.getByText(/Detailed review data was erased, expired or never produced/)).toBeVisible();
 });

@@ -31,7 +31,9 @@ public class ImportReconciliation {
             if(complete && jdbc.queryForObject("SELECT count(*) FROM transfer_completion WHERE job_id=? AND fence=? AND artifact_id IS NULL",Long.class,id,job.fence())!=1)throw new IllegalStateException("JOB_CONFLICT");
             var result=JSON.createObjectNode().put("jobId",id.toString()).put("state",job.state().name()).put("detailsAvailable",!receipts.isEmpty());
             JsonNode receipt=receipts.isEmpty()?null:JSON.readTree(receipts.getFirst());
-            if(receipt==null)result.putNull("review");else result.set("review",receipt);
+            if(receipt==null || receipt.path("erasedDetails").asBoolean()) {
+                result.putNull("review");result.put("detailsAvailable",false);
+            } else result.set("review",receipt);
             var counts=result.putObject("counts");
             for(var type:com.lawrencenno.commonbeacon.transfer.archive.ArchiveFormat.Entity.values()) {
                 var c=counts.putObject(type.name());

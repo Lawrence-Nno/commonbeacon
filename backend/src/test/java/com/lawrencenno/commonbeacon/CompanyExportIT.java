@@ -196,6 +196,8 @@ class CompanyExportIT {
         assertThat(jobs.status(ADMIN,job.id()).state()).isEqualTo(TransferJob.State.CANCELLED);
         assertThat(store.keysOlderThan(Instant.now().plusSeconds(1))).isEmpty();
         new ArtifactReconciler(jobs,store).reconcile();
+        // Revocation must leave a usable recovery administrator.
+        jdbc.update("INSERT INTO app_user(id,email,display_name,password_hash,role) VALUES (?,'recovery@example.test','Recovery',?,'ADMINISTRATOR')",UUID.randomUUID(),passwords.encode(PASSWORD));
         var revoked=create(false,false);DURING_WRITE.set(()->{
             try(var executor=Executors.newSingleThreadExecutor()) {
                 executor.submit(()->jdbc.update("UPDATE app_user SET role='MEMBER' WHERE id=?",ADMIN)).get(10,TimeUnit.SECONDS);

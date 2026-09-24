@@ -1,0 +1,5 @@
+# Disposable browser tests only; no volumes or development service references.
+services:
+  backend:
+    environment:
+      COMPANY_ERASURE_ENABLED: "true"

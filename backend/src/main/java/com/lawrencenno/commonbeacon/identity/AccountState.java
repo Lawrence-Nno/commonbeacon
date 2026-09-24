@@ -1,3 +1,3 @@
 package com.lawrencenno.commonbeacon.identity;
 
-public enum AccountState { ACTIVE, IMPORTED_INACTIVE }
+public enum AccountState { ACTIVE, IMPORTED_INACTIVE, ERASED }

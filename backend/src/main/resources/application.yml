@@ -61,6 +61,9 @@ management:
       show-components: never
 
 commonbeacon:
+  erasure:
+    company-enabled: ${COMPANY_ERASURE_ENABLED:false}
+    backup-retention-days: ${ERASURE_BACKUP_RETENTION_DAYS:30}
   transfer:
     storage:
       enabled: ${TRANSFER_STORAGE_ENABLED:false}

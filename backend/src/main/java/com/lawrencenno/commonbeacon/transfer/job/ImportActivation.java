@@ -166,7 +166,9 @@ public class ImportActivation {
         }
         return true;
     }
+    @org.springframework.beans.factory.annotation.Value("${commonbeacon.transfer.storage.enabled:false}") private boolean scheduledStorageEnabled;
     @Scheduled(initialDelay=5000,fixedDelay=5000) public void scheduledActivation() {
+        if(!scheduledStorageEnabled)return;
         try{runOnce();}catch(RuntimeException e){com.lawrencenno.commonbeacon.shared.OperationalLogs.failure(LOG,"import.activation_worker_failed",e,null);}
     }
 }

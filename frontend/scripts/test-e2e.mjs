@@ -18,6 +18,8 @@ const args = [
   ".env.example",
   "-f",
   "compose.e2e.yaml",
+  "-f",
+  "compose.erasure-e2e.yaml",
 ];
 // Explicit project/file on every call; no volumes exist and no development cleanup is possible.
 const docker = (extra, capture = false) =>
@@ -73,7 +75,7 @@ function saveLogs(group) {
   writeFileSync(new URL(`../test-results/${group}/backend-compose.log`, import.meta.url), (logs.stdout ?? "") + (logs.stderr ?? ""));
 }
 const selectors = process.argv.slice(2).filter(arg => arg.includes(".spec"));
-const groups = selectors.length ? [...new Set(selectors.map(arg => arg.includes("discourse-import.spec") ? "discourse" : arg.includes("import-activation.spec") ? "imports" : "community"))] : ["community", "imports", "discourse"];
+const groups = selectors.length ? [...new Set(selectors.map(arg => arg.includes("erasure.spec") ? "erasure" : arg.includes("discourse-import.spec") ? "discourse" : arg.includes("import-activation.spec") ? "imports" : "community"))] : ["community", "imports", "discourse", "erasure"];
 let code = 0, currentGroup = groups[0];
 try {
   for (const [index, group] of groups.entries()) {

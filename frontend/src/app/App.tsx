@@ -1,6 +1,7 @@
 import { AdminArticles } from "../features/knowledge/AdminArticles";
 import { DataManagement } from "../features/transfers/DataManagement";
 import { Imports } from "../features/transfers/Imports";
+import { Erasure, ErasureReceipt } from "../features/transfers/Erasure";
 import { SearchPage } from "../features/search/SearchPage";
 import { KnowledgePage, KnowledgeArticlePage } from "../features/knowledge/KnowledgePage";
 import { NewQuestionPage } from "../features/questions/NewQuestionPage";
@@ -21,7 +22,7 @@ function PageTitle() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    document.title = `${pathname.startsWith("/admin/data/imports") ? "Import company data" : (pathname === "/account/data/history" || pathname === "/admin/data/history") ? "Export history" : pathname === "/account/data" ? "Export my data" : pathname === "/admin/data" ? "Data management" : pathname === "/search" ? "Search" : pathname.startsWith("/admin/articles") ? "Manage articles" : pathname.startsWith("/knowledge") ? "Knowledge" : pathname.startsWith("/moderation") ? "Report review" : pathname.startsWith("/questions/") ? "Question" : pathname.endsWith("/questions/new") ? "Ask a question" : pathname.startsWith("/boards/") ? "Board" : pathname === "/admin/boards" ? "Manage boards" : pathname === "/about" ? "About" : pathname === "/login" ? "Sign in" : pathname === "/register" ? "Join" : pathname === "/" ? "Community" : "Page not found"} · CommonBeacon`;
+    document.title = `${pathname === "/account/delete" ? "Delete my account" : pathname === "/admin/erase" ? "Erase company data" : pathname === "/erasure/receipt" ? "Erasure receipt" : pathname.startsWith("/admin/data/imports") ? "Import company data" : (pathname === "/account/data/history" || pathname === "/admin/data/history") ? "Export history" : pathname === "/account/data" ? "Export my data" : pathname === "/admin/data" ? "Data management" : pathname === "/search" ? "Search" : pathname.startsWith("/admin/articles") ? "Manage articles" : pathname.startsWith("/knowledge") ? "Knowledge" : pathname.startsWith("/moderation") ? "Report review" : pathname.startsWith("/questions/") ? "Question" : pathname.endsWith("/questions/new") ? "Ask a question" : pathname.startsWith("/boards/") ? "Board" : pathname === "/admin/boards" ? "Manage boards" : pathname === "/about" ? "About" : pathname === "/login" ? "Sign in" : pathname === "/register" ? "Join" : pathname === "/" ? "Community" : "Page not found"} · CommonBeacon`;
   }, [pathname]);
   return null;
 }
@@ -233,7 +234,7 @@ function Shell() {
                             ? "Board"
                             : pathname === "/admin/boards"
                               ? "Manage boards"
-                              : pathname.startsWith("/admin/data/imports") ? "Import company data" : (pathname === "/account/data/history" || pathname === "/admin/data/history") ? "Export history" : pathname === "/account/data" ? "Export my data" : pathname === "/admin/data" ? "Data management" : pathname === "/search" ? "Search" : pathname.startsWith("/admin/articles") ? "Manage articles" : pathname.startsWith("/knowledge") ? "Knowledge" : pathname.startsWith("/moderation") ? "Report review" : "Not found"}
+                              : pathname === "/account/delete" ? "Delete my account" : pathname === "/admin/erase" ? "Erase company data" : pathname === "/erasure/receipt" ? "Erasure receipt" : pathname.startsWith("/admin/data/imports") ? "Import company data" : (pathname === "/account/data/history" || pathname === "/admin/data/history") ? "Export history" : pathname === "/account/data" ? "Export my data" : pathname === "/admin/data" ? "Data management" : pathname === "/search" ? "Search" : pathname.startsWith("/admin/articles") ? "Manage articles" : pathname.startsWith("/knowledge") ? "Knowledge" : pathname.startsWith("/moderation") ? "Report review" : "Not found"}
             </strong>
           </span>
           <AuthControls />
@@ -252,6 +253,9 @@ function Shell() {
             <Route path="/knowledge/:slug" element={<KnowledgeArticlePage />} />
             <Route path="/admin/articles" element={<AdminArticles />} />
             <Route path="/admin/data" element={<DataManagement />} />
+            <Route path="/account/delete" element={<Erasure />} />
+            <Route path="/admin/erase" element={<Erasure company />} />
+            <Route path="/erasure/receipt" element={<ErasureReceipt />} />
             <Route path="/admin/data/imports" element={<Imports />} />
             <Route path="/admin/data/imports/history" element={<Imports history />} />
             <Route path="/admin/data/imports/:jobId" element={<Imports />} />

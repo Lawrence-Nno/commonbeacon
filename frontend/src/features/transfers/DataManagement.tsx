@@ -135,6 +135,7 @@ function ExportScreen({ actorId, personal, history, onDenied }: { actorId: strin
   return <section className="board-page data-management">
     <p className="eyebrow">{personal ? "YOUR ACCOUNT" : "ADMINISTRATION"}</p><h1 ref={heading} tabIndex={-1}>{history ? "Export history" : personal ? "Export my data" : "Data management"}</h1>
     {!personal && !history && <p><Link to="/admin/data/imports">Import company data</Link></p>}
+    {!history && <p><Link to={personal ? "/account/delete" : "/admin/erase"}>{personal ? "Delete my account" : "Erase company data"}</Link></p>}
     {history && <p><Link to={basePath}>Back to exports</Link></p>}
     {!history && <>
     <p>{personal ? "Download a private copy of your own account data and contributions." : "Export a private copy of your company community."} Exporting and downloading never delete live data.</p>

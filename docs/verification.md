@@ -316,3 +316,41 @@ Original development database/artifact mounts remained intact and services healt
 See [Discourse compatibility](discourse-import.md) for the exact supported subset
 and losses. This evidence does not certify other Discourse releases, other
 platforms, production capacity or preservation of excluded source features.
+
+## Explicit offboarding verification (2026-09-24)
+
+Stage 14 is pushed as `c297d47`. Stage 15 verification is recorded below;
+the feature has not been deployed to the original development stack.
+The full backend run passed 78 unit and 254 integration tests. Final affected
+verification passed 3 unit and 17 integration tests, including the expanded 15-case
+erasure suite, automatic erasure without artifact storage, and import/identity gate
+concurrency. The combined inventory is 335 backend tests (78 unit, 257 integration).
+Frontend lint, type checking, all 172 tests and the production build passed.
+
+All browser groups passed: 14 community/export, 2 native import, 1 Discourse and
+1 offboarding journey. The native import group was rerun after its retention-text
+assertion was updated. Offboarding covers typed consent, scoped authentication,
+maintenance, private receipt download/reload, mobile/keyboard use and company erasure
+across backend restart without demo reseeding. The mobile screenshot was inspected.
+OpenAPI schema validation passed with 62 operations and 62 schemas.
+
+Database tests verify last-admin races, immediate account revocation, rejection of
+an old session after email reuse, retained authorship/acceptance/hidden content,
+scrubbed structured notes, preservation of others' text, bounded company deletion,
+foreign-file survival, stale/wrong-instance rejection, transfer/download barriers,
+failure retry, retained numeric reconciliation and expiry of status records.
+The actual operator SQL scripts export a minimal ledger and replay it against an
+older disposable snapshot; replay is idempotent and restores the erased state.
+
+Persistence passed backend/database restarts and Compose down/up with unchanged
+community records, private export bytes, quarantine metadata, staging and review
+fingerprints. Injected-failure cleanup removed only its disposable resources.
+Original development services remained healthy at V16/Stage 12 with both original
+volumes and unchanged aggregate counts. No development erasure or migration ran.
+
+Earlier failures exposed trigger lock ordering, outdated migration/revocation
+fixtures, lifecycle bookkeeping and stale test selectors; those were corrected and
+the affected checks rerun. See [offboarding](offboarding.md) for the supported
+single-backend contract. External backup expiry and current-ledger durability remain
+operator obligations. This is not Stage 16 disaster-recovery/capacity certification,
+verified imported identity claiming, or jurisdictional compliance certification.

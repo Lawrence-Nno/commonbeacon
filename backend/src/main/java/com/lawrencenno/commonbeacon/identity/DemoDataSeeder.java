@@ -9,7 +9,8 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 /** Explicit local opt-in. Existing identities, credentials and boards are never rewritten. */
 @Component
@@ -19,20 +20,25 @@ public class DemoDataSeeder implements ApplicationRunner {
     private final JdbcTemplate jdbc;
     private final PasswordEncoder encoder;
     private final String password;
+    private final TransactionTemplate transaction;
 
     public DemoDataSeeder(JdbcTemplate jdbc, PasswordEncoder encoder,
-                          @Value("${commonbeacon.demo.password:}") String password) {
+                          @Value("${commonbeacon.demo.password:}") String password, PlatformTransactionManager manager) {
         this.jdbc = jdbc;
         this.encoder = encoder;
         this.password = password;
+        this.transaction = new TransactionTemplate(manager);
     }
 
     @Override
-    @Transactional
     public void run(ApplicationArguments arguments) {
         if (password.isBlank() || password.length() < 12 || password.length() > 128) {
             throw new IllegalStateException("Demo seeding requires DEMO_PASSWORD with 12-128 characters.");
         }
+        // Never recreate erased demo identities or community content after restart.
+        if (Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM erasure_tombstone)", Boolean.class))) return;
+        transaction.executeWithoutResult(status -> {
+        com.lawrencenno.commonbeacon.shared.MigrationGate.shared(jdbc);
         var hash = encoder.encode(password);
         account("alex.member@example.test", "Alex River", "MEMBER", hash);
         account("sam.member@example.test", "Sam Reed", "MEMBER", hash);
@@ -43,6 +49,7 @@ public class DemoDataSeeder implements ApplicationRunner {
         conversations();
         operations();
         OnboardingData.seed(jdbc);
+        });
     }
 
     private void account(String email, String name, String role, String hash) {

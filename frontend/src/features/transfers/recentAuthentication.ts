@@ -1,6 +1,6 @@
 import { ApiError, postJson } from "../../lib/http";
 
-export type RecentAuthScope = "COMPANY_EXPORT" | "PERSONAL_EXPORT" | "IMPORT_UPLOAD" | "IMPORT_COMMIT" | "DOWNLOAD";
+export type RecentAuthScope = "COMPANY_EXPORT" | "PERSONAL_EXPORT" | "IMPORT_UPLOAD" | "IMPORT_COMMIT" | "DOWNLOAD" | "ACCOUNT_ERASURE" | "COMPANY_ERASURE";
 export type RecentAuthGrant = { token: string; expiresAt: string };
 export function confirmTransferPassword(password: string, scope: RecentAuthScope) {
   return postJson("/api/v1/account/data/reauthentication", { password, scope }, (value: unknown): RecentAuthGrant => {

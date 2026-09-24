@@ -11,3 +11,4 @@
 .import-screen summary { cursor: pointer; font-weight: 600; }
 .import-screen progress { width: min(100%, 32rem); display: block; margin-block: 1rem; }
 .import-screen .button { margin: .25rem; }
+.erasure-input { display: block; box-sizing: border-box; width: min(100%, 38rem); padding: .75rem; margin-block: .5rem 1rem; font: inherit; border: 1px solid #8caaa1; border-radius: .4rem; }

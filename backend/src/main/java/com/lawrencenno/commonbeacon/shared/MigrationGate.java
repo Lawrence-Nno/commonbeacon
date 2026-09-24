@@ -19,6 +19,8 @@ public class MigrationGate {
     public static void shared(JdbcTemplate jdbc) {
         if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT pg_try_advisory_xact_lock_shared(?)",Boolean.class,KEY)))
             throw new ApiFailure(409,"IMPORT_IN_PROGRESS","An import is activating. Retry after it completes.");
+        if(Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM erasure_job WHERE state IN ('RUNNING','RESTORE_QUEUED'))",Boolean.class)))
+            throw new ApiFailure(503,"ERASURE_IN_PROGRESS","Data erasure is in progress. Try again after it completes.");
     }
     @Bean @Role(org.springframework.beans.factory.config.BeanDefinition.ROLE_INFRASTRUCTURE)
     static DefaultPointcutAdvisor migrationWriteAdvisor(ObjectProvider<JdbcTemplate> jdbc) {

@@ -39,8 +39,10 @@ public class SecurityConfiguration {
         return new LoginRateLimiter(Clock.systemUTC(), 10, 10_000, Duration.ofMinutes(1));
     }
     @Bean SecurityFilterChain security(HttpSecurity http, IdentityService identity,
-            ApiProblems problems, ObjectMapper mapper, LoginRateLimiter limiter) throws Exception {
+            ApiProblems problems, ObjectMapper mapper, LoginRateLimiter limiter, com.lawrencenno.commonbeacon.offboarding.ErasureService erasure,
+            com.lawrencenno.commonbeacon.offboarding.ErasureAdmission admission) throws Exception {
         http.authorizeHttpRequests(auth -> auth
+                .requestMatchers(HttpMethod.GET,"/api/v1/erasure/receipts/*").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/search").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/articles", "/api/v1/articles/*").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/questions/*/replies", "/api/v1/replies/*").permitAll()
@@ -69,7 +71,9 @@ public class SecurityConfiguration {
                 .successHandler((request, response, authentication) -> {
                     response.setContentType("application/json");
                     response.setHeader("Cache-Control", "no-store");
-                    mapper.writeValue(response.getWriter(), identity.current(authentication));
+                    var current=identity.current(authentication);
+                    request.getSession().setAttribute("authenticatedUserId",current.id());
+                    mapper.writeValue(response.getWriter(), current);
                 })
                 .failureHandler((request, response, error) ->
                         problems.write(response, 401, "INVALID_CREDENTIALS", "Email or password is incorrect.")));
@@ -79,6 +83,17 @@ public class SecurityConfiguration {
         http.addFilterBefore(new OncePerRequestFilter() {
             @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                     FilterChain chain) throws ServletException, IOException {
+                String path=request.getServletPath();boolean receipt=path.startsWith("/api/v1/erasure/receipts/") && "GET".equals(request.getMethod());
+                boolean guarded=path.startsWith("/api/") && !path.startsWith("/api/v1/erasure/") && !path.equals("/api/v1/auth/csrf");
+                if(guarded && !admission.enter()) {
+                    response.setHeader("Retry-After","5");response.setHeader("Cache-Control","no-store");
+                    problems.write(response,503,"ERASURE_IN_PROGRESS","Data erasure is being confirmed. Try again later.");return;
+                }
+                try {
+                if(path.startsWith("/api/") && !receipt && !path.equals("/api/v1/auth/csrf") && erasure.active()) {
+                    response.setHeader("Retry-After","5");response.setHeader("Cache-Control","no-store");
+                    problems.write(response,503,"ERASURE_IN_PROGRESS","Data erasure is in progress. Try again after it completes.");return;
+                }
                 if ("POST".equals(request.getMethod()) && "/api/v1/auth/login".equals(request.getServletPath())) {
                     if (!limiter.allow(request.getRemoteAddr())) {
                         response.setHeader("Retry-After", "60");
@@ -93,9 +108,13 @@ public class SecurityConfiguration {
                     }
                 }
                 var authentication = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-                if (authentication != null && authentication.isAuthenticated()
+                if (!receipt && authentication != null && authentication.isAuthenticated()
                         && !(authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken)) {
-                    try { identity.current(authentication); }
+                    try {
+                        var current=identity.current(authentication);var session=request.getSession(false);
+                        if(session==null || !current.id().equals(session.getAttribute("authenticatedUserId")))
+                            throw new org.springframework.security.access.AccessDeniedException("Account unavailable");
+                    }
                     catch (org.springframework.security.access.AccessDeniedException unavailable) {
                         var session = request.getSession(false);
                         if (session != null) session.invalidate();
@@ -105,6 +124,7 @@ public class SecurityConfiguration {
                     }
                 }
                 chain.doFilter(request, response);
+                } finally {if(guarded)admission.leave();}
             }
         }, UsernamePasswordAuthenticationFilter.class);
         return http.build();

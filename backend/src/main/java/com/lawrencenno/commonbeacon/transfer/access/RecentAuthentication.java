@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class RecentAuthentication {
-    public enum Scope { COMPANY_EXPORT, PERSONAL_EXPORT, IMPORT_UPLOAD, IMPORT_COMMIT, DOWNLOAD }
+    public enum Scope { COMPANY_EXPORT, PERSONAL_EXPORT, IMPORT_UPLOAD, IMPORT_COMMIT, DOWNLOAD, ACCOUNT_ERASURE, COMPANY_ERASURE }
     public record Issued(String token,Instant expiresAt) { @Override public String toString(){return "Issued[redacted]";} }
     private record Grant(UUID actor,long revision,String session,Scope scope,UUID job,Instant expires) implements Serializable {}
     private static final class Vault implements Serializable { final Map<String,Grant> grants=new HashMap<>(); final Map<String,Grant> tickets=new HashMap<>(); }
@@ -49,7 +49,7 @@ public class RecentAuthentication {
             || !g.actor().equals(actor.id()) || g.revision()!=actor.revision() || !g.session().equals(session));
     }
     public Issued issue(Authentication authentication,HttpSession session,String address,String password,Scope scope) {
-        boolean administrator=scope!=Scope.PERSONAL_EXPORT && scope!=Scope.DOWNLOAD;
+        boolean administrator=scope!=Scope.PERSONAL_EXPORT && scope!=Scope.DOWNLOAD && scope!=Scope.ACCOUNT_ERASURE;
         var actor=access.current(authentication,administrator);
         boolean actorAllowed=actors.allow(actor.id().toString());boolean addressAllowed=addresses.allow(address);
         if(!actorAllowed || !addressAllowed)throw new ApiFailure(429,"RATE_LIMITED","Too many password confirmations. Try again later.");

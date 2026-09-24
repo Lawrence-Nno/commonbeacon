@@ -16,7 +16,7 @@ public class TransferHttpFilter extends OncePerRequestFilter {
     public TransferHttpFilter(ApiProblems problems){this.problems=problems;}
     @Override protected void doFilterInternal(HttpServletRequest request,HttpServletResponse response,FilterChain chain) throws ServletException,IOException {
         String path=request.getServletPath();
-        if(!path.startsWith("/api/v1/account/data/") && !path.startsWith("/api/v1/admin/data/")){chain.doFilter(request,response);return;}
+        if(!path.startsWith("/api/v1/account/data/") && !path.startsWith("/api/v1/admin/data/") && !path.startsWith("/api/v1/erasure/")){chain.doFilter(request,response);return;}
         response.setHeader("Cache-Control","no-store");response.setHeader("Pragma","no-cache");
         if(!request.getMethod().equals("POST")){chain.doFilter(request,response);return;}
         byte[] body=request.getInputStream().readNBytes(4097);

@@ -155,3 +155,5 @@ See [data transfer access and downloads](docs/data-transfer-access.md) for the i
 
 Quarantine upload and inspection APIs: [operator guide](docs/quarantine-upload.md).
 Private import staging and dry-run reviews: [operator guide](docs/import-dry-run.md).
+
+Account deletion and opt-in company erasure: [scope, recovery and backup obligations](docs/offboarding.md).

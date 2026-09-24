@@ -3,8 +3,9 @@
 With private storage enabled, a startup sweep and a sweep every 15 minutes recover
 expired jobs, revoke unavailable artifacts, remove temporary data, and reclaim
 reservations. Cleanup never deletes community records or imported provenance.
-There is no post-success rollback: edits after import require a separate, explicitly
-designed offboarding workflow. Export and download never request deletion.
+There is no post-success rollback. Normal edits use the community workflows;
+explicit erasure uses the separately confirmed [offboarding workflow](offboarding.md).
+Export and download never request deletion.
 
 ## Retention policy
 
@@ -35,6 +36,12 @@ designed offboarding workflow. Export and download never request deletion.
   staged bodies or source contact values. Confirmation replay remains tied to that
   receipt. Audit events and attempts still expire after 30 days. Failed confirmation
   receipts last until their ordinary job metadata is removed.
+
+Explicit account erasure strips detailed reviews and transfer audit/request data,
+retaining completed numeric counts and provenance. Company erasure removes those
+records too. Both delete registered transfer files and staged payloads under the
+separate confirmation/maintenance contract; ordinary retention sweeps remain
+non-destructive to community data. See [offboarding](offboarding.md) for scope.
 
 Sweeps process at most 10,000 artifact candidates (expired/deleting first), 100
 terminal staging jobs, 1,000 rows per metadata category and 100 old jobs per pass.

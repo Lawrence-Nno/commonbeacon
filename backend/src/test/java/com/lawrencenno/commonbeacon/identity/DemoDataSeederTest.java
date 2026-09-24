@@ -12,6 +12,7 @@ class DemoDataSeederTest {
     private final ApplicationContextRunner context = new ApplicationContextRunner()
             .withUserConfiguration(DemoDataSeeder.class)
             .withBean(JdbcTemplate.class, () -> mock(JdbcTemplate.class))
+            .withBean(org.springframework.transaction.PlatformTransactionManager.class, () -> mock(org.springframework.transaction.PlatformTransactionManager.class))
             .withBean(PasswordEncoder.class, () -> mock(PasswordEncoder.class));
 
     @Test void requiresLocalProfileAndExplicitOptIn() {
@@ -32,7 +33,7 @@ class DemoDataSeederTest {
         var jdbc = mock(JdbcTemplate.class);
         var encoder = mock(PasswordEncoder.class);
         for (String password : new String[] {"", "short", "x".repeat(129)}) {
-            assertThatThrownBy(() -> new DemoDataSeeder(jdbc, encoder, password).run(new DefaultApplicationArguments()))
+            assertThatThrownBy(() -> new DemoDataSeeder(jdbc, encoder, password, mock(org.springframework.transaction.PlatformTransactionManager.class)).run(new DefaultApplicationArguments()))
                     .isInstanceOf(IllegalStateException.class).hasMessageContaining("DEMO_PASSWORD");
         }
         verifyNoInteractions(jdbc, encoder);
