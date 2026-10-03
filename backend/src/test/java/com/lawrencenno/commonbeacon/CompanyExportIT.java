@@ -186,7 +186,14 @@ class CompanyExportIT {
         long deadline=System.nanoTime()+30_000_000_000L;
         while(System.nanoTime()<deadline) {
             try(var connection=java.sql.DriverManager.getConnection(postgres.getJdbcUrl(),postgres.getUsername(),postgres.getPassword())) {
-                if(connection.isValid(2))return;
+                if(connection.isValid(2)) {
+                    // A fresh socket proves PostgreSQL recovered, not that pooled sockets
+                    // survived SIGKILL. Resume this snapshot-durability test with new ones;
+                    // otherwise Hikari's recent-use validation bypass races on fast hosts.
+                    jdbc.getDataSource().unwrap(com.zaxxer.hikari.HikariDataSource.class)
+                            .getHikariPoolMXBean().softEvictConnections();
+                    return;
+                }
             }catch(java.sql.SQLException ignored){/* bounded WAL recovery readiness */}
             try{Thread.sleep(100);}catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
         }
