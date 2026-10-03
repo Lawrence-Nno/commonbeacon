@@ -121,11 +121,16 @@ public class ImportDryRuns {
         return manifest==null?"":hash(manifest);
     }
     String stagingDigest(UUID id) {
+        return stagingDigest(id,(entity,line,row)->{});
+    }
+    @FunctionalInterface private interface StagedRowCheck { void check(String entity,long line,JsonNode row); }
+    private String stagingDigest(UUID id,StagedRowCheck check) {
         var digest=ArchiveCodec.sha256();
         // Fixed metadata only, at most 40,000 records. Raw body fields never accumulate here.
-        jdbc.query(c->{var ps=c.prepareStatement("SELECT s.entity,s.source_id,s.payload_sha256,s.payload::text,m.local_id FROM transfer_stage s LEFT JOIN transfer_mapping m ON m.job_id=s.job_id AND m.entity=s.entity AND m.source_id=s.source_id WHERE s.job_id=? ORDER BY s.entity,s.source_id");ps.setObject(1,id);ps.setFetchSize(16);return ps;},(org.springframework.jdbc.core.RowCallbackHandler)r->{
-            String payload=r.getString(4);
-            digest.update((r.getString(1)+":"+r.getString(2)+":"+r.getString(3)+":"+hash(JSON.readTree(payload).toString())+":"+r.getString(5)+"\n").getBytes(StandardCharsets.UTF_8));
+        jdbc.query(c->{var ps=c.prepareStatement("SELECT s.entity,s.source_id,s.payload_sha256,s.payload::text,m.local_id,s.line FROM transfer_stage s LEFT JOIN transfer_mapping m ON m.job_id=s.job_id AND m.entity=s.entity AND m.source_id=s.source_id WHERE s.job_id=? ORDER BY s.entity,s.source_id");ps.setObject(1,id);ps.setFetchSize(16);return ps;},(org.springframework.jdbc.core.RowCallbackHandler)r->{
+            var row=JSON.readTree(r.getString(4));
+            digest.update((r.getString(1)+":"+r.getString(2)+":"+r.getString(3)+":"+hash(row.toString())+":"+r.getString(5)+"\n").getBytes(StandardCharsets.UTF_8));
+            check.check(r.getString(1),r.getLong(6),row);
         });
         jdbc.query("SELECT entity,source_id,local_id FROM transfer_mapping WHERE job_id=? ORDER BY entity,source_id",r->{
             digest.update((r.getString(1)+":"+r.getString(2)+":"+r.getString(3)+"\n").getBytes(StandardCharsets.UTF_8));
@@ -157,18 +162,21 @@ public class ImportDryRuns {
                 report.set("productVersion",manifest.path("productVersion"));
                 report.set("sourceWarnings",manifest.path("warnings"));
                 report.set("profile",manifest.get("profile"));report.set("formatVersion",manifest.get("formatVersion"));report.set("sourceInstanceId",manifest.get("sourceInstanceId"));
-                String instance=manifest.path("sourceInstanceId").asText();
-                var origins=new HashSet<String>();
-                jdbc.query(c->{var ps=c.prepareStatement("SELECT entity,line,payload::text FROM transfer_stage WHERE job_id=? ORDER BY entity,source_id");ps.setObject(1,id);ps.setFetchSize(16);return ps;},(org.springframework.jdbc.core.RowCallbackHandler)r->{
-                    String entity=r.getString(1);long line=r.getLong(2);var row=JSON.readTree(r.getString(3));
+            }
+            // Validate and fingerprint the same bounded stream. Reading/parsing every
+            // payload twice can exhaust the unchanged ten-second review transaction.
+            var origins=new HashSet<String>();
+            String stagedDigest=stagingDigest(id,(entity,line,row)->{
+                if(manifest!=null) {
+                    String instance=manifest.path("sourceInstanceId").asText();
                     for(String later:List.of("updatedAt","publishedAt","resolvedAt"))if(row.hasNonNull(later) && row.hasNonNull("createdAt") && Instant.parse(row.get(later).asText()).isBefore(Instant.parse(row.get("createdAt").asText())))error.accept(new ArchiveFormat.Issue(entity+".jsonl",line,"INVALID_TIMESTAMP_ORDER"));
                     if(row.hasNonNull("publishedAt") && row.hasNonNull("updatedAt") && Instant.parse(row.get("publishedAt").asText()).isAfter(Instant.parse(row.get("updatedAt").asText())))error.accept(new ArchiveFormat.Issue(entity+".jsonl",line,"INVALID_TIMESTAMP_ORDER"));
                     if(TABLES.containsKey(entity)) {
                         var origin=row.path("origin");String originKey=entity+":"+origin.path("sourceInstanceId").asText(instance)+":"+origin.path("sourceId").asText(row.path("id").asText());
                         if(!origins.add(originKey))error.accept(new ArchiveFormat.Issue(entity+".jsonl",line,"DUPLICATE_ORIGIN"));
                     }
-                });
-            }
+                }
+            });
             for(var entry:new TreeMap<>(TABLES).entrySet()) {
                 long collisions=jdbc.queryForObject("SELECT count(*) FROM transfer_mapping m JOIN "+entry.getValue()+" t ON t.id=m.local_id WHERE m.job_id=? AND m.entity=?",Long.class,id,entry.getKey());
                 if(collisions>0)error.accept(new ArchiveFormat.Issue(entry.getKey()+".jsonl",0,"LOCAL_ID_COLLISION"));
@@ -198,7 +206,7 @@ public class ImportDryRuns {
             warnings.forEach(acknowledgements::add);
             var preview=report.putArray("mappingPreview");
             jdbc.query("SELECT entity,source_id,local_id FROM transfer_mapping WHERE job_id=? ORDER BY entity,source_id LIMIT 100",r->{var m=preview.addObject();m.put("entity",r.getString(1));m.put("sourceId",r.getString(2));m.put("localId",r.getString(3));},id);
-            report.put("mappingPreviewLimit",100);report.put("stagingDigest",stagingDigest(id));report.put("totalErrors",errors[0]);report.put("fresh",true);report.put("eligible",errors[0]==0);
+            report.put("mappingPreviewLimit",100);report.put("stagingDigest",stagedDigest);report.put("totalErrors",errors[0]);report.put("fresh",true);report.put("eligible",errors[0]==0);
             report.put("manifestDigest",manifest==null?"":hash(jdbc.queryForObject("SELECT (?::jsonb)::text",String.class,manifest.toString())));
             report.put("activationAvailable",errors[0]==0);
             report.put("reviewDigest",reviewDigest(report));
