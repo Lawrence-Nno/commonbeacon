@@ -3,7 +3,7 @@
 Upload and inspection APIs require ACTIVE administrators; the [import screen](import-ui.md)
 provides the browser workflow. Inspection never inserts users, content, moderation records
 or staging mappings, and never permits activation. Target eligibility, staging and
-dry-run review are implemented separately in [Stage 10](import-dry-run.md); activation belongs to Stage 11.
+[dry-run review](import-dry-run.md) precede separately confirmed [atomic activation](import-activation.md).
 
 ## Request flow
 

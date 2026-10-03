@@ -1,6 +1,6 @@
 # Bounded atomic native activation
 
-Stage 11 adds backend activation for native company archives. Upload, inspection
+Atomic activation publishes validated native company archives. Upload, inspection
 and [dry-run review](import-dry-run.md) remain separate. The [browser import workflow](import-ui.md) is available in Data management. The seeded development community is not an eligible import target.
 
 ## Confirm and observe

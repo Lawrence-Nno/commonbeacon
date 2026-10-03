@@ -78,12 +78,13 @@ cleanup, and failure handling.
   Real HTTP tests also cover current roles, requester isolation, CSRF, scoped
   password grants, ticket replay/expiry, cancellation retries and in-flight revocation.
   Company export now has API-to-ZIP, snapshot consistency, recovery and durable
-  artifact checks. Personal export and live import workflows remain future work.
-- Deployment and migrations: clean V1-V13 migration, populated V5-to-V13, V9-to-V13 and V11-to-V13 upgrades,
+  artifact checks. Personal export, import review/activation/reconciliation, the
+  Discourse adapter and erasure have dedicated integration and browser coverage.
+- Deployment and migrations: clean migration through V18 and populated earlier-baseline upgrades,
   repeated migration, Hibernate validation, backend/database restarts, normal
   Compose down/up, and cleanup after an intentionally injected failure.
 
-The [OpenAPI contract](openapi.json) describes 51 application operations and 51
+The [OpenAPI contract](openapi.json) describes 62 application operations and 62
 schemas. [API documentation](api.md#checking-the-contract) gives an optional
 structural-validation command. Schema validation alone does not prove permissions,
 transaction behavior, or server-specific UTF-16 length bounds.
@@ -376,11 +377,50 @@ the measured runs. Existing input, storage and activation limits were retained.
 Historical Stage 11 measurements used Testcontainers' default fsync setting; the
 new measurements explicitly require durable PostgreSQL settings.
 
-These results apply to local synthetic fixtures on the declared host. The changes
-are uncommitted and no exact-revision remote CI success is claimed. Production
-capacity certification, additional source adapters and Stage 17 remain separate.
+These results apply to local synthetic fixtures on the declared host. Stage 16 was
+pushed as `7465a89`, with recovery/capacity follow-ups through `16d17a4`. Exact
+remote outcomes are recorded in [transfer evidence](transfer-verification.md).
+Production capacity certification and additional source adapters remain separate.
 All 18 existing browser journeys passed, as did persistence through backend/DB
 restarts and Compose down/up. Both injected-failure cleanup checks passed; the
 recovery guard also refused and preserved a pre-existing project-labelled volume.
 Final frontend lint, CI YAML parsing and diff whitespace checks passed.
 The original development database/artifact volumes were not mounted by the tests.
+
+
+## Release documentation and source-only setup (2026-10-03)
+
+The [migration guide](migration-guide.md) covers export, validation, review,
+activation, reconciliation and recovery. [Supported scope](transfer-scope.md)
+separates company/native migration, personal export, Discourse and erasure from
+unfinished identity/onboarding and deployment-specific launch requirements.
+
+`node scripts/verify-source-only.mjs` passed against committed runtime `2c8dc55`.
+The Git archive excluded local environment files, host dependencies and build
+output. The ordinary Compose files built and started with demo seeding disabled.
+Registration created a MEMBER; administrator transfer access returned 403.
+Personal export reached READY, downloaded a complete protected ZIP, and rejected
+replay of its one-use ticket. Erasure preview required CSRF; no deletion was
+requested. Conflicting inherited database/port/demo settings could not override
+the isolated environment. The helper removed its own containers, network, volumes
+and temporary source tree. The original development volumes remained untouched.
+
+OpenAPI 3.1 structural validation passed. All 62 operations matched implemented
+controller/security routes, local documentation links resolved, and captured
+TransferJob/ErasurePreview responses passed their JSON schemas. Unknown fields on
+legacy password/ticket DTOs were observed to be ignored; explicitly strict import,
+personal-export and erasure DTOs retain their rejection rules. These checks do not
+replace authorization, transaction or hostile-input integration tests.
+
+Fresh company onboarding is not complete: there is no supported non-demo
+administrator provisioning workflow. Administrator fixtures used in the separate
+import tests are test-only. This release does not implement verified account
+claiming or certify external backup deletion, production capacity or disaster recovery.
+
+
+Final runtime CI passed all four Verify jobs on `16d17a4`:
+[run 37134127929](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/37134127929).
+The backend reported 78 unit and 265 integration tests, with no failures or skips.
+Frontend, browser/persistence/cleanup and process-recovery checks also passed.
+The documentation and source-only helper described above were verified locally and
+remain a separate change from that runtime CI revision.

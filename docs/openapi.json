@@ -103,6 +103,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -195,6 +198,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -263,6 +269,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         }
       }
@@ -289,6 +298,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -326,6 +338,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         }
       },
@@ -399,6 +414,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -463,6 +481,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -549,6 +570,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -622,6 +646,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -751,6 +778,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -828,6 +858,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -914,6 +947,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -1021,6 +1057,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -1126,6 +1165,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -1199,6 +1241,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -1315,6 +1360,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -1388,6 +1436,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -1474,6 +1525,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -1591,6 +1645,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -1683,6 +1740,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -1796,6 +1856,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -1894,6 +1957,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -2001,6 +2067,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -2089,6 +2158,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -2209,6 +2281,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -2316,6 +2391,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -2404,6 +2482,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -2524,6 +2605,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -2621,6 +2705,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         }
       }
@@ -2654,6 +2741,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -2711,6 +2801,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -2788,6 +2881,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -2905,6 +3001,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -3008,6 +3107,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -3104,6 +3206,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -3221,6 +3326,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -3338,6 +3446,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -3401,6 +3512,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "parameters": [
@@ -3575,6 +3689,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "$ref": "#/components/responses/ErasureMaintenance"
           }
         },
         "requestBody": {
@@ -3729,12 +3846,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -3865,12 +3989,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -4054,12 +4185,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -4262,12 +4400,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -4338,6 +4483,15 @@
               "Content-Disposition": {
                 "schema": {
                   "type": "string"
+                }
+              },
+              "Content-Length": {
+                "description": "Expected complete ZIP length in bytes; reject a truncated response.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0,
+                  "maximum": 67108864
                 }
               }
             },
@@ -4459,12 +4613,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -4618,12 +4779,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -4754,12 +4922,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -4943,12 +5118,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -5151,12 +5333,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -5227,6 +5416,15 @@
               "Content-Disposition": {
                 "schema": {
                   "type": "string"
+                }
+              },
+              "Content-Length": {
+                "description": "Expected complete ZIP length in bytes; reject a truncated response.",
+                "schema": {
+                  "type": "integer",
+                  "format": "int64",
+                  "minimum": 0,
+                  "maximum": 67108864
                 }
               }
             },
@@ -5348,12 +5546,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -5492,12 +5697,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -5664,12 +5876,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -5836,12 +6055,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -6008,12 +6234,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -6062,7 +6295,7 @@
             }
           },
           "415": {
-            "description": "Only raw application/zip is supported",
+            "description": "Unsupported media type or provider mismatch: NATIVE requires raw application/zip; DISCOURSE requires raw application/json. No multipart uploads.",
             "headers": {
               "Cache-Control": {
                 "schema": {
@@ -6087,14 +6320,15 @@
               "schema": {
                 "type": "string",
                 "format": "binary",
-                "maxLength": 67108864
+                "x-maxBytes": 67108864,
+                "description": "Raw native company-profile ZIP. Server enforces 64 MiB on actual received bytes, including chunked bodies."
               }
             },
             "application/json": {
               "schema": {
-                "type": "string",
-                "format": "binary",
-                "description": "CommonBeacon Discourse bundle v1; strict source version, shape and count checks."
+                "type": "object",
+                "description": "CommonBeacon Discourse bundle v1 from the pinned 3.5.0 export helper; exact bundle fields and mappings are specified in docs/discourse-import.md. The server enforces an 8 MiB UTF-8 body limit on actual received bytes.",
+                "x-maxBytes": 8388608
               }
             }
           }
@@ -6217,12 +6451,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -6406,12 +6647,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -6570,12 +6818,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -6777,12 +7032,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -6950,12 +7212,19 @@
             }
           },
           "503": {
-            "description": "Transfer storage unavailable",
+            "description": "Transfer storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -7157,12 +7426,19 @@
             }
           },
           "503": {
-            "description": "Erasure maintenance or storage unavailable",
+            "description": "Erasure maintenance or storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -7174,7 +7450,17 @@
               }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
       }
     },
     "/api/v1/erasure/{id}/confirm": {
@@ -7197,6 +7483,14 @@
             "schema": {
               "type": "string",
               "format": "uuid"
+            }
+          },
+          {
+            "name": "X-CSRF-TOKEN",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
             }
           }
         ],
@@ -7357,12 +7651,19 @@
             }
           },
           "503": {
-            "description": "Erasure maintenance or storage unavailable",
+            "description": "Erasure maintenance or storage unavailable; ERASURE_IN_PROGRESS also blocks this route during erasure maintenance.",
             "headers": {
               "Cache-Control": {
                 "schema": {
                   "type": "string",
                   "const": "no-store"
+                }
+              },
+              "Retry-After": {
+                "description": "Present for security-filter maintenance responses.",
+                "schema": {
+                  "type": "string",
+                  "const": "5"
                 }
               }
             },
@@ -9272,7 +9573,7 @@
           "password",
           "scope"
         ],
-        "additionalProperties": false
+        "description": "Unknown JSON fields are ignored. Only the documented fields affect this request."
       },
       "TransferToken": {
         "type": "object",
@@ -9304,7 +9605,7 @@
         "required": [
           "expectedVersion"
         ],
-        "additionalProperties": false
+        "description": "Unknown JSON fields are ignored. Only the documented fields affect this request."
       },
       "TransferTicketRequest": {
         "type": "object",
@@ -9317,7 +9618,7 @@
         "required": [
           "recentAuthGrant"
         ],
-        "additionalProperties": false
+        "description": "Unknown JSON fields are ignored. Only the documented fields affect this request."
       },
       "TransferJob": {
         "type": "object",
@@ -9409,7 +9710,7 @@
               "DISCOURSE"
             ],
             "default": "NATIVE",
-            "description": "Immutable import provider. Discourse accepts only CommonBeacon bundle v1 from pinned Discourse 3.5.0."
+            "description": "Immutable provider. Exports use NATIVE; imports accept NATIVE or CommonBeacon bundle v1 from pinned Discourse 3.5.0."
           }
         },
         "required": [
@@ -9423,7 +9724,8 @@
           "processedRecords",
           "errorCode",
           "artifactAvailable",
-          "allowedActions"
+          "allowedActions",
+          "provider"
         ],
         "additionalProperties": false
       },
@@ -9452,7 +9754,6 @@
       },
       "CompanyExportRequest": {
         "type": "object",
-        "additionalProperties": false,
         "properties": {
           "includeContacts": {
             "type": [
@@ -9480,7 +9781,8 @@
         "required": [
           "acknowledgedPrivateContent",
           "recentAuthGrant"
-        ]
+        ],
+        "description": "Unknown JSON fields are ignored. Only the documented fields affect this request."
       },
       "PersonalExportRequest": {
         "type": "object",
@@ -10499,6 +10801,33 @@
           "retrying"
         ],
         "additionalProperties": false
+      }
+    },
+    "responses": {
+      "ErasureMaintenance": {
+        "description": "ERASURE_IN_PROGRESS: confirmed erasure or request draining temporarily blocks this route. Retry after the advertised delay; do not automatically replay an ambiguous mutation.",
+        "headers": {
+          "Retry-After": {
+            "description": "Present for security-filter maintenance responses.",
+            "schema": {
+              "type": "string",
+              "const": "5"
+            }
+          },
+          "Cache-Control": {
+            "schema": {
+              "type": "string",
+              "const": "no-store"
+            }
+          }
+        },
+        "content": {
+          "application/problem+json": {
+            "schema": {
+              "$ref": "#/components/schemas/Problem"
+            }
+          }
+        }
       }
     }
   }

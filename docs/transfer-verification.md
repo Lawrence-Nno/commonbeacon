@@ -144,7 +144,18 @@ into these jobs or uploaded artifacts.
 
 CI runs native browser round trips/persistence, backend recovery/benchmarks, and
 a separate bounded two-instance recovery job. Fallback cleanup includes both
-project names. Reports are retained seven days. Local results do not establish
-successful remote CI: record the exact commit/workflow after committing and
-pushing. Stage 17 handoff and deployment-specific capacity/backup/launch gates
-remain separate.
+project names. Reports are retained seven days.
+
+The implementation was pushed as `7465a89`, followed by `c9c94fa` (test-pool recovery)
+`2c8dc55` (one-pass staged validation/fingerprinting), and `16d17a4` (bounded
+mapping lookup without a bulk-table join). The final affected local
+checks passed all 18 company-export tests and all 55 upload/activation tests, including
+two 40,000-record pipelines. The optimization preserves digest semantics and all
+existing limits. Exact-revision [Verify run 37134127929](https://github.com/Lawrence-Nno/commonbeacon/actions/runs/37134127929)
+passed all four jobs on `16d17a42e8eca9f9b5451211ff7192b5e53c1a32`: 343 backend
+tests, frontend quality checks, browser/persistence and failure cleanup, and
+persistent source/destination crash recovery.
+
+The [operator handoff](migration-guide.md) and [release scope](transfer-scope.md)
+distinguish completed transfer workflows from administrator provisioning and
+production capacity/backup/launch dependencies.

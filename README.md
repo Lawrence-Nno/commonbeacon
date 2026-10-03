@@ -13,6 +13,9 @@ administrators organize boards and maintain the knowledge library.
 - Administrator-managed article drafts, publication, live edits, and archival.
 - English full-text search across question and article titles and bodies.
 - Protected operational counts for unanswered questions, open reports, and published articles.
+- Company/native export and bounded atomic import with review and reconciliation.
+- Requester-only personal export and a verified Discourse 3.5.0 bundle adapter.
+- Explicit account deletion and opt-in company erasure with backup obligations.
 
 ## Start from a fresh checkout
 
@@ -36,6 +39,10 @@ docker compose up -d --build --wait --wait-timeout 180
 
 Open **http://127.0.0.1:8081**. Without demo seeding, use Join the community to
 register a member. Registration never grants administrator privileges.
+Non-demo administrator provisioning is not implemented; fresh company onboarding
+remains a production dependency. See the [migration guide](docs/migration-guide.md)
+for transfer storage setup and prerequisites, and [supported scope](docs/transfer-scope.md)
+for implemented workflows and exclusions.
 
 ```powershell
 docker compose logs --tail 100 backend frontend db
@@ -70,6 +77,13 @@ or the development volume. No host backend is needed.
 For restart and storage checks, run `npm run test:persistence` and
 `npm run test:failure-cleanup` from `frontend`. These use a separate disposable
 volume and localhost port 4175; see [persistence verification](docs/compose.md#repeatable-persistence-check).
+
+The transfer regression baseline passed 343 backend and 172 frontend tests locally,
+plus browser, persistence and crash-recovery journeys. A source-only build with demo
+seeding disabled verified registration, denied administrator access, personal export
+and protected download. Run `node scripts/verify-source-only.mjs` to repeat that
+isolated check. See [release scope and evidence](docs/transfer-scope.md) for remaining
+identity, production capacity and backup dependencies.
 
 ## Demo accounts
 

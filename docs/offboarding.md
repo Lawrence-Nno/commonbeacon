@@ -107,7 +107,8 @@ with the same access controls as other private operational data. Export it after
 confirmations and as part of the backup process, and preserve subsequent ledger
 changes through your durability/replication policy. A stale or lost ledger cannot
 suppress deletions it never recorded; keep restoration offline until that gap is
-resolved. Full disaster-recovery certification remains Stage 16 work.
+resolved. [Local recovery tests](transfer-verification.md) cover application crash
+boundaries, not full disaster-recovery certification of your backup infrastructure.
 
 From a private backup working directory, with PostgreSQL connection credentials
 supplied through the operator's normal secure mechanism:

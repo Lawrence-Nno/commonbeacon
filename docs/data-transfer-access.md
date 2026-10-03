@@ -3,7 +3,7 @@
 The API supports company and personal export creation and generation, password
 confirmation, requester-scoped job lists/status, cancellation and protected
 downloads. [Quarantined upload and inspection](quarantine-upload.md) are also available
-through administrator APIs. Live import activation is not implemented.
+through administrator APIs, followed by [dry-run review and atomic activation](migration-guide.md).
 Administrators can use **Data management** in the application navigation to create
 company exports, check their own history, cancel supported jobs, and download archives.
 See the [administrator guide](data-management.md).
@@ -48,14 +48,15 @@ inactive users are invalidated on their next request.
 Short authorization transactions hold a shared account-row lock; a concurrent role
 update waits for that check to finish. File I/O occurs outside those transactions.
 Revocation stops subsequent protected checkpoints or publication; it cannot undo
-bytes already read or sent. Live import transaction/activation rules are not yet
-implemented.
+bytes already read or sent. [Atomic activation](import-activation.md) rechecks
+authority and reviewed inputs under the migration gate before publication.
 
 ## Password confirmation
 
 POST `/api/v1/account/data/reauthentication` with the session cookie, CSRF header
 and `{password, scope}`. Scopes are COMPANY_EXPORT, PERSONAL_EXPORT, IMPORT_UPLOAD,
-IMPORT_COMMIT and DOWNLOAD. Company/import scopes require current administrator
+IMPORT_COMMIT, DOWNLOAD, ACCOUNT_ERASURE and COMPANY_ERASURE. Company/import scopes
+(including COMPANY_ERASURE) require current administrator
 status. The response is `{token, expiresAt}`: a single-use, five-minute grant bound
 to actor, authorization revision, session ID and scope.
 
@@ -112,8 +113,8 @@ a new grant and ticket for a retry. See [private storage and recovery](data-tran
 role changes during work and delivery, grant/ticket replay and expiry, throttling,
 bounded requests, pagination, cancellation retries and cleanup leases against
 disposable PostgreSQL and private temporary files. Frontend tests cover password
-clearing and late-response isolation. These checks do not establish a complete
-export/import workflow or production load capacity.
+clearing and late-response isolation. [End-to-end and recovery evidence](transfer-verification.md)
+covers the broader workflow; production load capacity remains deployment-specific.
 
 ## Imported author identities
 
@@ -125,9 +126,9 @@ roles on inactive authors. Login, current-user authorization, existing HTTP sess
 transfer requests and worker checkpoints reject unavailable/inactive accounts.
 State changes advance the authorization revision used by grants and jobs.
 
-The internal `ImportedAuthors` primitive requires an enclosing transaction; the
-future activation worker must call it only after validated review and fenced
-activation authorization. It is not exposed as an HTTP endpoint. The durable
+The internal `ImportedAuthors` primitive requires an enclosing transaction and is
+not exposed as an HTTP endpoint. Bulk activation inserts validated identities in
+its fenced atomic transaction under the same database invariants. The durable
 `imported_author` table maps source-instance/source-user UUIDs uniquely to local
 authors. Duplicate mappings fail and roll back creation, rather than rewriting or
 matching an existing account. Updates to provenance are rejected by the database.
@@ -151,7 +152,7 @@ must never perform that handoff. No automatic email/display-name merge is suppor
 `ImportedIdentityIT` covers duplicate/forged contacts, private contact exclusion, readable
 attribution, immutable mappings, rollback, denied role/credential/activation changes,
 stale sessions and worker revocation. `MilestoneUpgradeIT` covers populated V11
-upgrades as well as earlier baselines. Full archive activation remains future work.
+upgrades as well as earlier baselines. `ImportActivationIT` covers full archive activation.
 
 ## Company export
 
@@ -197,7 +198,7 @@ ZIP output caps at 64 MiB; total JSONL at 256 MiB, each entry at 128 MiB. Entrie
 that would compress beyond 100:1 use ZIP STORED instead, and still count against the
 64 MiB output cap. Worker attempts have a ten-minute overall budget. Extraction,
 validation, and compression use bounded buffers; the codec's relationship index is
-row-bounded and still needs the planned capacity/heap measurements.
+row-bounded; see the [local capacity/heap measurements](transfer-verification.md).
 
 A recovered lease discards all previous intermediate/output bytes and starts a new
 snapshot from the first page. Complete snapshots are not reused across attempts in

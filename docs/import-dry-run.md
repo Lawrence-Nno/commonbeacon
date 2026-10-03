@@ -1,7 +1,7 @@
 # Import staging and dry-run review
 
-Stage 10 adds backend-only native import staging. Stage 11 adds the separate
-[atomic activation protocol](import-activation.md); the import screen remains Stage 12. Upload and inspection follow the
+Native import staging precedes the separate [atomic activation protocol](import-activation.md).
+The [import screen](import-ui.md) exposes both steps. Upload and inspection follow the
 [quarantine guide](quarantine-upload.md). Inspection and dry-run staging never write community records,
 active accounts, imported-author identities, roles, sessions or moderation history.
 
@@ -96,7 +96,7 @@ sequence and target state to cover transactions that committed after a sequence
 increment. They also recompute staging/mapping digests and inspect source metadata;
 changed inputs mark the report stale and remove READY_TO_COMMIT. A new dry run is
 required. A review read is not an atomic guarantee against subsequent writes: the
-Stage 11 gate and final revalidation are mandatory before any activation.
+exclusive migration gate and final revalidation are mandatory before any activation.
 
 The dry-run worker runs when private storage is enabled. Set
 `commonbeacon.transfer.import.dry-run.enabled=false` to pause it independently of

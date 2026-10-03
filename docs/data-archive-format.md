@@ -4,7 +4,7 @@ CommonBeacon includes schemas and a backend codec for portable community records
 The [company export API](data-transfer-access.md#company-export) produces this format
 and supports protected downloads. [Personal exports](personal-export.md) use the
 separate personal profile. [Quarantine upload and inspection](quarantine-upload.md)
-are available; activation is not implemented. The inspector uses the company-import
+and [atomic activation](import-activation.md) are available. The inspector uses the company-import
 codec entry point, which rejects personal manifests before visiting rows.
 
 The [schemas](../backend/src/main/resources/data-transfer/v1/) are JSON Schema
@@ -77,8 +77,8 @@ time. They exclude status, resolution, moderators and notes. Parent/target/reply
 references may point outside the personal archive; it declares
 `referencePolicy: "opaque-personal-context"`. Company archives instead require
 `"internal-only"`. Missing personal context is not filled by fetching other users'
-content. Personal archives are not company-import inputs. The later import boundary
-must enforce the company profile before staging or activation.
+content. Personal archives are not company-import inputs. The upload inspector
+enforces the company profile before staging or activation.
 
 Company user schemas contain no email, role, password or verification state.
 Optional contacts are private provenance, not login identities. Local account state
@@ -141,8 +141,8 @@ JSON parsing uses Jackson's
 This codec does not extract ZIPs, fetch URLs, authenticate users, create jobs,
 write domain tables or enforce download retention. ZIP entry types/path safety,
 compressed-size/ratio limits, disk reservations and worker deadlines are enforced
-by the quarantine/job integration. Production heap/throughput measurements remain
-later verification work.
+by the quarantine/job integration. [Local capacity measurements](transfer-verification.md)
+cover synthetic supported-size inputs; production infrastructure still needs qualification.
 The count-bounded metadata index has not been certified against the proposed
 production heap budget. Do not expose this codec directly as an upload endpoint.
 

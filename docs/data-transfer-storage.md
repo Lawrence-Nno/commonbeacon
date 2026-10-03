@@ -69,12 +69,14 @@ corrupted artifacts retain the READY outcome with an `ARTIFACT_MISSING` diagnost
 The quarantine upload handler and inspector use UPLOADING, UPLOADED, VALIDATING
 and REVIEW_REQUIRED. Inspection never transitions to READY_TO_COMMIT. The export
 runner does not claim imports; inspection and uploads share its global lease. COMMITTING work is never automatically replayed after expiry: it is
-flagged for activation reconciliation. Live-domain transactions and confirmation
-must be implemented before that state can be used by a product workflow.
+reconciled against the durable completion record. The [activation protocol](import-activation.md)
+implements confirmation and atomic domain publication; a lost response never authorizes
+a second insertion.
 
 ## Private local store
 
-Storage and its schedulers are disabled by default. The backend accepts these
+Transfer storage and transfer workers/sweeps are disabled by default. Erasure has
+its own independent scheduler. The backend accepts these
 environment settings:
 
 ```text
@@ -96,8 +98,8 @@ and non-regular artifact paths. Existing unrelated files are never cleanup targe
 Writes use private `.part` files, byte limits, flush-to-disk, and same-directory
 atomic rename to `.blob`. There is no fallback to a non-atomic move. Final keys
 cannot be overwritten. Cooperating processes serialize filesystem mutations with
-a lock file; all replicas must see the same durable directory and support file
-locking/atomic rename. See Java's [file operation contracts](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/nio/file/Files.html).
+a lock file. The filesystem must support locking and atomic rename. This does not
+certify multi-backend or multi-host operation; only one backend is supported. See Java's [file operation contracts](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/nio/file/Files.html).
 
 The default deployment-wide artifact quota is 2 GiB with a 1 GiB free-space floor.
 Job admission reserves 768 MiB of working space per active job. Once a job is
@@ -168,8 +170,10 @@ lease recovery, fencing, permissions, quota admission, mappings, publication rep
 interrupted work, orphan cleanup, corruption, expiry and retried deletion using
 disposable PostgreSQL and temporary files. `LocalArtifactStoreTest` checks immutable
 publication, file permissions, quotas and unsafe-directory handling. Migration tests
-verify fresh V11 startup and preservation of populated V5 and V9 domain data.
+verify fresh startup through V18 and preservation across supported populated
+baselines, including V5, V9, V11 and subsequent transfer-schema upgrades.
 
 These are functional tests, not production throughput or power-failure benchmarks.
-Large-data, multi-host storage and end-to-end transfer verification remain necessary
-before release. See the [archive format](data-archive-format.md) for entry validation.
+[Local bounded-capacity and end-to-end recovery tests](transfer-verification.md)
+cover the supported single-backend deployment. Multi-host operation is unsupported;
+production capacity and backup recovery still require deployment-specific qualification. See the [archive format](data-archive-format.md) for entry validation.

@@ -4,7 +4,9 @@ The checked-in [OpenAPI 3.1 contract](openapi.json) defines every `/api/v1` rout
 request and response schema, session/CSRF requirements, and documented errors.
 
 Use the same origin as the UI, normally http://127.0.0.1:8081. IDs are UUIDs.
-Content is plain text. Responses never include password hashes or email addresses.
+Community content is plain text. Public community DTOs exclude email addresses and
+password hashes. Protected company archives may include explicitly selected contacts;
+personal archives include the requester's own account data. Password hashes are never exported.
 
 ## Session and CSRF
 
@@ -93,7 +95,10 @@ retain drafts on recoverable errors.
 - 403: missing CSRF, wrong role, or wrong owner.
 - 404: missing/hidden content or a reply outside the target question.
 - 409: stale version, archived-board write, or conflicting unique value.
-- 429: login throttling, with Retry-After.
+- 429: login or password-confirmation throttling, with Retry-After.
+- 503: erasure maintenance (`ERASURE_IN_PROGRESS`, normally Retry-After: 5),
+  or unavailable transfer storage on transfer routes. CSRF-token and erasure-receipt
+  reads remain available during maintenance.
 
 Archived conversations remain readable. Hidden parents/replies are excluded from
 public endpoints. Hidden accepted content is suppressed defensively on reads;
@@ -170,7 +175,7 @@ report reasons, or identifiers. See [the overview behavior](moderation.md#operat
 
 ## Checking the contract
 
-`docs/openapi.json` is OpenAPI 3.1, with 59 implemented operations and 58 schemas.
+`docs/openapi.json` is OpenAPI 3.1, with 62 implemented operations and 62 schemas.
 It covers the application API; Nginx and Actuator health probes are separate.
 OpenAPI-compatible validators and clients can load the file directly. An optional
 Python validator can run without changing application dependencies:
