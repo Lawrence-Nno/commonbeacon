@@ -354,3 +354,33 @@ the affected checks rerun. See [offboarding](offboarding.md) for the supported
 single-backend contract. External backup expiry and current-ledger durability remain
 operator obligations. This is not Stage 16 disaster-recovery/capacity certification,
 verified imported identity claiming, or jurisdictional compliance certification.
+
+## Transfer integration, recovery and capacity (2026-10-03)
+
+Stage 16 adds a persistent source/destination crash harness, project-ownership and
+failure-cleanup checks, durable PostgreSQL test settings, and small/representative/
+repeated-limit measurements. See [the transfer verification record](transfer-verification.md)
+for commands, fixture distributions, exact results, crash boundaries and limits.
+
+The full backend verification passed **343 tests** (78 unit, 265 integration) in
+11 minutes 44 seconds. Frontend lint, type checking, all **172 tests** and the
+production build passed. This includes fresh/populated upgrades, Hibernate validation,
+existing community/moderation/search contracts, hostile archives, authorization,
+provenance, snapshot/packaging database crashes and capacity/cancellation checks.
+The two-instance process-crash journey passed in four minutes, including interrupted
+upload, staging, activation, READY/download, cleanup and company erasure.
+
+Maximum activation took 7,296 and 5,904 ms; the longest measured import pipeline
+was 150,252 ms. Foreground p95 stayed at or below 18 ms and maximum at 42 ms across
+the measured runs. Existing input, storage and activation limits were retained.
+Historical Stage 11 measurements used Testcontainers' default fsync setting; the
+new measurements explicitly require durable PostgreSQL settings.
+
+These results apply to local synthetic fixtures on the declared host. The changes
+are uncommitted and no exact-revision remote CI success is claimed. Production
+capacity certification, additional source adapters and Stage 17 remain separate.
+All 18 existing browser journeys passed, as did persistence through backend/DB
+restarts and Compose down/up. Both injected-failure cleanup checks passed; the
+recovery guard also refused and preserved a pre-existing project-labelled volume.
+Final frontend lint, CI YAML parsing and diff whitespace checks passed.
+The original development database/artifact volumes were not mounted by the tests.

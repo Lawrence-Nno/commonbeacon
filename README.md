@@ -98,6 +98,7 @@ See the [onboarding walkthrough](docs/demo-walkthrough.md) and
 - [Import screens and reconciliation](docs/import-ui.md)
 - [Discourse 3.5.0 adapter compatibility and export helper](docs/discourse-import.md)
 - [Transfer retention, metrics and recovery runbooks](docs/transfer-operations.md)
+- [Transfer crash recovery harness and capacity gates](docs/transfer-verification.md)
 - [REST API examples](docs/api.md) and [OpenAPI contract](docs/openapi.json)
 - [Architecture decisions](docs/architecture.md)
 - [Testing, verification results, and limitations](docs/verification.md)

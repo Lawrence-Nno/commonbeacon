@@ -9,7 +9,7 @@ jobs:
   backend:
     name: Backend and PostgreSQL integration tests
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -94,6 +94,7 @@ jobs:
         run: |
           status=0
           docker compose --project-name "$COMMONBEACON_E2E_PROJECT" --env-file .env.example -f compose.e2e.yaml down --remove-orphans || status=$?
+          docker compose --project-name "${COMMONBEACON_E2E_PROJECT}-imports" --env-file .env.example -f compose.e2e.yaml -f compose.import-e2e.yaml down --remove-orphans || status=$?
           docker compose --project-name "$COMMONBEACON_PERSISTENCE_PROJECT" --env-file .env.example -f compose.persistence.yaml down --volumes --remove-orphans || status=$?
           exit "$status"
       - name: Upload browser evidence
@@ -105,4 +106,51 @@ jobs:
             frontend/test-results/
             frontend/playwright-report/
           if-no-files-found: warn
+          retention-days: 7
+
+  transfer-recovery:
+    name: Persistent source/destination crash recovery
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      COMMONBEACON_E2E_PROJECT: commonbeacon-e2e-recovery-ci-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm install --global npm@11.8.0
+      - run: npm ci
+        working-directory: frontend
+      - name: Run API recovery boundaries on real isolated processes
+        run: npm run test:recovery
+        working-directory: frontend
+      - name: Verify both persistent stacks are reclaimed on failure
+        run: npm run test:recovery-cleanup
+        working-directory: frontend
+      - name: Cleanup only this run's two recovery projects
+        if: always()
+        run: |
+          status=0
+          mkdir -p frontend/test-results
+          for project in "$COMMONBEACON_E2E_PROJECT" "${COMMONBEACON_E2E_PROJECT}-imports"; do
+            docker compose --project-name "$project" --env-file .env.example -f compose.e2e.yaml -f compose.recovery-e2e.yaml logs --no-color > "frontend/test-results/${project}.log" 2>&1 || true
+            docker compose --project-name "$project" --env-file .env.example -f compose.e2e.yaml -f compose.recovery-e2e.yaml down --volumes --remove-orphans || status=$?
+            for resource in container network volume; do
+              extra=()
+              if [ "$resource" = container ]; then extra=(-a); fi
+              remaining=$(docker "$resource" ls "${extra[@]}" -q --filter "label=com.docker.compose.project=$project") || status=$?
+              test -z "$remaining" || status=1
+            done
+          done
+          exit "$status"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: synthetic-transfer-recovery
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
           retention-days: 7

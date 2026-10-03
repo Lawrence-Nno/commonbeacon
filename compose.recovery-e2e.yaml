@@ -1,0 +1,12 @@
+# Used only by the guarded browser runner's recovery group, for both instances.
+services:
+  db:
+    tmpfs: !reset []
+    volumes:
+      - recovery_data:/var/lib/postgresql
+  backend:
+    volumes:
+      - recovery_artifacts:/var/lib/commonbeacon/transfers
+volumes:
+  recovery_data:
+  recovery_artifacts:

@@ -335,10 +335,11 @@ class ImportActivationIT {
         assertThat(jobs.status(admin,id).state()).isEqualTo(TransferJob.State.FAILED);assertThat(domain()).isEqualTo(before);assertThat(count("transfer_completion")).isZero();
     }
     private static String source(int entity,int i){return new UUID(entity,i+1L).toString();}
-    Map<String,byte[]> envelope()throws Exception {
+    Map<String,byte[]> envelope(int divisor)throws Exception {
         var files=fixture("company-full");var manifest=(tools.jackson.databind.node.ObjectNode)json.readTree(files.get("manifest.json"));
         var descriptors=manifest.putArray("files");var codec=new com.lawrencenno.commonbeacon.transfer.archive.ArchiveCodec();
-        int[] counts={2000,100,5000,20000,5000,1000,2000,3900,1000};int group=0;
+        int[] counts={2000,100,5000,20000,5000,1000,2000,3900,1000};
+        for(int i=0;i<counts.length;i++)counts[i]/=divisor;int group=0;
         for(var entity:com.lawrencenno.commonbeacon.transfer.archive.ArchiveFormat.Entity.values()) {
             var output=new ByteArrayOutputStream();
             for(int i=0;i<counts[group];i++) {
@@ -347,13 +348,13 @@ class ImportActivationIT {
                 switch(entity) {
                     case users -> row.put("displayName","Imported "+i);
                     case boards -> row.put("slug","board-"+i).put("name","Board "+i).put("description","Description").put("archived",false);
-                    case questions -> row.put("boardId",source(1,i%100)).put("authorId",source(0,i%2000)).put("title","Question "+i).put("body","searchable content ".repeat(16).trim()+" "+i).put("visibility","VISIBLE").put("updatedAt",timestamp);
-                    case replies -> row.put("questionId",source(2,i%5000)).put("authorId",source(0,i%2000)).put("body","searchable reply ".repeat(16).trim()+" "+i).put("visibility","VISIBLE").put("updatedAt",timestamp);
+                    case questions -> row.put("boardId",source(1,i%counts[1])).put("authorId",source(0,i%counts[0])).put("title","Question "+i).put("body","searchable content ".repeat(16).trim()+" "+i).put("visibility","VISIBLE").put("updatedAt",timestamp);
+                    case replies -> row.put("questionId",source(2,i%counts[2])).put("authorId",source(0,i%counts[0])).put("body","searchable reply ".repeat(16).trim()+" "+i).put("visibility","VISIBLE").put("updatedAt",timestamp);
                     case acceptances -> row.put("questionId",source(2,i)).put("replyId",source(3,i));
-                    case articles -> row.put("slug","article-"+i).put("title","Article "+i).put("body","searchable article ".repeat(16).trim()+" "+i).put("status","PUBLISHED").put("authorId",source(0,i%2000)).put("updatedAt",timestamp).put("publishedAt",timestamp);
+                    case articles -> row.put("slug","article-"+i).put("title","Article "+i).put("body","searchable article ".repeat(16).trim()+" "+i).put("status","PUBLISHED").put("authorId",source(0,i%counts[0])).put("updatedAt",timestamp).put("publishedAt",timestamp);
                     case contacts -> row.put("userId",source(0,i)).put("email","source"+i+"@example.test");
-                    case reports -> row.put("reporterId",source(0,i%2000)).put("questionId",source(2,i%5000)).putNull("replyId").put("reason","Please review this question.").put("status","OPEN").put("updatedAt",timestamp).putNull("resolverId").putNull("resolvedAt").putNull("resolutionDecision").putNull("resolutionNote");
-                    case actions -> row.put("actorId",source(0,i%2000)).put("questionId",source(2,i%5000)).putNull("replyId").put("action","HIDE").put("reason","Historical source action.");
+                    case reports -> row.put("reporterId",source(0,i%counts[0])).put("questionId",source(2,i%counts[2])).putNull("replyId").put("reason","Please review this question.").put("status","OPEN").put("updatedAt",timestamp).putNull("resolverId").putNull("resolvedAt").putNull("resolutionDecision").putNull("resolutionNote");
+                    case actions -> row.put("actorId",source(0,i%counts[0])).put("questionId",source(2,i%counts[2])).putNull("replyId").put("action","HIDE").put("reason","Historical source action.");
                 }
                 output.write(codec.encodeRow(com.lawrencenno.commonbeacon.transfer.archive.ArchiveFormat.Profile.company,entity,row));
             }
@@ -362,15 +363,56 @@ class ImportActivationIT {
         }
         files.put("manifest.json",codec.encodeManifest(manifest));return files;
     }
-    @Test void measuredMaximumRecordEnvelopeCommitsWithinThirtySeconds()throws Exception {
-        UUID id=inspected(envelope());var report=reviewed(id);assertThat(report.path("eligible").asBoolean()).as(report.toString()).isTrue();
-        assertThat(count("transfer_stage")).isEqualTo(40000);long bytes=report.path("budget").path("stagedBytes").asLong();assertThat(bytes).isBetween(16000000L,ImportActivation.MAX_BYTES);
-        activation.confirm(admin,id,UUID.randomUUID(),confirmation(id,report),()->{});var claim=activation.claim().orElseThrow();
-        String lsn=jdbc.queryForObject("SELECT pg_current_wal_insert_lsn()::text",String.class);long start=System.nanoTime();activation.activate(claim.lease());long millis=(System.nanoTime()-start)/1000000;
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.CsvSource({"100,1","10,1","1,1","1,2"})
+    void measuredPipelineEnvelope(int divisor,int repetition)throws Exception {
+        for(String setting:List.of("fsync","synchronous_commit","full_page_writes"))assertThat(jdbc.queryForObject("SHOW "+setting,String.class)).isEqualTo("on");
+        // Fixture construction is excluded from pipeline time but included in whole-JVM heap samples.
+        var input=envelope(divisor);int rows=40000/divisor;
+        var latencies=new java.util.concurrent.CopyOnWriteArrayList<Long>();
+        var peakHeap=new AtomicLong();var peakLockWaiters=new AtomicLong();var running=new AtomicBoolean(true);
+        String lsn=jdbc.queryForObject("SELECT pg_current_wal_insert_lsn()::text",String.class);
+        long beforeDb=jdbc.queryForObject("SELECT pg_database_size(current_database())",Long.class);
+        long pipelineStart=System.nanoTime();long millis;long bytes;long disk;long inspectMs;long stageMs;
+        try(var client=HttpClient.newHttpClient();var pool=java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+            var foreground=pool.submit(()->{
+                while(running.get()) {
+                    long start=System.nanoTime();
+                    try {
+                        var response=client.send(HttpRequest.newBuilder(URI.create("http://127.0.0.1:"+port+"/api/v1/boards")).timeout(Duration.ofSeconds(5)).build(),HttpResponse.BodyHandlers.discarding());
+                        assertThat(response.statusCode()).isEqualTo(200);latencies.add((System.nanoTime()-start)/1000000);
+                        peakHeap.accumulateAndGet(java.lang.management.ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getUsed(),Math::max);
+                        peakLockWaiters.accumulateAndGet(jdbc.queryForObject("SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'",Long.class),Math::max);
+                        Thread.sleep(100);
+                    }catch(Exception e){throw new RuntimeException(e);}
+                }
+            });
+            try {
+                UUID id=inspected(input);inspectMs=(System.nanoTime()-pipelineStart)/1000000;
+                long stageStart=System.nanoTime();var report=reviewed(id);stageMs=(System.nanoTime()-stageStart)/1000000;
+                assertThat(report.path("eligible").asBoolean()).as(report.toString()).isTrue();
+                assertThat(count("transfer_stage")).isEqualTo(rows);bytes=report.path("budget").path("stagedBytes").asLong();
+                assertThat(bytes).isLessThanOrEqualTo(ImportActivation.MAX_BYTES);
+                if(divisor==1)assertThat(bytes).isGreaterThan(16000000);
+                disk=store.usage().orElseThrow().usedBytes();assertThat(disk).isLessThan(805306368);
+                activation.confirm(admin,id,UUID.randomUUID(),confirmation(id,report),()->{});var claim=activation.claim().orElseThrow();
+                long start=System.nanoTime();activation.activate(claim.lease());millis=(System.nanoTime()-start)/1000000;
+                assertThat(millis).isLessThan(30000);assertThat(jobs.status(admin,id).state()).isEqualTo(TransferJob.State.COMPLETED);
+                assertThat(count("app_user")).isEqualTo(2000/divisor+2);assertThat(count("question")).isEqualTo(5000/divisor);assertThat(count("reply")).isEqualTo(20000/divisor);
+            } finally {running.set(false);foreground.get(10,java.util.concurrent.TimeUnit.SECONDS);}
+        }
+        long pipelineMs=(System.nanoTime()-pipelineStart)/1000000;
         long wal=jdbc.queryForObject("SELECT pg_wal_lsn_diff(pg_current_wal_insert_lsn(),?::pg_lsn)",Long.class,lsn);
-        long indexes=jdbc.queryForObject("SELECT sum(pg_indexes_size(c.oid)) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('app_user','board','question','reply','knowledge_article','content_report','moderation_action','imported_author','imported_record')",Long.class);
-        System.out.println("ACTIVATION_BENCHMARK rows=40000 stagedBytes="+bytes+" elapsedMs="+millis+" walBytes="+wal+" indexBytes="+indexes);
-        assertThat(millis).isLessThan(30000);assertThat(jobs.status(admin,id).state()).isEqualTo(TransferJob.State.COMPLETED);assertThat(count("app_user")).isEqualTo(2002);assertThat(count("question")).isEqualTo(5000);assertThat(count("reply")).isEqualTo(20000);
+        long dbGrowth=jdbc.queryForObject("SELECT pg_database_size(current_database())",Long.class)-beforeDb;
+        long indexes=jdbc.queryForObject("SELECT sum(pg_indexes_size(c.oid)) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public'",Long.class);
+        var sorted=latencies.stream().sorted().toList();assertThat(sorted).isNotEmpty();long p95=sorted.get((int)Math.ceil(sorted.size()*0.95)-1);
+        System.out.println("TRANSFER_BENCHMARK rows="+rows+" repetition="+repetition+" cache=uncontrolled-warm-host stagedBytes="+bytes+" inspectionMs="+inspectMs+" stagingMs="+stageMs+" activationMs="+millis+" pipelineMs="+pipelineMs+" walBytes="+wal+" databaseGrowthBytes="+dbGrowth+" indexBytes="+indexes+" artifactBytes="+disk+" sampledJvmHeapBytes="+peakHeap.get()+" foregroundSamples="+sorted.size()+" foregroundP95Ms="+p95+" foregroundMaxMs="+sorted.getLast()+" sampledLockWaiters="+peakLockWaiters.get());
+        assertThat(pipelineMs).isLessThan(600000);assertThat(p95).isLessThan(2000);assertThat(sorted.getLast()).isLessThan(5000);
+        // Whole test JVM, including fixtures/framework, not a per-job allocation claim.
+        assertThat(peakHeap.get()).isLessThan(1073741824L);
+        new ArtifactReconciler(jobs,store).reconcile();
+        assertThat(count("transfer_stage")).isZero();assertThat(store.usage().orElseThrow().usedBytes()).isZero();
+        assertThat(jdbc.queryForObject("SELECT coalesce(sum(reserved_bytes),0) FROM transfer_job",Long.class)).isZero();
     }
     @Test void oversizedValidArchiveFailsReviewBeforeAnyActivation()throws Exception {
         var files=fixture("company-full");var out=new ByteArrayOutputStream();var codec=new com.lawrencenno.commonbeacon.transfer.archive.ArchiveCodec();
@@ -383,6 +425,9 @@ class ImportActivationIT {
         files.put("manifest.json",codec.encodeManifest(manifest));UUID id=inspected(files);assertThat(jobs.inspection(admin,id).valid()).isTrue();
         var report=reviewed(id);assertThat(report.path("errors").toString()).contains("ACTIVATION_BUDGET_EXCEEDED");assertThat(report.path("activationAvailable").asBoolean()).isFalse();
         assertThatThrownBy(()->activation.confirm(admin,id,UUID.randomUUID(),confirmation(id,report),()->{})).hasMessage("JOB_CONFLICT");assertThat(count("board")).isZero();assertThat(count("transfer_activation")).isZero();
+        jobs.cancel(admin,id,jobs.status(admin,id).version());new ArtifactReconciler(jobs,store).reconcile();
+        assertThat(count("transfer_stage")).isZero();assertThat(store.usage().orElseThrow().usedBytes()).isZero();
+        assertThat(jdbc.queryForObject("SELECT reserved_bytes FROM transfer_job WHERE id=?",Long.class,id)).isZero();
     }
     @Test void rejectedManifestStillHasReadableIneligibleReview()throws Exception {
         var files=fixture("company-empty");files.put("manifest.json","{}".getBytes(java.nio.charset.StandardCharsets.UTF_8));

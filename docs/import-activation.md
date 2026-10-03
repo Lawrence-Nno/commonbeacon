@@ -127,13 +127,14 @@ durable replay/recovery and semantic native re-export. `MilestoneUpgradeIT` veri
 forward migration from populated V15, preserving existing review metadata (old
 validation-version-1 reviews must be run again before confirmation).
 
-The maximum-record benchmark uses isolated PostgreSQL 18.6, the real ZIP inspector
-and staging worker, 40,000 records across every native entity, and measures only
-the final activation transaction. It prints `ACTIVATION_BENCHMARK` with elapsed
-milliseconds, serialized staged bytes, WAL bytes and total domain/provenance index
-bytes. Staging time is separate.
+Stage 16 expands the original activation benchmark to small, representative and
+repeated maximum datasets, with durable PostgreSQL settings, pipeline timing,
+foreground reads and resource measurements. See the maintained
+[transfer verification harness](transfer-verification.md). It now prints
+`TRANSFER_BENCHMARK`; export measurements print `EXPORT_BENCHMARK`.
 
-Local measured run on 2026-09-23: PostgreSQL 18.6 in Docker Desktop on Windows,
+Historical Stage 11 run on 2026-09-23 (Testcontainers' default `fsync=off`, not
+durability/capacity certification): PostgreSQL 18.6 in Docker Desktop on Windows,
 Java 21.0.12.1, 16 Docker CPUs and 19.15 GiB Docker memory; 40,000 source records, **16,621,800 staged bytes**, final transaction
 **5,377 ms**, **49,838,560 WAL bytes**, **15,958,016 index bytes**. The source was a
 STORED ZIP, so hashing covered the full uncompressed archive. The fixture includes

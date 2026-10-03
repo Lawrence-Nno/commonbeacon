@@ -39,6 +39,7 @@ class CompanyExportIT {
     static final UUID ADMIN=id(3);
     static final Path ROOT=root();
     static final AtomicReference<Runnable> DURING_WRITE=new AtomicReference<>();
+    static final AtomicReference<Runnable> DURING_ZIP_WRITE=new AtomicReference<>();
     static Path root(){try{return Files.createTempDirectory("commonbeacon-export-");}catch(IOException e){throw new UncheckedIOException(e);}}
     static UUID id(int n){return UUID.fromString("00000000-0000-0000-0000-%012d".formatted(n));}
     @TestConfiguration(proxyBeanMethods=false) static class Storage {
@@ -49,7 +50,7 @@ class CompanyExportIT {
                     return local.write(key,limit,out->writer.write(new FilterOutputStream(out) {
                         public void write(int b)throws IOException{write(new byte[]{(byte)b},0,1);}
                         public void write(byte[] b,int off,int len)throws IOException{
-                            out.write(b,off,len);var hook=DURING_WRITE.getAndSet(null);if(hook!=null)hook.run();
+                            out.write(b,off,len);var hook=(limit==67108864L?DURING_ZIP_WRITE:DURING_WRITE).getAndSet(null);if(hook!=null)hook.run();
                         }
                     }));
                 }
@@ -61,6 +62,7 @@ class CompanyExportIT {
         }
     }
     @Autowired JdbcTemplate jdbc;
+    @Autowired org.testcontainers.postgresql.PostgreSQLContainer postgres;
     @Autowired TransferJobs jobs;
     @Autowired ArtifactStore store;
     @Autowired CompanySnapshot snapshot;
@@ -72,7 +74,7 @@ class CompanyExportIT {
     static final java.util.concurrent.atomic.AtomicInteger WINDOWS=new java.util.concurrent.atomic.AtomicInteger();
     Map<String,List<JsonNode>> fixture=new LinkedHashMap<>();
     @BeforeEach void setup() throws Exception {
-        when(loginLimiter.allow(anyString())).thenReturn(true);DURING_WRITE.set(null);
+        when(loginLimiter.allow(anyString())).thenReturn(true);DURING_WRITE.set(null);DURING_ZIP_WRITE.set(null);
         Instant now=Instant.parse("2026-09-22T00:00:00Z").plusSeconds(1000L*WINDOWS.incrementAndGet());
         when(clock.instant()).thenReturn(now);when(clock.millis()).thenReturn(now.toEpochMilli());
         jdbc.execute("TRUNCATE app_user,board CASCADE");
@@ -173,6 +175,42 @@ class CompanyExportIT {
         assertThat(store.inspect(partial)).isEmpty();assertThat(jobs.status(ADMIN,job.id()).attempts()).isEqualTo(2);
         assertThatThrownBy(()->jobs.checkpoint(old.lease(),13)).hasMessage("STALE_LEASE");
     }
+    void crashDatabase() {
+        // A backend SIGKILL makes the postmaster terminate every connection and perform
+        // crash recovery. Keep the container/network alive so its random host port is stable.
+        try(var connection=java.sql.DriverManager.getConnection(postgres.getJdbcUrl(),postgres.getUsername(),postgres.getPassword());
+                var statement=connection.createStatement();var result=statement.executeQuery("SELECT pg_backend_pid()")) {
+            assertThat(result.next()).isTrue();
+            assertThat(postgres.execInContainer("kill","-KILL",Integer.toString(result.getInt(1))).getExitCode()).isZero();
+        }catch(Exception e){throw new IllegalStateException(e);}
+        long deadline=System.nanoTime()+30_000_000_000L;
+        while(System.nanoTime()<deadline) {
+            try(var connection=java.sql.DriverManager.getConnection(postgres.getJdbcUrl(),postgres.getUsername(),postgres.getPassword())) {
+                if(connection.isValid(2))return;
+            }catch(java.sql.SQLException ignored){/* bounded WAL recovery readiness */}
+            try{Thread.sleep(100);}catch(InterruptedException e){Thread.currentThread().interrupt();throw new IllegalStateException(e);}
+        }
+        throw new AssertionError("Disposable PostgreSQL did not recover");
+    }
+    @Test void databaseCrashDuringSnapshotNeverPublishesPartialArchive()throws Exception {
+        var job=create(true,true);DURING_WRITE.set(this::crashDatabase);
+        assertThat(worker().runOnce()).isTrue();
+        assertThat(jobs.status(ADMIN,job.id()).state()).isEqualTo(TransferJob.State.FAILED);
+        assertThat(jobs.artifactAvailable(ADMIN,job.id())).isFalse();
+        new ArtifactReconciler(jobs,store).reconcile();
+        assertThat(store.keysOlderThan(Instant.now().plusSeconds(1))).isEmpty();
+        assertThat(jdbc.queryForObject("SELECT reserved_bytes FROM transfer_job WHERE id=?",Long.class,job.id())).isZero();
+        // Explicit fresh job takes a new complete snapshot after recovery.
+        var retry=create(true,true);worker().runOnce();validate(archive(retry));
+    }
+    @Test void databaseCrashDuringCompressionRetainsTheCompletedSnapshot()throws Exception {
+        var job=create(true,true);DURING_ZIP_WRITE.set(this::crashDatabase);
+        assertThat(worker().runOnce()).isTrue();
+        assertThat(DURING_ZIP_WRITE.get()).isNull();
+        assertThat(jobs.status(ADMIN,job.id()).state()).isEqualTo(TransferJob.State.READY);
+        validate(archive(job));
+        assertThat(rows(archive(job),"questions")).isEqualTo(fixture.get("questions"));
+    }
     @Test void invalidSourceAndCountLimitNeverPublishAnArchive() {
         jdbc.update("UPDATE question SET title=? WHERE id=?",new String(Character.toChars(0x1F600)).repeat(150),id(20));
         var job=create(false,false);worker().runOnce();assertThat(jobs.status(ADMIN,job.id()).errorCode()).isEqualTo(TransferJob.Failure.INVALID_SOURCE_DATA);
@@ -213,6 +251,31 @@ class CompanyExportIT {
             assertThat(jobs.status(ADMIN,job.id()).state()).isEqualTo(TransferJob.State.FAILED);assertThat(jobs.artifactAvailable(ADMIN,job.id())).isFalse();
             assertThat(limited.keysOlderThan(Instant.now().plusSeconds(1))).isEmpty();
         }finally{Files.deleteIfExists(small.resolve(".store.lock"));Files.delete(small);}
+    }
+    @ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(ints={100,10,1})
+    void measuresSnapshotAndPackagingAtSupportedCounts(int divisor)throws Exception {
+        jdbc.execute("TRUNCATE board,knowledge_article,content_report,moderation_action CASCADE");
+        int boards=100/divisor,questions=5000/divisor,replies=20000/divisor,articles=1000/divisor,reports=5000/divisor,actions=3894/divisor;
+        jdbc.execute("INSERT INTO board(id,slug,name,description) SELECT md5('bench-board-'||n)::uuid,'bench-board-'||n,'Benchmark board '||n,'Synthetic distribution' FROM generate_series(1,"+boards+") n");
+        jdbc.execute("INSERT INTO question(id,board_id,author_id,title,body) SELECT md5('bench-question-'||n)::uuid,md5('bench-board-'||((n-1)%"+boards+"+1))::uuid,'"+ADMIN+"','Benchmark question '||n,repeat('Synthetic searchable question ',10)||n FROM generate_series(1,"+questions+") n");
+        jdbc.execute("INSERT INTO reply(id,question_id,author_id,body) SELECT md5('bench-reply-'||n)::uuid,md5('bench-question-'||((n-1)%"+questions+"+1))::uuid,'"+ADMIN+"',repeat('Synthetic searchable reply ',10)||n FROM generate_series(1,"+replies+") n");
+        jdbc.execute("UPDATE question q SET accepted_reply_id=md5('bench-reply-'||n)::uuid FROM generate_series(1,"+questions+") n WHERE q.id=md5('bench-question-'||n)::uuid");
+        jdbc.execute("INSERT INTO knowledge_article(id,slug,title,body,author_id) SELECT md5('bench-article-'||n)::uuid,'bench-article-'||n,'Benchmark article '||n,repeat('Synthetic article ',20)||n,'"+ADMIN+"' FROM generate_series(1,"+articles+") n");
+        jdbc.execute("INSERT INTO content_report(id,reporter_id,question_id,reason) SELECT md5('bench-report-'||n)::uuid,'"+ADMIN+"',md5('bench-question-'||n)::uuid,'Synthetic report '||n FROM generate_series(1,"+reports+") n");
+        jdbc.execute("INSERT INTO moderation_action(id,actor_id,question_id,action,reason) SELECT md5('bench-action-'||n)::uuid,'"+ADMIN+"',md5('bench-question-'||n)::uuid,'HIDE','Synthetic historical action '||n FROM generate_series(1,"+actions+") n");
+        var job=create(true,true);var intermediate=UUID.randomUUID();var output=UUID.randomUUID();
+        var data=new CompanySnapshot.Dataset[1];long start=System.nanoTime();
+        var saved=store.write(intermediate,268435456L,out->data[0]=snapshot.extract(job,out,n->{}));
+        long snapshotMs=(System.nanoTime()-start)/1000000;var archive=new CompanyArchive(store);
+        start=System.nanoTime();archive.validate(intermediate,data[0],()->{});var zip=archive.packageSnapshot(intermediate,output,data[0],()->{});
+        long packagingMs=(System.nanoTime()-start)/1000000;
+        System.out.println("EXPORT_BENCHMARK divisor="+divisor+" rows="+data[0].rows()+" cache=uncontrolled-warm-host snapshotMs="+snapshotMs+" validationPackagingMs="+packagingMs+" intermediateBytes="+saved.bytes()+" zipBytes="+zip.bytes());
+        if(divisor==1)assertThat(data[0].rows()).isEqualTo(40000);
+        assertThat(snapshotMs).isLessThan(120000);assertThat(packagingMs).isLessThan(600000);
+        assertThat(saved.bytes()+zip.bytes()).isLessThan(805306368);assertThat(zip.bytes()).isLessThanOrEqualTo(67108864);
+        try(var input=store.open(output)){validate(unzip(input.readAllBytes()));}
+        store.delete(intermediate);store.delete(output);jobs.cancel(ADMIN,job.id(),jobs.status(ADMIN,job.id()).version());
+        new ArtifactReconciler(jobs,store).reconcile();assertThat(store.keysOlderThan(Instant.now().plusSeconds(1))).isEmpty();
     }
     @Test void highCompressionEntriesUseStoredZipMethod()throws Exception {
         // Repeated long bodies exercise the 100:1 fallback without a large heap fixture.

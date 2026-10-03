@@ -112,3 +112,12 @@ counts and reload reconciliation. Run it alone with
 
 See [verification](verification.md) for repeatable commands, coverage, recorded
 results, and current limitations.
+
+## Transfer process-crash verification
+
+`npm run test:recovery` runs a separate API journey against persistent disposable
+source/destination stacks. Run it sequentially with smoke/cleanup commands because
+they use the same local ports. `npm run test:recovery-cleanup` tests refusal of
+pre-existing project resources and failure cleanup after both instances start.
+See [transfer verification](transfer-verification.md) for fault boundaries,
+synthetic clock advancement, measurements and the CI evidence policy.

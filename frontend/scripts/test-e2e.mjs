@@ -21,7 +21,7 @@ const args = [
   "-f",
   "compose.erasure-e2e.yaml",
 ];
-// Explicit project/file on every call; no volumes exist and no development cleanup is possible.
+// Explicit project/file on every call; only recovery creates this runner's test volumes.
 const docker = (extra, capture = false) =>
   spawnSync("docker", [...args, ...extra], {
     cwd: root,
@@ -32,6 +32,14 @@ const docker = (extra, capture = false) =>
 const targetArgs = [...args];
 targetArgs[targetArgs.indexOf(project)] = project + "-imports";
 targetArgs.push("-f", "compose.import-e2e.yaml");
+function assertClean() {
+  for (const name of [project, project + "-imports"]) {
+    for (const type of ["container", "network", "volume"]) {
+      const result = spawnSync("docker", [type, "ls", ...(type === "container" ? ["-a"] : []), "-q", "--filter", "label=com.docker.compose.project=" + name], { cwd: root, encoding: "utf8", timeout: 30000 });
+      if (result.status !== 0 || result.stdout.trim()) throw new Error("Disposable project is not clean: " + name + " " + type);
+    }
+  }
+}
 const targetDocker = (extra, input) => spawnSync("docker", [...targetArgs, ...extra], {
   cwd: root, stdio: "pipe", encoding: "utf8", timeout: 600000, input,
 });
@@ -73,9 +81,13 @@ function saveLogs(group) {
   const logs = docker(["logs", "--no-color"], true);
   mkdirSync(new URL(`../test-results/${group}/`, import.meta.url), { recursive: true });
   writeFileSync(new URL(`../test-results/${group}/backend-compose.log`, import.meta.url), (logs.stdout ?? "") + (logs.stderr ?? ""));
+  const targetLogs = targetDocker(["logs", "--no-color"]);
+  writeFileSync(new URL(`../test-results/${group}/import-compose.log`, import.meta.url), (targetLogs.stdout ?? "") + (targetLogs.stderr ?? ""));
 }
 const selectors = process.argv.slice(2).filter(arg => arg.includes(".spec"));
-const groups = selectors.length ? [...new Set(selectors.map(arg => arg.includes("erasure.spec") ? "erasure" : arg.includes("discourse-import.spec") ? "discourse" : arg.includes("import-activation.spec") ? "imports" : "community"))] : ["community", "imports", "discourse", "erasure"];
+const groups = selectors.length ? [...new Set(selectors.map(arg => arg.includes("transfer-recovery.spec") ? "recovery" : arg.includes("erasure.spec") ? "erasure" : arg.includes("discourse-import.spec") ? "discourse" : arg.includes("import-activation.spec") ? "imports" : "community"))] : ["community", "imports", "discourse", "erasure"];
+// Refuse adoption before entering cleanup's try/finally. A prefix alone is not ownership.
+assertClean();
 let code = 0, currentGroup = groups[0];
 try {
   for (const [index, group] of groups.entries()) {
@@ -83,13 +95,18 @@ try {
     if (index > 0) {
       // Fresh disposable tmpfs DB and process-local rate limiters between suites.
       // Exercise real production limits without carrying another suite's quotas.
-      const reset = docker(["down", "--remove-orphans"]);
+      const reset = docker(["down", "--volumes", "--remove-orphans"]);
       if (reset.error || reset.status !== 0) throw new Error("Disposable source reset failed.");
-      const resetTarget = targetDocker(["down", "--remove-orphans"]);
+      const resetTarget = targetDocker(["down", "--volumes", "--remove-orphans"]);
       if (resetTarget.error || resetTarget.status !== 0) throw new Error("Disposable import target reset failed.");
     }
+    if (group === "recovery") {
+      args.push("-f", "compose.recovery-e2e.yaml");
+      targetArgs.push("-f", "compose.recovery-e2e.yaml");
+    }
     startSource();
-    if (group === "imports" || group === "discourse") startTarget();
+    if (["imports", "discourse", "recovery"].includes(group)) startTarget();
+    if (process.argv.includes("--inject-recovery-failure") && group === "recovery") throw new Error("Injected recovery failure after both persistent stacks started");
     code = Math.max(code, run(group));
     saveLogs(group);
   }
@@ -98,20 +115,18 @@ try {
   code = 1;
 } finally {
   try {
-    saveLogs(currentGroup);
-    const targetLogs = targetDocker(["logs", "--no-color"]);
-    mkdirSync(new URL("../test-results/imports/", import.meta.url), { recursive: true });
-    writeFileSync(new URL("../test-results/imports/import-compose.log", import.meta.url), (targetLogs.stdout ?? "") + (targetLogs.stderr ?? ""));
+    saveLogs(currentGroup + (process.argv.includes("--inject-recovery-failure") ? "-failure" : ""));
   } catch (error) {
     console.error("Could not save logs:", error.message);
     code = 1;
   }
-  const cleanup = docker(["down", "--remove-orphans"]);
-  const targetCleanup = targetDocker(["down", "--remove-orphans"]);
+  const cleanup = docker(["down", "--volumes", "--remove-orphans"]);
+  const targetCleanup = targetDocker(["down", "--volumes", "--remove-orphans"]);
   if (targetCleanup.error || targetCleanup.status !== 0) { console.error("Import test target cleanup failed."); code = 1; }
   if (cleanup.error || cleanup.status !== 0) {
     console.error("Cleanup failed for disposable project " + project);
     code = 1;
   }
+  try { assertClean(); } catch (error) { console.error(error.message); code = 1; }
 }
 process.exitCode = code;
