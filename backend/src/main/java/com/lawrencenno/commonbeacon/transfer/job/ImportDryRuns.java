@@ -126,15 +126,22 @@ public class ImportDryRuns {
     @FunctionalInterface private interface StagedRowCheck { void check(String entity,long line,JsonNode row); }
     private String stagingDigest(UUID id,StagedRowCheck check) {
         var digest=ArchiveCodec.sha256();
-        // Fixed metadata only, at most 40,000 records. Raw body fields never accumulate here.
-        jdbc.query(c->{var ps=c.prepareStatement("SELECT s.entity,s.source_id,s.payload_sha256,s.payload::text,m.local_id,s.line FROM transfer_stage s LEFT JOIN transfer_mapping m ON m.job_id=s.job_id AND m.entity=s.entity AND m.source_id=s.source_id WHERE s.job_id=? ORDER BY s.entity,s.source_id");ps.setObject(1,id);ps.setFetchSize(16);return ps;},(org.springframework.jdbc.core.RowCallbackHandler)r->{
-            var row=JSON.readTree(r.getString(4));
-            digest.update((r.getString(1)+":"+r.getString(2)+":"+r.getString(3)+":"+hash(row.toString())+":"+r.getString(5)+"\n").getBytes(StandardCharsets.UTF_8));
-            check.check(r.getString(1),r.getLong(6),row);
-        });
-        jdbc.query("SELECT entity,source_id,local_id FROM transfer_mapping WHERE job_id=? ORDER BY entity,source_id",r->{
-            digest.update((r.getString(1)+":"+r.getString(2)+":"+r.getString(3)+"\n").getBytes(StandardCharsets.UTF_8));
+        // Bound the metadata index independently of planner statistics on frequently
+        // emptied staging tables. Do not join two bulk-loaded tables for every payload.
+        // Insertion order retains the original mapping digest's SQL ordering.
+        var mappings=new LinkedHashMap<String,String>();
+        jdbc.query("SELECT entity,source_id,local_id FROM transfer_mapping WHERE job_id=? ORDER BY entity,source_id LIMIT 40001",r->{
+            mappings.put(r.getString(1)+":"+r.getString(2),r.getString(3));
         },id);
+        if(mappings.size()>40000)throw new IllegalStateException("TRANSFER_LIMIT_EXCEEDED");
+        // Raw body fields never accumulate: one bounded fetch and one parsed row.
+        jdbc.query(c->{var ps=c.prepareStatement("SELECT entity,source_id,payload_sha256,payload::text,line FROM transfer_stage WHERE job_id=? ORDER BY entity,source_id");ps.setObject(1,id);ps.setFetchSize(16);return ps;},(org.springframework.jdbc.core.RowCallbackHandler)r->{
+            var row=JSON.readTree(r.getString(4));
+            String key=r.getString(1)+":"+r.getString(2);
+            digest.update((key+":"+r.getString(3)+":"+hash(row.toString())+":"+mappings.get(key)+"\n").getBytes(StandardCharsets.UTF_8));
+            check.check(r.getString(1),r.getLong(5),row);
+        });
+        mappings.forEach((key,local)->digest.update((key+":"+local+"\n").getBytes(StandardCharsets.UTF_8)));
         return HexFormat.of().formatHex(digest.digest());
     }
     public void finish(Lease lease,TransferJobs.Artifact source,ArchiveFormat.Result validation) {
