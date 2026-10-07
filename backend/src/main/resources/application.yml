@@ -3,6 +3,9 @@ logging:
     format:
       console: logstash
   level:
+    # Identity challenges/passwords are never safe JDBC/Hibernate bind diagnostics.
+    org.springframework.jdbc.core.StatementCreatorUtils: "OFF"
+    org.hibernate.orm.jdbc.bind: "OFF"
     org.hibernate.orm.jdbc.error: "OFF"
     org.hibernate.engine.jdbc.spi.SqlExceptionHelper: "OFF"
 

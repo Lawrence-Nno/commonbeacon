@@ -2,8 +2,9 @@
 
 Stage 2 adds storage in Flyway V19; Stage 3 adds authoritative sessions and
 permissions, with V20 connecting explicit epoch advances to transfer invalidation.
-Token issuance, verification/reset endpoints, email delivery, and pending
-registration remain later stages. Registration still creates ACTIVE members.
+Stage 4 adds internal transactional challenge issuance and consumption. Public
+verification/reset endpoints, email delivery, and pending registration remain later
+stages. Registration still creates ACTIVE members.
 Completing these stages does not close the production email launch gate.
 
 ## Upgrade and transition mode
@@ -127,9 +128,64 @@ response shapes; state-aware responses lacking capabilities fail closed for comm
 actions. Session/role/state/proof/capability changes clear actor-private query caches
 even when UUID is unchanged. Backend services remain the authority.
 
+## Stage 4 challenge primitives
+
+`EmailChallenges` is an internal service, with no controller, token introspection API,
+or automatic login. `issue` generates 32 bytes with injected `SecureRandom`, encodes
+43 canonical unpadded base64url characters, and stores only a purpose-separated SHA-256
+digest. Verification lifetime is 24 hours; reset and email-change lifetime is 30 minutes.
+Parsing checks length/alphabet/canonical encoding before database work. A UTC clock is
+injected; issuance timestamps use PostgreSQL microsecond precision so returned expiry
+matches persisted expiry. Equality with expiry is expired, and a clock before creation
+grants nothing.
+
+Both issuance and consumption join the caller's transaction, or start a transaction
+when called alone. They explicitly take the maintenance shared gate, exclusive identity
+gate, subject row, then challenge/proposal rows. Never invoke them after taking transfer,
+outbox, or other domain locks. Stage 8 must take durable rate-budget rows in the agreed
+order before calling these primitives; the admission callback here is a precomputed
+decision, not a substitute for unknown-address/global rate limits. Public email-change
+issuance must additionally enforce owner and recent authentication in its Stage 11
+orchestrator. There is no exposed issuance endpoint at this stage.
+
+Issuance checks current account/address eligibility and a 60-second cooldown including
+previous terminal challenges. An admitted resend advances only that purpose's generation,
+revokes the prior challenge, and creates a new binding. A denied attempt changes no
+challenge, generation, or proposal. Its `Issued` object is delivered only to an internal
+transaction callback; Stage 5 must persist encrypted delivery intent there. The service
+does not send mail or expose the token as a response. Do not retain/log callback secrets
+or treat a callback value as committed until the enclosing transaction commits.
+
+Consumption rechecks current state, purpose, address, generation, expiry, terminal state,
+and email-change proposal. Expired, replayed, revoked, wrong-purpose, missing/ineligible
+subject, stale binding, and address-collision links share `INVALID_EMAIL_LINK`. An eligible
+pending verifier must choose a nonblank 12-128-character replacement password; invalid
+passwords leave the token usable. Legacy ACTIVE verification retains credentials/role.
+Verification establishes proof and invalidates sessions without creating a session.
+Reset changes credentials/epoch but preserves state/proof and a pending verification
+link; it cancels reset links and email-change proposals. Email change switches the address
+and records new proof only on completion, and revokes old-address challenges. If the
+existing proof timestamp equals the injected clock, new proof advances one microsecond
+so the existing address-change trigger does not mistake it for unchanged proof.
+
+The consumed marker, account transition, challenge revocations, proposal deletion, and
+completion callback commit together. A callback failure or outer rollback preserves the
+original account and token; a conflicting address cannot partially consume the link.
+Stage 5 must persist security intents in the completion callback using the same transaction
+and datasource. Callbacks must perform database work only, with no independent transaction,
+network request, log of private values, or externally visible side effect. `Issued` and
+`Completion` serialize as empty objects and print redacted representations; private
+storage projections also redact their string representations. Bind diagnostics are OFF.
+
+`EmailChallengesIT` covers real PostgreSQL expiry, cooldown, purpose/binding isolation,
+password replacement, rollback, conflicting address, concurrent issuance/consumption,
+resend/consume, and suspension. `EmailChallengeHttpIT` verifies GET/HEAD/POST to an
+unimplemented link route cannot consume a challenge and request logs omit token/body
+values. This is absence-of-mutation qualification, not an implemented landing page.
+
 ## Next stages
 
-Stage 4 must recheck current state, address, generation, expiry, and terminal status
-when consuming a challenge, including after the account changes following issuance.
-SMTP configuration and actual outbound delivery belong to later stages. No email
-provider account or credentials are required to run Stages 2-3.
+Stage 5 adds the encrypted transactional outbox and wires the internal callbacks.
+Later stages implement HTTP flows and landing pages: GET/HEAD render only, and explicit
+CSRF-protected POST invokes consumption. Links will use fragments removed from browser
+history and trusted configured origins. No SMTP provider or credentials are needed yet.

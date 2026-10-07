@@ -20,6 +20,15 @@ and download revocation with cleanup; the authoritative-identity browser journey
 checks the pending-account UI and fresh login after simulated activation in a disposable
 stack. Frontend authentication tests check same-UUID capability cache invalidation.
 
+`EmailChallengesIT` covers token format/purpose separation, expiry and cooldown,
+current address/generation/proposal binding, password policy, one-use consumption,
+atomic rollback, collision handling, and concurrent issuance/consumption/resend/
+suspension on PostgreSQL. `EmailChallengeHttpIT` verifies link-shaped GET/HEAD/POST
+requests cannot mutate identity before public endpoints exist, and token/query/body
+secrets do not appear in responses or operational logs. Internal issued/completion
+objects have redacted string and empty JSON representations. See
+[challenge transaction integration](identity-verification.md#stage-4-challenge-primitives).
+
 CommonBeacon uses unit tests, real PostgreSQL integration tests, browser workflows,
 and disposable deployment checks. Each covers a different boundary; a passing
 build does not establish production readiness or a performance service level.
