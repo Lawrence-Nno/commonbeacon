@@ -78,11 +78,12 @@ class ErasureIT {
         UUID file=artifact(),foreignFile=UUID.randomUUID();store.write(foreignFile,100,out->out.write(1));
         var before=jdbc.queryForList("SELECT to_jsonb(q)::text FROM question q",String.class);
         var preview=service.preview(member,Scope.ACCOUNT);assertThat(preview.path("counts").has("content_report")).isFalse();
+        MailFixtures.queue(jdbc,transactions,passwords,member);
         UUID id=confirm(member,Scope.ACCOUNT);
         assertThat(jdbc.queryForObject("SELECT account_state FROM app_user WHERE id=?",String.class,member)).isEqualTo("ERASED");
         assertThat(jdbc.queryForMap("SELECT email,password_hash FROM app_user WHERE id=?",member)).containsEntry("email",null).containsEntry("password_hash",null);
         assertThatThrownBy(()->jdbc.update("UPDATE question SET title='Forbidden update' WHERE id=?",question)).isInstanceOf(org.springframework.dao.DataAccessException.class);
-        drain();assertThat(store.inspect(file)).isEmpty();assertThat(store.inspect(foreignFile)).isPresent();
+        drain();assertThat(count("email_outbox")).isZero();assertThat(store.inspect(file)).isEmpty();assertThat(store.inspect(foreignFile)).isPresent();
         assertThat(jdbc.queryForList("SELECT to_jsonb(q)::text FROM question q",String.class)).isEqualTo(before);
         assertThat(count("reply")).isEqualTo(1);assertThat(count("app_user")).isEqualTo(3);
         assertThat(jdbc.queryForObject("SELECT reason FROM content_report WHERE reporter_id=?",String.class,member)).isEqualTo("Removed by account deletion");
@@ -117,13 +118,14 @@ class ErasureIT {
         }
     }
     @Test void companyErasesInBatchesPreservesOnlyRequestingAdministratorAndLedger()throws Exception {
+        MailFixtures.queue(jdbc,transactions,passwords,admin);MailFixtures.queue(jdbc,transactions,passwords,member);
         UUID file=artifact();UUID extraAdmin=user("ADMINISTRATOR");
         jdbc.update("UPDATE app_user SET email_verified_at=clock_timestamp(),email_change_generation=1 WHERE id=?",admin);
         jdbc.update("INSERT INTO pending_email_change(subject_id,intended_email,generation,expires_at) VALUES (?,'private-proposed@example.test',1,clock_timestamp()+interval '1 day')",admin);
         jdbc.update("INSERT INTO email_challenge(id,subject_id,purpose,intended_email,token_digest,generation,expires_at) VALUES (?,?,'EMAIL_CHANGE','private-proposed@example.test',?,1,clock_timestamp()+interval '1 hour')",UUID.randomUUID(),admin,"a".repeat(64));
         jdbc.update("INSERT INTO reply(id,question_id,author_id,body) SELECT gen_random_uuid(),?,?,'Disposable bounded batch reply' FROM generate_series(1,405)",question,other);
         UUID id=confirm(admin,Scope.COMPANY);drain();
-        for(String table:List.of("board","question","reply","knowledge_article","content_report","moderation_action","transfer_job","transfer_artifact","imported_author","imported_record","email_challenge","pending_email_change"))assertThat(count(table)).as(table).isZero();
+        for(String table:List.of("board","question","reply","knowledge_article","content_report","moderation_action","transfer_job","transfer_artifact","imported_author","imported_record","email_challenge","pending_email_change","email_outbox"))assertThat(count(table)).as(table).isZero();
         assertThat(jdbc.queryForList("SELECT id FROM app_user",UUID.class)).containsExactly(admin);assertThat(store.inspect(file)).isEmpty();
         assertThat(count("erasure_tombstone")).isEqualTo(1);assertThat(service.status(id,TOKEN).path("processed").asInt()).isGreaterThan(405);
         assertThatThrownBy(()->service.preview(extraAdmin,Scope.COMPANY)).isInstanceOf(com.lawrencenno.commonbeacon.shared.ApiFailure.class);
@@ -226,6 +228,7 @@ class ErasureIT {
         assertThat(export.getExitCode()).as(export.getStderr()).isZero();
         // Simulate the old database snapshot without the later erasure, in this test container only.
         setup();jdbc.update("INSERT INTO app_user(id,email,display_name,password_hash,role) VALUES (?,?,'Restored private name',?,'MEMBER')",erased,erased+"@example.test",passwords.encode(PASSWORD));
+        MailFixtures.queue(jdbc,transactions,passwords,erased);
         var restored=database.execInContainer("sh","-c","cd /tmp && psql -X -U test -d test -v ON_ERROR_STOP=1 -f restore-erasure-ledger.sql");
         assertThat(restored.getExitCode()).as(restored.getStderr()).isZero();assertThat(service.active()).isTrue();drain();
         assertThat(jdbc.queryForObject("SELECT account_state FROM app_user WHERE id=?",String.class,erased)).isEqualTo("ERASED");

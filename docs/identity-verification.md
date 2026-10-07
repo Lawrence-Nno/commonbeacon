@@ -2,14 +2,15 @@
 
 Stage 2 adds storage in Flyway V19; Stage 3 adds authoritative sessions and
 permissions, with V20 connecting explicit epoch advances to transfer invalidation.
-Stage 4 adds internal transactional challenge issuance and consumption. Public
+Stage 4 adds internal transactional challenge issuance and consumption; Stage 5
+adds a private encrypted outbox in V21 and internal `EmailIdentity` orchestration. Public
 verification/reset endpoints, email delivery, and pending registration remain later
 stages. Registration still creates ACTIVE members.
 Completing these stages does not close the production email launch gate.
 
 ## Upgrade and transition mode
 
-Normal startup applies V19 and V20 once after V18 and validates the JPA mapping.
+Normal startup applies V19-V21 once after V18 and validates the JPA mapping.
 All existing addresses have `email_verified_at = NULL`: their verification is
 unknown. Existing credentials, roles, content, and transfer authorization revisions
 are preserved. No timestamps are inferred from prior use or administrator status.
@@ -56,7 +57,7 @@ predicate remains unchanged; its verified-administrator replacement is Stage 13.
 - A partial unique index permits one nonterminal challenge per subject/purpose.
   Expired nonterminal rows must be explicitly revoked before replacement. Issuance
   must update the purpose generation and revoke the prior row in one transaction;
-  admission and consumption logic are Stage 4.
+  runtime rotation and consumption are implemented by the Stage 4 primitives.
 - `pending_email_change` holds one private proposal per subject. It requires an
   ACTIVE verified subject and matching email-change generation. The challenge must
   match its address/generation and cannot outlive the proposal. Creating it never
@@ -185,7 +186,87 @@ values. This is absence-of-mutation qualification, not an implemented landing pa
 
 ## Next stages
 
-Stage 5 adds the encrypted transactional outbox and wires the internal callbacks.
-Later stages implement HTTP flows and landing pages: GET/HEAD render only, and explicit
+Stage 6 adds transport, templates, and isolated capture. Later stages implement HTTP
+flows and landing pages: GET/HEAD render only, and explicit
 CSRF-protected POST invokes consumption. Links will use fragments removed from browser
 history and trusted configured origins. No SMTP provider or credentials are needed yet.
+
+## Stage 5 encrypted outbox
+
+`EmailIdentity` wires Stage 4 callbacks to `EmailOutbox`: challenge/generation changes
+and an encrypted intent commit together; completion and required password/new/old-address
+notices also commit together. Use this orchestrator for future public flows rather than
+calling the low-level challenge primitive with an empty callback. An unavailable outbox
+or failed intent rolls back the identity transaction, preserving an existing usable link.
+No service makes a network call, starts a mail scheduler, or exposes a token/receipt API.
+
+`email_outbox` stores subject/message/event IDs, template version, challenge/generation,
+key ID, nonce/ciphertext, state, attempt count, next attempt, lease owner/version/expiry,
+safe UUID provider correlation, timestamps, and an allowlisted failure code. Unique
+subject/type/event bindings deduplicate semantic intents. Message bindings are immutable,
+terminal rows cannot become sendable again, and a key/nonce pair cannot be reused while
+stored. Outbox recipients and tokens occur only inside AES-256-GCM ciphertext, with fresh 96-bit
+nonces and a 128-bit authentication tag. Authenticated context binds message, subject,
+type/template version, event, challenge/generation, timestamps, and key ID. Payloads and
+encrypted/storage objects print redacted representations; payload JSON is empty.
+Existing private account/challenge address bindings retain their current schema.
+
+States are QUEUED, SENDING, RETRY_WAIT, ACCEPTED, FAILED, CANCELLED, and EXPIRED.
+ACCEPTED means provider submission acceptance, not inbox delivery or verification.
+Claim/prepare/finalization are short transactions behind maintenance/identity gates.
+One claim grants a 60-second fenced lease; a clock before creation grants no decryption
+or finalization. Prepare rechecks current subject/challenge/
+generation/address/proposal before decrypting. Its return holds no database lock.
+Already prepared/submitted bytes cannot be recalled after suspension/resend/erasure;
+future work is cancelled and old links remain invalid. Stage 7 must add bounded dispatch,
+transport budgeting, shutdown coordination, and provider uncertainty qualification.
+
+Transient failures preserve the exact ciphertext/nonce/token and original expiry.
+There are at most six attempts, with 30-second, 2-minute, 10-minute, 30-minute, and
+2-hour delays plus less than 10% positive jitter. Retry cannot extend lifetime. A retry
+that would reach expiry expires the message. Provider acceptance, terminal failure,
+cancellation, and expiry erase ciphertext/nonce and clear/fence leases. Expired uncertain
+leases currently fail closed with LEASE_EXPIRED; Stage 7 must qualify recovery/operator
+retry behavior instead of claiming exactly-once remote sending. Retention cleanup uses
+bounded 200-row batches and removes terminal metadata after 30 days without deleting
+accounts. It is an explicit primitive, not a scheduled dispatcher at this stage.
+
+Challenge consumption/revocation/deletion cancels linked queued/leased messages through
+database triggers. Suspension/import-inactive/erasure cancels subject mail, including
+security notices. Account/company erasure phase 0 deletes outbox rows before challenge
+and proposal rows, preserving existing durable phase numbering and including the retained
+company administrator. The restore-ledger function preserves its public SQL signature,
+closes the erasure barrier, and cancels/purges restored mail before returning; ordinary
+claims are blocked until erasure replay finishes. Content export projections remain
+allowlists and omit the whole outbox, ciphertext, keys, and identity secrets.
+
+Security alert recipients are frozen inside the encrypted payload. Email-change completion
+creates separate old/new-address alerts; a later account lookup must not redirect the
+old-address warning. Password reset and pending activation queue password-change notices.
+Version 1 security notices expire after 24 hours; link messages retain challenge expiry.
+
+### External key setup and restore
+
+Outbox creation is disabled by default. Set `EMAIL_OUTBOX_ENABLED=true`, an
+`EMAIL_OUTBOX_ACTIVE_KEY` ID, and `EMAIL_OUTBOX_KEYS` from an external secret store.
+The key ring format is comma-separated `key-id=base64-32-byte-key` entries. IDs allow
+1-40 ASCII letters/digits/underscore/hyphen. Enabled startup requires a valid active key;
+invalid/duplicate IDs, malformed base64, and wrong key sizes fail with a redacted error.
+There is no generated/default deployment key. `.env.example` keeps all secret values
+blank. Avoid putting real values in Git, command histories, logs, or shared Compose dumps.
+
+For rotation, add a new independently generated AES-256 key to the external ring, switch
+the active ID, and retain old IDs for decryption until their queued/retry/leased rows are
+resolved or explicitly expired/purged. Changing the active ID does not rewrite tokens,
+payloads, or expiry. Key loss marks affected messages FAILED/KEY_UNAVAILABLE and purges
+the unusable body; never regenerate a token or extend expiry as a transport retry.
+After restoring a backup, keep network/mail dispatch closed, restore required external
+keys separately, replay the separately retained erasure ledger with the existing offline
+script, then qualify eligibility before dispatch. Missing keys fail closed; encrypted
+backups still contain private data and require the documented backup retention policy.
+
+`EmailOutboxIT` covers ciphertext/deduplication, rollback, service/database restart,
+retries/fencing/exhaustion, stale eligibility, key rotation/loss, immutable bindings,
+retention, frozen alert recipients, suspension/erasure, and restore replay. Existing export
+and erasure tests include actual encrypted mail fixtures. V20 upgrade and transactional
+V21 failure/retry tests verify migration safety. No provider was contacted.

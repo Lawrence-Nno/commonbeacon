@@ -29,6 +29,14 @@ secrets do not appear in responses or operational logs. Internal issued/completi
 objects have redacted string and empty JSON representations. See
 [challenge transaction integration](identity-verification.md#stage-4-challenge-primitives).
 
+`OutboxCryptoTest` qualifies authenticated encryption, nonce uniqueness, external-key
+validation, redacted failures and bounded payloads. `EmailOutboxIT` exercises encrypted
+intent deduplication, identity/outbox rollback, actual disposable database restart with
+fresh connections, current eligibility, retries/leases/terminal purges, rotation/key loss,
+fixed old-address notices, retention, and restored erasure ledgers. Company/personal export
+and erasure fixtures contain real encrypted intents; V20-to-V21 and failed-V21 rollback
+tests verify safe upgrades. See [outbox operations](identity-verification.md#stage-5-encrypted-outbox).
+
 CommonBeacon uses unit tests, real PostgreSQL integration tests, browser workflows,
 and disposable deployment checks. Each covers a different boundary; a passing
 build does not establish production readiness or a performance service level.

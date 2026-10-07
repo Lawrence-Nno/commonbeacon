@@ -43,9 +43,10 @@ public class EmailChallenges {
     }
     @JsonAutoDetect(fieldVisibility=JsonAutoDetect.Visibility.NONE,getterVisibility=JsonAutoDetect.Visibility.NONE,isGetterVisibility=JsonAutoDetect.Visibility.NONE)
     public static final class Completion {
-        private final UUID subject; private final Purpose purpose; private final String previousEmail,email;
-        private Completion(UUID subject,Purpose purpose,String previousEmail,String email){this.subject=subject;this.purpose=purpose;this.previousEmail=previousEmail;this.email=email;}
+        private final UUID subject,challenge; private final Purpose purpose; private final String previousEmail,email;private final boolean passwordChanged;
+        private Completion(UUID subject,UUID challenge,Purpose purpose,String previousEmail,String email,boolean passwordChanged){this.subject=subject;this.challenge=challenge;this.purpose=purpose;this.previousEmail=previousEmail;this.email=email;this.passwordChanged=passwordChanged;}
         public UUID subject(){return subject;} public Purpose purpose(){return purpose;}
+        public UUID challenge(){return challenge;}public boolean passwordChanged(){return passwordChanged;}
         public String previousEmail(){return previousEmail;} public String email(){return email;}
         @Override public String toString(){return "Completion[REDACTED]";}
     }
@@ -162,7 +163,7 @@ public class EmailChallenges {
                 }
             }
             jdbc.update("DELETE FROM pending_email_change WHERE subject_id=?",subject);
-            intent.accept(new Completion(subject,purpose,a.email,purpose==Purpose.EMAIL_CHANGE?c.email:a.email));
+            intent.accept(new Completion(subject,c.id,purpose,a.email,purpose==Purpose.EMAIL_CHANGE?c.email:a.email,replace));
         });}catch(DataIntegrityViolationException conflict){throw invalid();}
     }
 }

@@ -61,6 +61,7 @@ class PersonalExportIT {
         }
     }
     @Autowired JdbcTemplate jdbc;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
     @Autowired TransferJobs jobs;
     @Autowired ArtifactStore store;
     @Autowired CompanySnapshot snapshot;
@@ -125,8 +126,9 @@ class PersonalExportIT {
     }
     @ParameterizedTest @org.junit.jupiter.params.provider.ValueSource(ints={1,2,3})
     void exactPersonalProjectionNeverExpandsForAdministrators(int actorNumber)throws Exception {
-        UUID actor=id(actorNumber);var job=create(actor);assertThat(worker().runOnce()).isTrue();
+        UUID actor=id(actorNumber);var mail=MailFixtures.queue(jdbc,transactions,passwords,actor);var job=create(actor);assertThat(worker().runOnce()).isTrue();
         var files=archive(job);validate(files);
+        for(var bytes:files.values())assertThat(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).doesNotContain(mail.token(),"email_outbox","ciphertext","nonce","key_id");
         assertThat(files.keySet()).containsExactlyInAnyOrder("manifest.json","users.jsonl","boards.jsonl","questions.jsonl","replies.jsonl","acceptances.jsonl","articles.jsonl","reports.jsonl");
         var manifest=json.readTree(files.get("manifest.json"));
         assertThat(manifest.path("profile").asText()).isEqualTo("personal");

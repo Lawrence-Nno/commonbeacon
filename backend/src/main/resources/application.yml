@@ -64,6 +64,12 @@ management:
       show-components: never
 
 commonbeacon:
+  email:
+    outbox:
+      enabled: ${EMAIL_OUTBOX_ENABLED:false}
+      active-key: ${EMAIL_OUTBOX_ACTIVE_KEY:}
+      # External secret: comma-separated key-id=base64-32-byte-key entries. No default key.
+      keys: ${EMAIL_OUTBOX_KEYS:}
   identity:
     # Keep legacy ACTIVE access until the verified-account rollout is qualified.
     # ENFORCED requires current-address proof for community and company authority.

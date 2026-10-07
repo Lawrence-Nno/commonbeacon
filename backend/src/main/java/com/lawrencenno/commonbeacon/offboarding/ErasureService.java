@@ -147,7 +147,8 @@ public class ErasureService {
                 // Preserve durable phase numbering; include the retained company administrator.
                 String predicate=company?"true":"subject_id=?";
                 Object[] args=company?new Object[0]:new Object[]{actor};
-                int removed=deleteBatch("email_challenge",predicate,args);
+                int removed=deleteBatch("email_outbox",predicate,args);
+                if(removed==0)removed=deleteBatch("email_challenge",predicate,args);
                 if(removed==0)removed=deleteBatch("pending_email_change",predicate,args);
                 yield removed>0?removed:updateBatch("transfer_job","state='CANCELLED',version=version+1,fence=fence+1,worker_id=NULL,lease_until=NULL,reserved_bytes=0","state NOT IN ('COMPLETED','FAILED','CANCELLED')");
             }

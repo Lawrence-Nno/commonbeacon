@@ -62,6 +62,7 @@ class CompanyExportIT {
         }
     }
     @Autowired JdbcTemplate jdbc;
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactions;
     @Autowired org.testcontainers.postgresql.PostgreSQLContainer postgres;
     @Autowired TransferJobs jobs;
     @Autowired ArtifactStore store;
@@ -127,6 +128,7 @@ class CompanyExportIT {
     }
     @ParameterizedTest @CsvSource({"false,false","true,false","false,true","true,true"})
     void exportsExactFixtureFieldsCountsDigestsAndIndependentPrivateOptions(boolean contacts,boolean history)throws Exception {
+        var mail=MailFixtures.queue(jdbc,transactions,passwords,id(3));
         var job=create(contacts,history);assertThat(worker().runOnce()).isTrue();var files=archive(job);validate(files);
         assertThat(files.containsKey("contacts.jsonl")).isEqualTo(contacts);
         assertThat(files.containsKey("reports.jsonl")).isEqualTo(history);assertThat(files.containsKey("actions.jsonl")).isEqualTo(history);
@@ -140,7 +142,7 @@ class CompanyExportIT {
             assertThat(rows(files,"actions")).isEqualTo(fixture.get("actions").stream().map(row->{var copy=(ObjectNode)row.deepCopy();copy.remove("origin");return copy;}).toList());
         }
         if(contacts)assertThat(rows(files,"contacts")).hasSize(2);
-        for(var bytes:files.values())assertThat(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).doesNotContain("password_hash","auth_revision","auth_epoch","email_verified_at","token_digest","verification_generation","password_reset_generation","email_change_generation","pending_email_change","search_vector","ADMINISTRATOR","IMPORTED_INACTIVE");
+        for(var bytes:files.values())assertThat(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).doesNotContain(mail.token(),"email_outbox","ciphertext","nonce","key_id","password_hash","auth_revision","auth_epoch","email_verified_at","token_digest","verification_generation","password_reset_generation","email_change_generation","pending_email_change","search_vector","ADMINISTRATOR","IMPORTED_INACTIVE");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_artifact WHERE job_id=? AND purpose='INTERMEDIATE' AND state='DELETED'",Integer.class,job.id())).isEqualTo(1);
     }
     @Test void snapshotRemainsConsistentAcrossConcurrentEditsHidesAndPublication()throws Exception {
