@@ -37,6 +37,22 @@ fixed old-address notices, retention, and restored erasure ledgers. Company/pers
 and erasure fixtures contain real encrypted intents; V20-to-V21 and failed-V21 rollback
 tests verify safe upgrades. See [outbox operations](identity-verification.md#stage-5-encrypted-outbox).
 
+Stage 6 SMTP/template tests use a controllable loopback SMTP peer for real MIME,
+rejections, timeouts and TLS downgrade refusal. `MailCaptureIT` sends all six templates
+through the actual adapter into its own temporary Mailpit container, checking text/HTML,
+frozen recipients and loopback publishing. No provider account is needed. The `email`
+browser group has a separate disposable capture service/project/port and qualifies
+deep links, URL-secret scrubbing including repeated paste, explicit-submit forms,
+passive GET/HEAD, reload behavior, mobile layout and security headers. The confirmation
+API adapters and durable dispatcher remain later-stage work. See
+[SMTP configuration and local capture](identity-verification.md#stage-6-smtp-templates-and-token-landing-pages).
+
+Local Stage 6 qualification passed 96 backend unit and 331 integration tests, 183
+frontend tests, lint/type checking/build, and all 22 browser journeys. The final
+localhost/reserved-origin guard was separately rerun against all unit tests and real
+SMTP capture. The standalone capture Compose file passed UI/SMTP startup and cleanup.
+These are local results, not a production provider delivery or deployment certification.
+
 CommonBeacon uses unit tests, real PostgreSQL integration tests, browser workflows,
 and disposable deployment checks. Each covers a different boundary; a passing
 build does not establish production readiness or a performance service level.

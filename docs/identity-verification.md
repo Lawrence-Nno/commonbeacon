@@ -3,8 +3,9 @@
 Stage 2 adds storage in Flyway V19; Stage 3 adds authoritative sessions and
 permissions, with V20 connecting explicit epoch advances to transfer invalidation.
 Stage 4 adds internal transactional challenge issuance and consumption; Stage 5
-adds a private encrypted outbox in V21 and internal `EmailIdentity` orchestration. Public
-verification/reset endpoints, email delivery, and pending registration remain later
+adds a private encrypted outbox in V21 and internal `EmailIdentity` orchestration.
+Stage 6 adds SMTP transport, versioned templates, local capture, and token landing pages.
+Public verification/reset endpoints, worker dispatch, and pending registration remain later
 stages. Registration still creates ACTIVE members.
 Completing these stages does not close the production email launch gate.
 
@@ -172,7 +173,7 @@ so the existing address-change trigger does not mistake it for unchanged proof.
 The consumed marker, account transition, challenge revocations, proposal deletion, and
 completion callback commit together. A callback failure or outer rollback preserves the
 original account and token; a conflicting address cannot partially consume the link.
-Stage 5 must persist security intents in the completion callback using the same transaction
+Stage 5 persists security intents in the completion callback using the same transaction
 and datasource. Callbacks must perform database work only, with no independent transaction,
 network request, log of private values, or externally visible side effect. `Issued` and
 `Completion` serialize as empty objects and print redacted representations; private
@@ -186,8 +187,9 @@ values. This is absence-of-mutation qualification, not an implemented landing pa
 
 ## Next stages
 
-Stage 6 adds transport, templates, and isolated capture. Later stages implement HTTP
-flows and landing pages: GET/HEAD render only, and explicit
+Stage 6 provides transport, templates, isolated capture and passive landing-page forms.
+Stage 7 supplies durable dispatch; later stages connect HTTP identity flows: GET/HEAD
+render only, and explicit
 CSRF-protected POST invokes consumption. Links will use fragments removed from browser
 history and trusted configured origins. No SMTP provider or credentials are needed yet.
 
@@ -270,3 +272,131 @@ retries/fencing/exhaustion, stale eligibility, key rotation/loss, immutable bind
 retention, frozen alert recipients, suspension/erasure, and restore replay. Existing export
 and erasure tests include actual encrypted mail fixtures. V20 upgrade and transactional
 V21 failure/retry tests verify migration safety. No provider was contacted.
+
+## Stage 6: SMTP, templates, and token landing pages
+
+`MailTransport` accepts a rendered message and durable outbox UUID. The SMTP adapter
+makes one attempt outside database transactions and returns the UUID on SMTP acceptance.
+It does not verify an inbox, guarantee delivery, retry automatically, or change an account.
+The stable `<outbox-uuid@sender-domain>` Message-ID is correlation, not deduplication:
+repeated attempts can produce duplicate messages. Stage 7 must wire the dispatcher and
+map safe failure categories to outbox disposition with bounded recovery and concurrency.
+There is no dispatcher or provider API/webhook integration in Stage 6.
+
+Spring Boot manages Jakarta Mail/Angus versions. Angus is explicitly a compile dependency
+so SMTP rejection codes can be classified without parsing or retaining provider text.
+The adapter emits only `TIMEOUT`, `TRANSIENT`, `PERMANENT`, `CONFIGURATION`, or
+`INVALID_MESSAGE` failures with no nested cause or provider response. Socket timeouts,
+temporary 4xx failures, permanent 5xx rejections, authentication and certificate failures
+are distinguished. SMTP diagnostics are disabled; mail objects redact string/JSON output.
+
+### Configure a deployment
+
+Mail is disabled by default. No provider is contacted at startup, and no credential
+or key is generated automatically. Configure through deployment environment/secrets,
+not a CommonBeacon account settings UI. A provider supporting SMTP requires no code change.
+
+- Enable `EMAIL_OUTBOX_ENABLED`, supply the external key ring described above, then set
+  `EMAIL_SMTP_ENABLED=true`.
+- Set `EMAIL_SMTP_HOST` and `EMAIL_SMTP_PORT` to your provider's documented endpoint.
+  Set `EMAIL_SMTP_TLS=STARTTLS` for a required TLS upgrade, or `IMPLICIT` for TLS from
+  connection start. Neither mode disables certificate or hostname verification.
+- Supply `EMAIL_SMTP_USERNAME` and `EMAIL_SMTP_PASSWORD` from a secret store. Do not
+  put them in Git, shared command output, Compose dumps, or logs.
+- Set `EMAIL_SENDER` to a single authorized sender mailbox and `EMAIL_SUPPORT` to a
+  single monitored support mailbox. Display names, address lists and header injection
+  are rejected. Provider-side domain/sender authorization remains an operator task.
+- Set `EMAIL_PUBLIC_ORIGIN` to the exact public origin, e.g.
+  `https://community.your-company.com`, without a trailing slash, path, credentials,
+  query or fragment. Template links are built only from this deployment setting;
+  request Host/forwarded-host headers, redirects and recipient input are not involved.
+- Connection, read and write timeouts use `EMAIL_SMTP_CONNECT_TIMEOUT_MS`,
+  `EMAIL_SMTP_READ_TIMEOUT_MS`, and `EMAIL_SMTP_WRITE_TIMEOUT_MS`. Each defaults to
+  10,000 ms and must be 100–15,000 ms. These are socket operation limits; Stage 7
+  must qualify the worker's total send/lease/shutdown budget separately.
+
+Enabled startup fails with a redacted configuration error for missing keys or required
+fields, unsafe addresses, invalid TLS/port/timeout values, or partial credentials.
+Every profile other than explicit `local` uses production checks: authenticated TLS,
+HTTPS public origin, no localhost/IP/reserved example origin, and demo seeding disabled.
+Activating both `local` and `prod` retains production checks. Ordinary `compose.yaml`
+is the existing local development stack; production must select `prod` and its actual
+deployment secrets/origin. Plain SMTP (`NONE`) and HTTP links are only allowed in local
+capture; plaintext SMTP cannot carry configured credentials.
+
+### Templates and links
+
+Version 1 renders verification, password reset, new-address verification, password
+change, previous-address change notice, and new-address change notice. The outbox
+version/purpose must match the payload; unknown versions and malformed recipients
+fail closed. Link messages contain the original challenge expiry in UTC, explicit
+confirmation guidance, ignored-request advice, a full copy/paste URL, and support
+contact. Security notices tell recipients how to report an unexpected change.
+All six include accessible HTML and equivalent plain text, with no tracking assets,
+passwords or private community content. Optional names are bounded and HTML-escaped;
+the durable worker can use the generic greeting without querying a new recipient.
+Old/new alert recipients always come from their frozen encrypted payloads.
+
+Links use `/verify-email#token=…`, `/reset-password#token=…`, and
+`/confirm-email-change#token=…`. The frontend accepts only an exact 43-character
+base64url token fragment; query tokens, extra fragment parameters and redirect values
+are rejected. It reads the token into document memory and immediately replaces history
+with the clean path before rendering. Same-document fragment changes are also scrubbed
+and reset the form. Tokens/passwords are never placed in persistent storage or DOM data
+attributes. Reloading deliberately loses the token; reopen the original email to retry.
+
+Token pages bypass authentication/community/router initialization and make no requests
+on opening. Explicit forms provide confirmation and reset-password matching/length
+checks. Their purpose-specific POST adapters are intentionally unwired until Stages
+9–12: submission currently displays a safe unavailable/retry message and changes no
+identity. No new API operation is exposed. This is landing-page groundwork, not a
+completed verification/recovery journey. GET/HEAD remain passive.
+
+Nginx returns the SPA document with `Cache-Control: no-store`, `Referrer-Policy:
+no-referrer`, and a same-origin Content-Security-Policy, including after deep-link
+fallback to `index.html`. The HTML also declares no-referrer; Vite supplies no-store
+and no-referrer for local development. Token pages use only local assets/system fonts.
+Raw Nginx access and request error logging are disabled because malformed query links
+can contain tokens. Frontend health checks and sanitized backend diagnostics remain
+available; request-level frontend failures have no raw error dump. The browser suite verifies
+the query-token fixture does not appear in frontend container logs.
+
+### Local-only capture
+
+[Mailpit's Docker documentation](https://mailpit.axllent.org/docs/install/docker/)
+describes its SMTP and inbox UI. `compose.mail-capture.yaml` pins the image by version
+and digest, publishes only loopback SMTP/UI ports, uses a dedicated bridge and tmpfs,
+and configures no SMTP relay or provider credentials. Keep it out of production.
+Start it in its own project, without `.env` or existing development volumes:
+
+```powershell
+docker compose --project-name commonbeacon-mail-local --env-file .env.example -f compose.mail-capture.yaml up -d --wait
+```
+
+The UI is at `http://127.0.0.1:8026`; a host-run local backend can use
+`EMAIL_SMTP_HOST=127.0.0.1`, port `1026`, TLS `NONE`, empty SMTP credentials, safe
+`@example.test` sender/support addresses, and its local frontend origin. Supply an
+independent disposable outbox key. A containerized backend needs a deliberately
+connected local network/SMTP endpoint; its loopback is not the host. The Stage 6
+runtime still has no dispatcher, so creating an outbox row does not yet send it.
+
+When finished, stop only that project:
+
+```powershell
+docker compose --project-name commonbeacon-mail-local --env-file .env.example -f compose.mail-capture.yaml down --volumes
+```
+
+Stopping removes the temporary inbox. Port overrides `MAIL_CAPTURE_UI_PORT` and
+`MAIL_CAPTURE_SMTP_PORT` are available for local collisions. There is no public inbox
+viewer in ordinary Compose. The `email` browser group instead uses its own disposable
+project and `compose.email-e2e.yaml`, with an independent UI port 8027, internal SMTP
+service and test-only keys. It mounts neither development mail nor production secrets.
+
+`MailSettingsTest`, `MailTemplatesTest`, and `SmtpMailTransportTest` cover configuration,
+all templates, escaping/redaction, exact links, real multipart SMTP, stable Message-ID,
+controllable rejection/timeouts, TLS downgrade refusal, and transaction separation.
+`MailCaptureIT` sends all six through real SMTP into a disposable loopback-bound Mailpit
+container and checks MIME text/HTML and recipients. Frontend unit/browser tests cover
+URL scrubbing, repeated copy/paste, missing/malformed tokens, passive loading, explicit
+submit, password confirmation, reload behavior, safe failures, security headers and
+local capture UI. No external mail provider is used by these tests.

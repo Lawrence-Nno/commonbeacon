@@ -1,0 +1,8 @@
+.email-link-page { max-width: 42rem; margin: 3rem auto; padding: 0 1.25rem; }
+.email-link-card { margin-top: 2rem; padding: clamp(1.25rem, 5vw, 3rem); border: 1px solid #c6d2cd; border-radius: 1rem; background: #fffdf8; }
+.email-link-card h1 { font-size: clamp(1.8rem, 6vw, 2.6rem); line-height: 1.15; }
+.email-link-card p { line-height: 1.6; }
+.email-link-card form { display: grid; gap: 0.8rem; margin: 1.5rem 0; }
+.email-link-card input { width: 100%; min-width: 0; padding: 0.8rem; border: 1px solid #82988c; border-radius: 0.4rem; font: inherit; }
+.email-link-card button { justify-self: start; }
+.email-link-card [role="alert"] { color: #822d27; }

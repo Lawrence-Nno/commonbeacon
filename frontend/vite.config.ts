@@ -7,6 +7,7 @@ export default defineConfig({
   plugins: [react()],
   server: {
     strictPort: true,
+    headers: { "Referrer-Policy": "no-referrer", "Cache-Control": "no-store" },
     proxy: {
       "/api/health": {
         target: backend,

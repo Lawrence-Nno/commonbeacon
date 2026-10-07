@@ -1,0 +1,37 @@
+# Only the disposable email browser project uses this overlay.
+services:
+  backend:
+    environment:
+      EMAIL_OUTBOX_ENABLED: "true"
+      EMAIL_OUTBOX_ACTIVE_KEY: browser-test
+      EMAIL_OUTBOX_KEYS: browser-test=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+      EMAIL_SMTP_ENABLED: "true"
+      EMAIL_SMTP_HOST: mailpit
+      EMAIL_SMTP_PORT: "1025"
+      EMAIL_SMTP_TLS: NONE
+      EMAIL_SENDER: accounts@example.test
+      EMAIL_SUPPORT: support@example.test
+      EMAIL_PUBLIC_ORIGIN: http://127.0.0.1:4173
+    networks:
+      - default
+      - capture
+  mailpit:
+    image: axllent/mailpit:v1.27.4@sha256:df6c2541907e1be6fac21f509927cf6ed771617a1f4b361ef66d97bd05593d2d
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_MAX_MESSAGES: "100"
+      MP_DISABLE_VERSION_CHECK: "true"
+    tmpfs:
+      - /data
+    ports:
+      - "127.0.0.1:8027:8025"
+    networks:
+      - capture
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+networks:
+  capture:
+    driver: bridge

@@ -8,6 +8,8 @@ logging:
     org.hibernate.orm.jdbc.bind: "OFF"
     org.hibernate.orm.jdbc.error: "OFF"
     org.hibernate.engine.jdbc.spi.SqlExceptionHelper: "OFF"
+    org.eclipse.angus.mail: "OFF"
+    org.springframework.mail: "OFF"
 
 spring:
   servlet:
@@ -65,6 +67,19 @@ management:
 
 commonbeacon:
   email:
+    smtp:
+      enabled: ${EMAIL_SMTP_ENABLED:false}
+      host: ${EMAIL_SMTP_HOST:}
+      port: ${EMAIL_SMTP_PORT:587}
+      tls: ${EMAIL_SMTP_TLS:STARTTLS}
+      username: ${EMAIL_SMTP_USERNAME:}
+      password: ${EMAIL_SMTP_PASSWORD:}
+      sender: ${EMAIL_SENDER:}
+      support: ${EMAIL_SUPPORT:}
+      public-origin: ${EMAIL_PUBLIC_ORIGIN:}
+      connect-timeout-ms: ${EMAIL_SMTP_CONNECT_TIMEOUT_MS:10000}
+      read-timeout-ms: ${EMAIL_SMTP_READ_TIMEOUT_MS:10000}
+      write-timeout-ms: ${EMAIL_SMTP_WRITE_TIMEOUT_MS:10000}
     outbox:
       enabled: ${EMAIL_OUTBOX_ENABLED:false}
       active-key: ${EMAIL_OUTBOX_ACTIVE_KEY:}

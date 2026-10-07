@@ -85,7 +85,7 @@ function saveLogs(group) {
   writeFileSync(new URL(`../test-results/${group}/import-compose.log`, import.meta.url), (targetLogs.stdout ?? "") + (targetLogs.stderr ?? ""));
 }
 const selectors = process.argv.slice(2).filter(arg => arg.includes(".spec"));
-const groups = selectors.length ? [...new Set(selectors.map(arg => arg.includes("authoritative-identity.spec") ? "identity" : arg.includes("transfer-recovery.spec") ? "recovery" : arg.includes("erasure.spec") ? "erasure" : arg.includes("discourse-import.spec") ? "discourse" : arg.includes("import-activation.spec") ? "imports" : "community"))] : ["community", "identity", "imports", "discourse", "erasure"];
+const groups = selectors.length ? [...new Set(selectors.map(arg => arg.includes("email-links.spec") ? "email" : arg.includes("authoritative-identity.spec") ? "identity" : arg.includes("transfer-recovery.spec") ? "recovery" : arg.includes("erasure.spec") ? "erasure" : arg.includes("discourse-import.spec") ? "discourse" : arg.includes("import-activation.spec") ? "imports" : "community"))] : ["community", "identity", "imports", "discourse", "erasure", "email"];
 // Refuse adoption before entering cleanup's try/finally. A prefix alone is not ownership.
 assertClean();
 let code = 0, currentGroup = groups[0];
@@ -104,6 +104,7 @@ try {
       args.push("-f", "compose.recovery-e2e.yaml");
       targetArgs.push("-f", "compose.recovery-e2e.yaml");
     }
+    if (group === "email") args.push("-f", "compose.email-e2e.yaml");
     startSource();
     if (["imports", "discourse", "recovery"].includes(group)) startTarget();
     if (process.argv.includes("--inject-recovery-failure") && group === "recovery") throw new Error("Injected recovery failure after both persistent stacks started");

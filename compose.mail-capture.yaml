@@ -1,0 +1,24 @@
+# Standalone local/test capture. Use its own project, never production deployment.
+services:
+  mailpit:
+    image: axllent/mailpit:v1.27.4@sha256:df6c2541907e1be6fac21f509927cf6ed771617a1f4b361ef66d97bd05593d2d
+    ports:
+      - "127.0.0.1:${MAIL_CAPTURE_UI_PORT:-8026}:8025"
+      - "127.0.0.1:${MAIL_CAPTURE_SMTP_PORT:-1026}:1025"
+    environment:
+      MP_MAX_MESSAGES: "100"
+      MP_DATABASE: /data/mailpit.db
+      MP_DISABLE_VERSION_CHECK: "true"
+    tmpfs:
+      - /data
+    networks:
+      - capture
+    healthcheck:
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+networks:
+  # Dedicated private bridge. Only loopback ports are published; no relay configured.
+  capture:
+    driver: bridge
