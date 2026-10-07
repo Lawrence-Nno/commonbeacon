@@ -139,7 +139,14 @@ public class ErasureService {
     private int databasePhase(int phase,Scope scope,UUID actor) {
         boolean company=scope==Scope.COMPANY;
         return switch(phase) {
-            case 0->updateBatch("transfer_job","state='CANCELLED',version=version+1,fence=fence+1,worker_id=NULL,lease_until=NULL,reserved_bytes=0","state NOT IN ('COMPLETED','FAILED','CANCELLED')");
+            case 0->{
+                // Preserve durable phase numbering; include the retained company administrator.
+                String predicate=company?"true":"subject_id=?";
+                Object[] args=company?new Object[0]:new Object[]{actor};
+                int removed=deleteBatch("email_challenge",predicate,args);
+                if(removed==0)removed=deleteBatch("pending_email_change",predicate,args);
+                yield removed>0?removed:updateBatch("transfer_job","state='CANCELLED',version=version+1,fence=fence+1,worker_id=NULL,lease_until=NULL,reserved_bytes=0","state NOT IN ('COMPLETED','FAILED','CANCELLED')");
+            }
             case 2->deleteBatch("transfer_stage","true");
             case 3->deleteBatch("transfer_dry_run","true");
             case 4->deleteBatch("transfer_inspection","true");

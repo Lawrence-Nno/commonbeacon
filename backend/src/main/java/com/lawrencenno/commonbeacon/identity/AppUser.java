@@ -37,6 +37,26 @@ public class AppUser {
     @Column(name = "account_state", nullable = false, length = 24)
     private AccountState accountState = AccountState.ACTIVE;
 
+    @Column(name = "email_verified_at")
+    private Instant emailVerifiedAt;
+
+    // Database-maintained counters are internal, never part of UserSummary.
+    @Column(name = "auth_epoch", nullable = false, insertable = false, updatable = false)
+    private long authEpoch;
+    @Column(name = "verification_generation", nullable = false, insertable = false, updatable = false)
+    private long verificationGeneration;
+    @Column(name = "password_reset_generation", nullable = false, insertable = false, updatable = false)
+    private long passwordResetGeneration;
+    @Column(name = "email_change_generation", nullable = false, insertable = false, updatable = false)
+    private long emailChangeGeneration;
+
+    public AccountState getAccountState() { return accountState; }
+    public boolean isEmailVerified() { return email != null && emailVerifiedAt != null; }
+    long authEpoch() { return authEpoch; }
+    long verificationGeneration() { return verificationGeneration; }
+    long passwordResetGeneration() { return passwordResetGeneration; }
+    long emailChangeGeneration() { return emailChangeGeneration; }
+
     public boolean isActive() { return accountState == AccountState.ACTIVE; }
 
     @Column(name = "created_at", nullable = false)

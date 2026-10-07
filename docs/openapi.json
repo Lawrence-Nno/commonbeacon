@@ -7918,12 +7918,21 @@
               "MODERATOR",
               "ADMINISTRATOR"
             ]
+          },
+          "accountState": {
+            "type": "string",
+            "enum": ["ACTIVE", "PENDING_VERIFICATION", "SUSPENDED", "IMPORTED_INACTIVE", "ERASED"]
+          },
+          "emailVerified": {
+            "type": "boolean"
           }
         },
         "required": [
           "id",
           "displayName",
-          "role"
+          "role",
+          "accountState",
+          "emailVerified"
         ],
         "additionalProperties": false
       },

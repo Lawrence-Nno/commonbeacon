@@ -88,7 +88,11 @@ class IdentityIT {
         try (var browser = new Browser()) {
             var response = browser.register(" " + email.toUpperCase(Locale.ROOT) + " ");
             assertThat(response.statusCode()).isEqualTo(201);
-            assertThat(response.body()).contains("MEMBER", "Test Member").doesNotContain("password", "email");
+            assertThat(response.body()).contains("MEMBER", "Test Member").doesNotContain("password", email, "authEpoch", "generation", "tokenDigest", "pendingEmail");
+            var account=json.readTree(response.body());
+            assertThat(account.size()).isEqualTo(5);
+            assertThat(account.path("accountState").asText()).isEqualTo("ACTIVE");
+            assertThat(account.path("emailVerified").asBoolean()).isFalse();
             assertThat(browser.get("/api/v1/auth/me").statusCode()).isEqualTo(401);
             String hash = jdbc.queryForObject("SELECT password_hash FROM app_user WHERE email=?", String.class, email);
             assertThat(hash).startsWith("{pbkdf2}").isNotEqualTo(PASSWORD);

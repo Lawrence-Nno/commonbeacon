@@ -146,7 +146,7 @@ class PersonalExportIT {
         assertThat(rows(files,"reports")).isEqualTo(fixture.get("reports").stream().filter(r->r.path("reporterId").asText().equals(actor.toString())).map(r->{
             var n=json.createObjectNode();for(String key:List.of("id","questionId","replyId","reason","createdAt"))n.set(key,r.get(key));return (JsonNode)n;
         }).toList());
-        for(String entity:List.of("users","reports"))for(var row:rows(files,entity))assertThat(row.toString()).doesNotContain("password","resolverId","resolvedAt","resolutionDecision","resolutionNote","authRevision");
+        for(String entity:List.of("users","reports"))for(var row:rows(files,entity))assertThat(row.toString()).doesNotContain("password","resolverId","resolvedAt","resolutionDecision","resolutionNote","authRevision","authEpoch","emailVerifiedAt","tokenDigest","verificationGeneration","emailChangeGeneration","pendingEmail");
         var rejected=new ArchiveCodec().validateCompanyImport(files.get("manifest.json"),Map.of(),row->{throw new AssertionError("Personal rows must never reach company activation");});
         assertThat(rejected.valid()).isFalse();assertThat(rejected.issues()).extracting(ArchiveFormat.Issue::code).contains("COMPANY_PROFILE_REQUIRED");
     }

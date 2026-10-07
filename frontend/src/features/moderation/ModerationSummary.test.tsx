@@ -44,6 +44,7 @@ it("has an explicit loading state before counts arrive", async () => {
   let finish!: (r: Response) => void;
   setup(undefined, () => new Promise((resolve) => { finish = resolve; }));
   await screen.findByText("Loading community overview...");
+  await waitFor(() => expect(finish).toBeDefined());
   expect(screen.queryAllByRole("definition")).toHaveLength(0);
   await act(async () => finish(Response.json({ ...zero, openReports: 3 })));
   expect(await screen.findByText("3", { selector: "dd" })).toBeVisible();

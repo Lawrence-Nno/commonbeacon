@@ -1,5 +1,11 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { login, logout } from "./api";
+import { login, logout, readUser } from "./api";
+
+it("reads additive account state and inbox proof without retaining private fields", () => {
+  expect(readUser({ id: "a", displayName: "A", role: "MEMBER", accountState: "PENDING_VERIFICATION", emailVerified: false, tokenDigest: "private", pendingEmail: "private@example.test" })).toEqual({ id: "a", displayName: "A", role: "MEMBER", accountState: "PENDING_VERIFICATION", emailVerified: false });
+  expect(() => readUser({ id: "a", displayName: "A", role: "MEMBER", accountState: "UNKNOWN" })).toThrow();
+  expect(() => readUser({ id: "a", displayName: "A", role: "MEMBER", emailVerified: "yes" })).toThrow();
+});
 
 afterEach(() => vi.unstubAllGlobals());
 it("renews CSRF across login/logout, encodes credentials, and accepts an empty logout response", async () => {

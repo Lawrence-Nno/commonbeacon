@@ -117,9 +117,12 @@ class ErasureIT {
     }
     @Test void companyErasesInBatchesPreservesOnlyRequestingAdministratorAndLedger()throws Exception {
         UUID file=artifact();UUID extraAdmin=user("ADMINISTRATOR");
+        jdbc.update("UPDATE app_user SET email_verified_at=clock_timestamp(),email_change_generation=1 WHERE id=?",admin);
+        jdbc.update("INSERT INTO pending_email_change(subject_id,intended_email,generation,expires_at) VALUES (?,'private-proposed@example.test',1,clock_timestamp()+interval '1 day')",admin);
+        jdbc.update("INSERT INTO email_challenge(id,subject_id,purpose,intended_email,token_digest,generation,expires_at) VALUES (?,?,'EMAIL_CHANGE','private-proposed@example.test',?,1,clock_timestamp()+interval '1 hour')",UUID.randomUUID(),admin,"a".repeat(64));
         jdbc.update("INSERT INTO reply(id,question_id,author_id,body) SELECT gen_random_uuid(),?,?,'Disposable bounded batch reply' FROM generate_series(1,405)",question,other);
         UUID id=confirm(admin,Scope.COMPANY);drain();
-        for(String table:List.of("board","question","reply","knowledge_article","content_report","moderation_action","transfer_job","transfer_artifact","imported_author","imported_record"))assertThat(count(table)).as(table).isZero();
+        for(String table:List.of("board","question","reply","knowledge_article","content_report","moderation_action","transfer_job","transfer_artifact","imported_author","imported_record","email_challenge","pending_email_change"))assertThat(count(table)).as(table).isZero();
         assertThat(jdbc.queryForList("SELECT id FROM app_user",UUID.class)).containsExactly(admin);assertThat(store.inspect(file)).isEmpty();
         assertThat(count("erasure_tombstone")).isEqualTo(1);assertThat(service.status(id,TOKEN).path("processed").asInt()).isGreaterThan(405);
         assertThatThrownBy(()->service.preview(extraAdmin,Scope.COMPANY)).isInstanceOf(com.lawrencenno.commonbeacon.shared.ApiFailure.class);

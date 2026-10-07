@@ -3,6 +3,9 @@ export type User = {
   id: string;
   displayName: string;
   role: "MEMBER" | "MODERATOR" | "ADMINISTRATOR";
+  // Additive during rollout; older account responses remain readable.
+  accountState?: "ACTIVE" | "PENDING_VERIFICATION" | "SUSPENDED" | "IMPORTED_INACTIVE" | "ERASED";
+  emailVerified?: boolean;
 };
 export function readUser(value: unknown): User {
   if (
@@ -17,7 +20,21 @@ export function readUser(value: unknown): User {
       value.role === "MODERATOR" ||
       value.role === "ADMINISTRATOR")
   ) {
-    return { id: value.id, displayName: value.displayName, role: value.role };
+    const user: User = { id: value.id, displayName: value.displayName, role: value.role };
+    if ("accountState" in value) {
+      const state = value.accountState;
+      if (state !== "ACTIVE" && state !== "PENDING_VERIFICATION" && state !== "SUSPENDED" && state !== "IMPORTED_INACTIVE" && state !== "ERASED") {
+        throw new ApiError("invalid-response", "The account response was unexpected.");
+      }
+      user.accountState = state;
+    }
+    if ("emailVerified" in value) {
+      if (typeof value.emailVerified !== "boolean") {
+        throw new ApiError("invalid-response", "The account response was unexpected.");
+      }
+      user.emailVerified = value.emailVerified;
+    }
+    return user;
   }
   throw new ApiError(
     "invalid-response",

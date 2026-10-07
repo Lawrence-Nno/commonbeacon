@@ -140,7 +140,7 @@ class CompanyExportIT {
             assertThat(rows(files,"actions")).isEqualTo(fixture.get("actions").stream().map(row->{var copy=(ObjectNode)row.deepCopy();copy.remove("origin");return copy;}).toList());
         }
         if(contacts)assertThat(rows(files,"contacts")).hasSize(2);
-        for(var bytes:files.values())assertThat(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).doesNotContain("password_hash","auth_revision","search_vector","ADMINISTRATOR","IMPORTED_INACTIVE");
+        for(var bytes:files.values())assertThat(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).doesNotContain("password_hash","auth_revision","auth_epoch","email_verified_at","token_digest","verification_generation","password_reset_generation","email_change_generation","pending_email_change","search_vector","ADMINISTRATOR","IMPORTED_INACTIVE");
         assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_artifact WHERE job_id=? AND purpose='INTERMEDIATE' AND state='DELETED'",Integer.class,job.id())).isEqualTo(1);
     }
     @Test void snapshotRemainsConsistentAcrossConcurrentEditsHidesAndPublication()throws Exception {

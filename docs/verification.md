@@ -5,6 +5,12 @@ Backend operational logging is covered by `RequestLoggingTest` and
 safe exception diagnostics, HTTP semantics, response resets, and MDC cleanup.
 See [logging operations](logging.md).
 
+Identity verification schema groundwork is covered by `IdentitySchemaIT` and
+`MilestoneUpgradeIT`, including populated V18 upgrades, Hibernate validation,
+challenge/credential constraints, and failed-migration rollback/retry. Export and
+erasure tests also check the new private storage boundaries. See
+[implemented scope and transition mode](identity-verification.md).
+
 CommonBeacon uses unit tests, real PostgreSQL integration tests, browser workflows,
 and disposable deployment checks. Each covers a different boundary; a passing
 build does not establish production readiness or a performance service level.
