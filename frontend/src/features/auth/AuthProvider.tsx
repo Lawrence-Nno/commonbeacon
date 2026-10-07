@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         const next = await currentUser(controller.signal);
         if (!active || currentGeneration !== generation.current) return;
-        if (previous.current?.id !== next?.id) {
+        if (JSON.stringify(previous.current) !== JSON.stringify(next)) {
           await client.cancelQueries();
           client.clear();
           if (!active || currentGeneration !== generation.current) return;

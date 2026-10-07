@@ -17,7 +17,7 @@ import org.springframework.stereotype.Service;
 public class RecentAuthentication {
     public enum Scope { COMPANY_EXPORT, PERSONAL_EXPORT, IMPORT_UPLOAD, IMPORT_COMMIT, DOWNLOAD, ACCOUNT_ERASURE, COMPANY_ERASURE }
     public record Issued(String token,Instant expiresAt) { @Override public String toString(){return "Issued[redacted]";} }
-    private record Grant(UUID actor,long revision,String session,Scope scope,UUID job,Instant expires) implements Serializable {}
+    private record Grant(UUID actor,long revision,long epoch,String session,Scope scope,UUID job,Instant expires) implements Serializable {}
     private static final class Vault implements Serializable { final Map<String,Grant> grants=new HashMap<>(); final Map<String,Grant> tickets=new HashMap<>(); }
     private static final String ATTRIBUTE=RecentAuthentication.class.getName()+".vault";
     private final TransferAccess access;
@@ -46,7 +46,7 @@ public class RecentAuthentication {
     private String token(){byte[] bytes=new byte[32];random.nextBytes(bytes);return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);}
     private void prune(Vault vault,TransferAccess.Actor actor,String session) {
         for(var map:List.of(vault.grants,vault.tickets))map.values().removeIf(g->!g.expires().isAfter(clock.instant())
-            || !g.actor().equals(actor.id()) || g.revision()!=actor.revision() || !g.session().equals(session));
+            || !g.actor().equals(actor.id()) || g.revision()!=actor.revision() || g.epoch()!=actor.epoch() || !g.session().equals(session));
     }
     public Issued issue(Authentication authentication,HttpSession session,String address,String password,Scope scope) {
         boolean administrator=scope!=Scope.PERSONAL_EXPORT && scope!=Scope.DOWNLOAD && scope!=Scope.ACCOUNT_ERASURE;
@@ -58,7 +58,7 @@ public class RecentAuthentication {
         synchronized(vault) {
             prune(vault,actor,session.getId());if(vault.grants.size()>=8)throw required();
             String token=token();Instant expires=clock.instant().plusSeconds(300);
-            vault.grants.put(digest(token),new Grant(actor.id(),actor.revision(),session.getId(),scope,null,expires));return new Issued(token,expires);
+            vault.grants.put(digest(token),new Grant(actor.id(),actor.revision(),actor.epoch(),session.getId(),scope,null,expires));return new Issued(token,expires);
         }
     }
     public void consume(TransferAccess.Actor actor,HttpSession session,Scope scope,String token) {
@@ -72,7 +72,7 @@ public class RecentAuthentication {
             prune(vault,actor,session.getId());if(vault.tickets.size()>=8)throw required();
             consume(actor,session,Scope.DOWNLOAD,grant);
             String token=token();Instant expires=clock.instant().plusSeconds(60);
-            vault.tickets.put(digest(token),new Grant(actor.id(),actor.revision(),session.getId(),Scope.DOWNLOAD,job,expires));return new Issued(token,expires);
+            vault.tickets.put(digest(token),new Grant(actor.id(),actor.revision(),actor.epoch(),session.getId(),Scope.DOWNLOAD,job,expires));return new Issued(token,expires);
         }
     }
     public void consumeTicket(TransferAccess.Actor actor,HttpSession session,UUID job,String token) {

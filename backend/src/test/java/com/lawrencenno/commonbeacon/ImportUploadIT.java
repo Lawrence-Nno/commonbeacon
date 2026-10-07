@@ -160,6 +160,16 @@ class ImportUploadIT {
             assertThat(jdbc.queryForObject("SELECT error_code FROM transfer_job WHERE id=?",String.class,id)).isEqualTo("AUTHORIZATION_REVOKED");
         }
     }
+    @Test void epochChangeDuringUploadRejectsPublicationAndStillCleansItsLeaseAndFile()throws Exception {
+        try(var browser=new Browser(admin)) {
+            UUID id=browser.create();
+            DURING_WRITE.set(()->jdbc.update("UPDATE app_user SET auth_epoch=auth_epoch+1 WHERE id=?",admin));
+            assertThat(browser.put(path(id)+"/archive",zip(fixture("company-empty"),true),true,"application/zip").statusCode()).isEqualTo(401);
+            assertThat(jdbc.queryForObject("SELECT worker_id IS NULL AND lease_until IS NULL FROM transfer_job WHERE id=?",Boolean.class,id)).isTrue();
+            assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_artifact WHERE job_id=? AND state<>'DELETED'",Long.class,id)).isZero();
+            assertThat(store.keysOlderThan(Instant.now().plusSeconds(1))).isEmpty();
+        }
+    }
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.EnumSource(TransferJob.Provider.class)
     void chunkedUploadEnforcesActualByteLimitWithoutBufferingTheArchive(TransferJob.Provider provider)throws Exception {
@@ -175,7 +185,7 @@ class ImportUploadIT {
             public boolean isFinished(){return left<=0;}public boolean isReady(){return true;}
             public void setReadListener(jakarta.servlet.ReadListener listener){throw new UnsupportedOperationException();}
         });
-        var authentication=org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(admin+"@example.test","unused",List.of());
+        var authentication=org.springframework.security.authentication.UsernamePasswordAuthenticationToken.authenticated(new com.lawrencenno.commonbeacon.identity.AccountPrincipal(admin,jdbc.queryForObject("SELECT auth_epoch FROM app_user WHERE id=?",Long.class,admin),"unused",com.lawrencenno.commonbeacon.identity.UserRole.ADMINISTRATOR,true),"unused",List.of());
         assertThatThrownBy(()->controller.upload(authentication,request,intent.id())).isInstanceOf(com.lawrencenno.commonbeacon.shared.ApiFailure.class).hasMessageContaining(provider==TransferJob.Provider.DISCOURSE?"8 MiB":"64 MiB");
         assertThat(jobs.status(admin,intent.id()).state()).isEqualTo(TransferJob.State.UPLOADING);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_artifact WHERE state<>'DELETED'",Long.class)).isZero();
@@ -310,7 +320,7 @@ class ImportUploadIT {
             new ImportDryRunWorker(jobs,store,dryRuns).runOnce();var response=a.get(path(id)+"/review");
             assertThat(response.statusCode()).isEqualTo(200);assertThat(response.headers().firstValue("Cache-Control")).contains("no-store");
             assertThat(b.get(path(id)+"/review").statusCode()).isEqualTo(404);
-            jdbc.update("UPDATE app_user SET role='MEMBER' WHERE id=?",admin);assertThat(a.get(path(id)+"/review").statusCode()).isEqualTo(403);
+            jdbc.update("UPDATE app_user SET role='MEMBER' WHERE id=?",admin);assertThat(a.get(path(id)+"/review").statusCode()).isEqualTo(401);
         }
     }
     class Browser implements AutoCloseable {

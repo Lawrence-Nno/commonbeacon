@@ -364,7 +364,7 @@ class CompanyExportIT {
             String id=json.readTree(response.body()).get("id").asText();
             assertThat(outsider.get("/api/v1/admin/data/jobs/"+id).statusCode()).isEqualTo(404);
             jdbc.update("UPDATE app_user SET role='MEMBER' WHERE id=?",ADMIN);
-            assertThat(admin.post(route,body,headers).statusCode()).isEqualTo(403);
+            assertThat(admin.post(route,body,headers).statusCode()).isEqualTo(401);
         }
     }
 

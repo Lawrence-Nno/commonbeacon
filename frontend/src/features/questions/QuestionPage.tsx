@@ -1,3 +1,4 @@
+import { canContribute } from "../auth/api";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
@@ -65,6 +66,7 @@ export function QuestionPage({ editing = false }: { editing?: boolean }) {
           </Link>
         </section>
       );
+    if (!canContribute(user)) return <p role="status">Email verification is required to edit contributions.</p>;
     if (user.id !== question.author.id)
       return (
         <section className="board-page">
@@ -105,7 +107,7 @@ export function QuestionPage({ editing = false }: { editing?: boolean }) {
         </p>
       )}
       <div className="question-body">{question.body}</div>
-      {user?.id === question.author.id && !question.board.archived && (
+      {canContribute(user) && user?.id === question.author.id && !question.board.archived && (
         <Link
           className="button button-secondary"
           to={"/questions/" + questionId + "/edit"}

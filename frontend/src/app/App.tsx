@@ -1,3 +1,4 @@
+import { canAdminister, canModerate, canContribute } from "../features/auth/api";
 import { AdminArticles } from "../features/knowledge/AdminArticles";
 import { DataManagement } from "../features/transfers/DataManagement";
 import { Imports } from "../features/transfers/Imports";
@@ -186,10 +187,11 @@ function Shell() {
           <NavLink to="/about">
             <span aria-hidden="true">◎</span> About this space
           </NavLink>
-          {user?.role === "ADMINISTRATOR" && (
+          {user && !canContribute(user) && <p role="status">Your account has limited access. Email verification is required for community actions. You can still export your data or delete your account.</p>}
+          {canAdminister(user) && (
             <><NavLink to="/admin/boards">Manage boards</NavLink><NavLink to="/admin/articles">Manage articles</NavLink><NavLink to="/admin/data">Data management</NavLink></>
           )}
-          {(user?.role === "MODERATOR" || user?.role === "ADMINISTRATOR") && (
+          {canModerate(user) && (
             <NavLink to="/moderation">Report review</NavLink>
           )}
         </nav>

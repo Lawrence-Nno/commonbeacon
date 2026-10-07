@@ -16,6 +16,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class TransferJobs {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transaction;
+    private final com.lawrencenno.commonbeacon.identity.AccountPolicy policy;
     private static final String TERMINAL = "'READY','COMPLETED','FAILED','CANCELLED'";
     static final RowMapper<TransferJob> ROW = (r, n) -> new TransferJob(
         r.getObject("id",UUID.class),r.getObject("requester_id",UUID.class),Kind.valueOf(r.getString("kind")),
@@ -23,15 +24,21 @@ public class TransferJobs {
         r.getObject("worker_id",UUID.class),r.getTimestamp("lease_until") == null ? null : r.getTimestamp("lease_until").toInstant(),r.getLong("checkpoint"),
         r.getTimestamp("created_at").toInstant(),r.getTimestamp("updated_at").toInstant(),r.getTimestamp("expires_at").toInstant(),
         r.getString("error_code")==null ? null : Failure.valueOf(r.getString("error_code")),Provider.valueOf(r.getString("import_provider")));
-    public TransferJobs(JdbcTemplate jdbc, PlatformTransactionManager manager) {
-        this.jdbc = jdbc; transaction = new TransactionTemplate(manager);
+    public TransferJobs(JdbcTemplate jdbc, PlatformTransactionManager manager,com.lawrencenno.commonbeacon.identity.AccountPolicy policy) {
+        this.jdbc = jdbc;this.policy=policy; transaction = new TransactionTemplate(manager);
         transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         transaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         transaction.setTimeout(10);
     }
     <T> T locked(Supplier<T> action) {
+        return locked(action,true);
+    }
+    private <T> T locked(Supplier<T> action,boolean checkSession) {
         return transaction.execute(status -> {
             com.lawrencenno.commonbeacon.shared.MigrationGate.shared(jdbc);
+            com.lawrencenno.commonbeacon.identity.AccountPolicy.shared(jdbc);
+            var auth=org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if(checkSession && auth!=null && auth.getPrincipal() instanceof com.lawrencenno.commonbeacon.identity.AccountPrincipal)policy.current(auth,true);
             jdbc.execute("SET LOCAL lock_timeout='5s'");
             jdbc.queryForObject("SELECT id FROM transfer_control WHERE id=1 FOR UPDATE", Integer.class);
             return action.get();
@@ -46,8 +53,8 @@ public class TransferJobs {
         return jdbc.queryForObject("SELECT j.authorization_revision=u.auth_revision FROM transfer_job j JOIN app_user u ON u.id=j.requester_id WHERE j.id=?",Boolean.class,j.id());
     }
     boolean permitted(UUID requester, Kind kind) {
-        var roles = jdbc.queryForList("SELECT role FROM app_user WHERE id=? AND account_state='ACTIVE' FOR SHARE", String.class, requester);
-        return !roles.isEmpty() && (kind == Kind.PERSONAL_EXPORT || roles.getFirst().equals("ADMINISTRATOR"));
+        var account=policy.find(requester,true);
+        return kind==Kind.PERSONAL_EXPORT?policy.credentialed(account):policy.full(account) && account.role()==com.lawrencenno.commonbeacon.identity.UserRole.ADMINISTRATOR;
     }
     private TransferJob owned(UUID actor, UUID id) {
         var j = job(id);
@@ -152,7 +159,7 @@ public class TransferJobs {
                 jdbc.update("UPDATE transfer_job SET worker_id=NULL,lease_until=NULL,version=version+1,updated_at=clock_timestamp() WHERE id=?",j.id());
             }
             return null;
-        });
+        },false);
     }
     public Optional<TransferJob> claimInspection(UUID worker) {
         return locked(()->{
@@ -350,14 +357,14 @@ public class TransferJobs {
                 jdbc.update("UPDATE transfer_artifact SET state='DELETING' WHERE id=?",artifact);return true;
             }
             return false;
-        });
+        },false);
     }
     public void cleaned(UUID artifact) {
         locked(() -> {
             var rows=jdbc.queryForList("SELECT job_id FROM transfer_artifact WHERE id=? AND state IN ('DELETING','MISSING') FOR UPDATE",artifact);
             if(!rows.isEmpty()) {jdbc.update("UPDATE transfer_artifact SET state='DELETED' WHERE id=?",artifact);audit((UUID)rows.getFirst().get("job_id"),Event.CLEANUP_COMPLETED);}
             reconcileReservationsLocked();return null;
-        });
+        },false);
     }
     public TransferJob status(UUID actor,UUID id,boolean personal) {
         return locked(() -> {
@@ -400,6 +407,7 @@ public class TransferJobs {
     public record Download(UUID artifact,long bytes,String hash,UUID lease) {}
     private Download available(UUID actor,UUID id) {
         var j=owned(actor,id);
+        if(!permitted(j))throw new IllegalStateException("FORBIDDEN");
         if(j.state()!=State.READY)throw new IllegalStateException("JOB_CONFLICT");
         var files=jdbc.query("SELECT a.id,a.byte_count,a.sha256 FROM transfer_completion c JOIN transfer_artifact a ON a.id=c.artifact_id WHERE c.job_id=? AND a.state='AVAILABLE' AND a.expires_at>clock_timestamp()",
             (r,n)->new Download(r.getObject(1,UUID.class),r.getLong(2),r.getString(3),null),id);
@@ -422,11 +430,12 @@ public class TransferJobs {
     }
     public boolean downloadLive(UUID lease) {return jdbc.queryForObject("SELECT count(*) FROM transfer_download WHERE id=? AND finished_at IS NULL AND expires_at>clock_timestamp()",Long.class,lease)>0;}
     public void finishDownload(UUID actor,UUID id,UUID lease,boolean delivered) {
+        // Cleanup cannot grant access. Close an owned existing lease even after session revocation.
         locked(() -> {
             var j=job(id);if(!j.requester().equals(actor))throw new IllegalStateException("JOB_NOT_FOUND");
             int changed=jdbc.update("UPDATE transfer_download SET finished_at=clock_timestamp() WHERE id=? AND job_id=? AND finished_at IS NULL",lease,id);
             if(changed==1 && delivered && permitted(actor,j.kind()))audit(id,Event.DOWNLOAD_COMPLETED);return null;
-        });
+        },false);
     }
     // Called only under the deployment-wide transfer lock. Active/uncertain files
     // retain the full working reservation until deletion is confirmed.

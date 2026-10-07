@@ -31,11 +31,12 @@ public class ErasureService {
     private final boolean companyEnabled;private final int backupDays;
     @Value("${commonbeacon.erasure.worker-enabled:true}") private boolean workerEnabled=true;
     private final ErasureAdmission admission;
+    private final com.lawrencenno.commonbeacon.identity.AccountPolicy policy;
     public ErasureService(JdbcTemplate jdbc,PlatformTransactionManager manager,ObjectProvider<ArtifactStore> stores,
             @Value("${commonbeacon.erasure.company-enabled:false}") boolean enabled,
-            @Value("${commonbeacon.erasure.backup-retention-days:30}") int backupDays,ErasureAdmission admission) {
+            @Value("${commonbeacon.erasure.backup-retention-days:30}") int backupDays,ErasureAdmission admission,com.lawrencenno.commonbeacon.identity.AccountPolicy policy) {
         if(backupDays<1 || backupDays>365)throw new IllegalArgumentException("Backup retention must be 1-365 days");
-        this.jdbc=jdbc;this.stores=stores;this.companyEnabled=enabled;this.backupDays=backupDays;this.admission=admission;
+        this.jdbc=jdbc;this.stores=stores;this.companyEnabled=enabled;this.backupDays=backupDays;this.admission=admission;this.policy=policy;
         tx=new TransactionTemplate(manager);tx.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);tx.setTimeout(10);
     }
     private static ApiFailure conflict(String code,String message){return new ApiFailure(409,code,message);}
@@ -44,6 +45,9 @@ public class ErasureService {
             jdbc.execute("SET LOCAL lock_timeout='2s'");jdbc.execute("SET LOCAL statement_timeout='8s'");
             if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT pg_try_advisory_xact_lock(?)",Boolean.class,MigrationGate.KEY)))
                 throw conflict("ERASURE_BUSY","An operation is in progress. Refresh the preview and try again.");
+            jdbc.queryForObject("SELECT pg_advisory_xact_lock(?)",Object.class,com.lawrencenno.commonbeacon.identity.AccountPolicy.IDENTITY_KEY);
+            var auth=org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if(auth!=null && auth.getPrincipal() instanceof com.lawrencenno.commonbeacon.identity.AccountPrincipal)policy.current(auth,true);
             return action.get();
         });
     }
@@ -51,10 +55,10 @@ public class ErasureService {
     private UUID instance(){return jdbc.queryForObject("SELECT source_instance_id FROM transfer_instance WHERE id=1",UUID.class);}
     private static String hash(String value){return HexFormat.of().formatHex(ArchiveCodec.sha256().digest(value.getBytes(StandardCharsets.UTF_8)));}
     private TransferAccess.Actor actor(UUID id,Scope scope) {
-        var found=jdbc.query("SELECT role,auth_revision FROM app_user WHERE id=? AND account_state='ACTIVE' FOR UPDATE",
-            (r,n)->new TransferAccess.Actor(id,r.getString(1),r.getLong(2)),id);
-        if(found.isEmpty())throw new ApiFailure(401,"UNAUTHENTICATED","Please sign in again.");
-        var actor=found.getFirst();
+        var account=policy.find(id,true);
+        if(!policy.credentialed(account))throw new ApiFailure(401,"UNAUTHENTICATED","Please sign in again.");
+        if(scope==Scope.COMPANY)policy.requireFull(account,false,false);
+        var actor=new TransferAccess.Actor(id,account.role().name(),account.revision(),account.epoch());
         if(scope==Scope.COMPANY && (!companyEnabled || !actor.role().equals("ADMINISTRATOR")))
             throw new ApiFailure(403,"COMPANY_ERASURE_DISABLED","Company erasure requires an administrator and deployment-level enablement.");
         if(scope==Scope.ACCOUNT && actor.role().equals("ADMINISTRATOR")

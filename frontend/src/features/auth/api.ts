@@ -6,7 +6,11 @@ export type User = {
   // Additive during rollout; older account responses remain readable.
   accountState?: "ACTIVE" | "PENDING_VERIFICATION" | "SUSPENDED" | "IMPORTED_INACTIVE" | "ERASED";
   emailVerified?: boolean;
+  capabilities?: { contribute: boolean; moderate: boolean; administer: boolean; personalData: boolean; eraseAccount: boolean };
 };
+export function canContribute(user: User | null | undefined) { return !!user && (user.capabilities?.contribute ?? (user.accountState === undefined)); }
+export function canAdminister(user: User | null | undefined) { return !!user && (user.capabilities?.administer ?? (canContribute(user) && user.role === "ADMINISTRATOR")); }
+export function canModerate(user: User | null | undefined) { return !!user && (user.capabilities?.moderate ?? (canContribute(user) && user.role !== "MEMBER")); }
 export function readUser(value: unknown): User {
   if (
     typeof value === "object" &&
@@ -33,6 +37,13 @@ export function readUser(value: unknown): User {
         throw new ApiError("invalid-response", "The account response was unexpected.");
       }
       user.emailVerified = value.emailVerified;
+    }
+    if ("capabilities" in value) {
+      const c = value.capabilities;
+      if (typeof c !== "object" || c === null || !("contribute" in c) || typeof c.contribute !== "boolean" || !("moderate" in c) || typeof c.moderate !== "boolean" || !("administer" in c) || typeof c.administer !== "boolean" || !("personalData" in c) || typeof c.personalData !== "boolean" || !("eraseAccount" in c) || typeof c.eraseAccount !== "boolean") {
+        throw new ApiError("invalid-response", "The account response was unexpected.");
+      }
+      user.capabilities = { contribute: c.contribute, moderate: c.moderate, administer: c.administer, personalData: c.personalData, eraseAccount: c.eraseAccount };
     }
     return user;
   }

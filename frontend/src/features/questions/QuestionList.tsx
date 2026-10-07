@@ -1,3 +1,4 @@
+import { canContribute } from "../auth/api";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
@@ -28,7 +29,7 @@ export function QuestionList({ board }: { board: Board }) {
       <div className="section-heading">
         <h2 id="questions-heading">Questions</h2>
         {!board.archived &&
-          (user ? (
+          (canContribute(user) ? (
             <Link
               className="button button-primary"
               to={"/boards/" + board.id + "/questions/new"}

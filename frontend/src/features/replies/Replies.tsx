@@ -1,3 +1,4 @@
+import { canContribute } from "../auth/api";
 import { useSolution } from "./useSolution";
 import { SolutionPanel, SolutionButton } from "./SolutionPanel";
 import { useState } from "react";
@@ -42,7 +43,7 @@ function ReplyThread({ question }: { question: Question }) {
   const [closed, setClosed] = useState(false);
   const solution = useSolution(question);
   const canSelect =
-    user?.id === question.author.id && !question.board.archived && !closed;
+    canContribute(user) && user?.id === question.author.id && !question.board.archived && !closed;
   const unavailable =
     query.error instanceof ApiError && query.error.status === 404;
   const archived = question.board.archived || closed;
@@ -179,7 +180,7 @@ function ReplyThread({ question }: { question: Question }) {
                     canSelect={canSelect}
                     state={solution}
                   />
-                  {user?.id === reply.author.id && !archived && (
+                  {canContribute(user) && user?.id === reply.author.id && !archived && (
                     <button
                       className="button button-secondary"
                       onClick={() => {
@@ -224,7 +225,7 @@ function ReplyThread({ question }: { question: Question }) {
         </>
       )}
       {!unavailable &&
-        user &&
+        user && canContribute(user) &&
         (editing ? (
           <ReplyForm
             key={editing.id}

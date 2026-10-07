@@ -1,3 +1,4 @@
+import { canAdminister } from "../auth/api";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router";
@@ -13,7 +14,7 @@ export function DataManagement({ personal = false, history = false }: { personal
   const { user, sessionError } = useAuth();
   if (user === undefined) return <p role="status">{sessionError ? "Account connection unavailable. Reload to try again." : "Checking your account..."}</p>;
   if (!user) return <section className="board-page"><h1>Sign in to manage data.</h1><Link to="/login">Sign in</Link></section>;
-  if (!personal && user.role !== "ADMINISTRATOR") return <section className="board-page"><h1>Data management is restricted to administrators.</h1><Link to="/">Back to the community</Link></section>;
+  if (!personal && !canAdminister(user)) return <section className="board-page"><h1>Data management is restricted to administrators.</h1><Link to="/">Back to the community</Link></section>;
   return <ActorExports key={`${user.id}:${personal}:${history}`} actorId={user.id} personal={personal} history={history} />;
 }
 function ActorExports({ actorId, personal, history }: { actorId: string; personal: boolean; history: boolean }) {

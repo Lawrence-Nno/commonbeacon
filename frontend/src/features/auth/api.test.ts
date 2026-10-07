@@ -1,5 +1,15 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { login, logout, readUser } from "./api";
+import { login, logout, readUser, canContribute, canAdminister, canModerate } from "./api";
+
+it("uses explicit capabilities rather than the account role for limited access", () => {
+  const user = readUser({ id: "limited-admin", displayName: "Limited", role: "ADMINISTRATOR", accountState: "ACTIVE", emailVerified: false,
+    capabilities: { contribute: false, moderate: false, administer: false, personalData: true, eraseAccount: true } });
+  expect(canContribute(user)).toBe(false);
+  expect(canAdminister(user)).toBe(false);
+  expect(canModerate(user)).toBe(false);
+  expect(user.capabilities?.personalData).toBe(true);
+  expect(() => readUser({ id: "a", displayName: "A", role: "MEMBER", capabilities: { contribute: "yes" } })).toThrow();
+});
 
 it("reads additive account state and inbox proof without retaining private fields", () => {
   expect(readUser({ id: "a", displayName: "A", role: "MEMBER", accountState: "PENDING_VERIFICATION", emailVerified: false, tokenDigest: "private", pendingEmail: "private@example.test" })).toEqual({ id: "a", displayName: "A", role: "MEMBER", accountState: "PENDING_VERIFICATION", emailVerified: false });

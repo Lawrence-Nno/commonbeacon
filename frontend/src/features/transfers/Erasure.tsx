@@ -1,3 +1,4 @@
+import { canAdminister } from "../auth/api";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Button } from "../../components/Button";
@@ -28,7 +29,7 @@ export function Erasure({ company = false }: { company?: boolean }) {
   if (receipt) return <ReceiptStatus receipt={receipt} />;
   if (user === undefined) return <p role="status">Checking your account...</p>;
   if (!user) return <section className="board-page"><h1>Sign in to review erasure.</h1><Link to="/login">Sign in</Link><p><Link to="/erasure/receipt">Check a saved erasure receipt</Link></p></section>;
-  if (company && user.role !== "ADMINISTRATOR") return <section className="board-page"><h1>Company erasure requires an administrator.</h1></section>;
+  if (company && !canAdminister(user)) return <section className="board-page"><h1>Company erasure requires an administrator.</h1></section>;
   return <ErasureForm key={`${user.id}:${company}`} actorId={user.id} company={company} onReceipt={setReceipt} />;
 }
 function ErasureForm({ actorId, company, onReceipt }: { actorId: string; company: boolean; onReceipt: (r: Receipt) => void }) {

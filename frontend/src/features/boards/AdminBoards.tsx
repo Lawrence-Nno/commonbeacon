@@ -1,3 +1,4 @@
+import { canAdminister } from "../auth/api";
 import { useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router";
@@ -26,7 +27,7 @@ export function AdminBoards() {
         </Link>
       </section>
     );
-  if (user.role !== "ADMINISTRATOR")
+  if (!canAdminister(user))
     return (
       <section className="about-page">
         <h1>Administrator access required.</h1>

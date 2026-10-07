@@ -1,3 +1,4 @@
+import { canAdminister } from "../auth/api";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
@@ -12,7 +13,7 @@ export function AdminArticles({ creating = false }: { creating?: boolean }) {
   const { articleId } = useParams();
   if (user === undefined) return <p role="status">{sessionError ? "Account connection unavailable. Reload to try again." : "Checking your account..."}</p>;
   if (!user) return <section className="board-page"><h1>Sign in to manage articles.</h1><Link to="/login">Sign in</Link></section>;
-  if (user.role !== "ADMINISTRATOR") return <section className="board-page"><h1>Article administration is restricted.</h1><Link to="/knowledge">Browse published articles</Link></section>;
+  if (!canAdminister(user)) return <section className="board-page"><h1>Article administration is restricted.</h1><Link to="/knowledge">Browse published articles</Link></section>;
   return creating ? <Editor key={user.id + ":new"} actorId={user.id} /> : articleId ? <LoadEditor key={user.id + articleId} id={articleId} actorId={user.id} /> : <AdminList key={user.id} actorId={user.id} />;
 }
 function AdminList({ actorId }: { actorId: string }) {

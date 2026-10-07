@@ -110,9 +110,10 @@ class TransferAccessIT {
         var visitor=new Browser(null);error(visitor.get("/api/v1/admin/data/jobs"),401,"UNAUTHENTICATED");
         var a=new Browser(admin);var job=create(admin,false);
         error(a.send("POST","/api/v1/account/data/reauthentication",json.writeValueAsString(Map.of("password",PASSWORD,"scope","DOWNLOAD")),"application/json",false,Map.of()),403,"CSRF_INVALID");
-        jdbc.update("UPDATE app_user SET role='MEMBER' WHERE id=?",admin);error(a.get(path(job)),403,"FORBIDDEN");
+        jdbc.update("UPDATE app_user SET role='MEMBER' WHERE id=?",admin);error(a.get(path(job)),401,"UNAUTHENTICATED");
         var m=new Browser(member);error(m.get("/api/v1/admin/data/jobs"),403,"FORBIDDEN");
-        jdbc.update("UPDATE app_user SET role='ADMINISTRATOR' WHERE id=?",member);assertThat(m.get("/api/v1/admin/data/jobs").statusCode()).isEqualTo(200);
+        jdbc.update("UPDATE app_user SET role='ADMINISTRATOR' WHERE id=?",member);error(m.get("/api/v1/admin/data/jobs"),401,"UNAUTHENTICATED");
+        assertThat(new Browser(member).get("/api/v1/admin/data/jobs").statusCode()).isEqualTo(200);
     }
     @Test void jobViewsArePrivateScopedAndBounded()throws Exception {
         var a=new Browser(admin);var b=new Browser(other);var j=create(admin,false);
@@ -156,6 +157,8 @@ class TransferAccessIT {
     @Test void logoutAndRoleAbaChangesRevokeConfirmation()throws Exception {
         var a=new Browser(admin);var j=ready(admin,false);String grant=a.grant("DOWNLOAD");
         jdbc.update("UPDATE app_user SET role='MEMBER' WHERE id=?",admin);jdbc.update("UPDATE app_user SET role='ADMINISTRATOR' WHERE id=?",admin);
+        error(a.post(path(j)+"/download-ticket",Map.of("recentAuthGrant",grant)),401,"UNAUTHENTICATED");
+        a=new Browser(admin);j=ready(admin,false);
         error(a.post(path(j)+"/download-ticket",Map.of("recentAuthGrant",grant)),403,"RECENT_AUTH_REQUIRED");
         String ticket=a.ticket(path(j),a.grant("DOWNLOAD"));assertThat(a.post("/api/v1/auth/logout",Map.of()).statusCode()).isEqualTo(204);
         error(a.download(path(j),ticket),401,"UNAUTHENTICATED");
@@ -164,7 +167,7 @@ class TransferAccessIT {
     @Test void passwordChangeRevokesExistingTickets()throws Exception {
         var a=new Browser(admin);var j=ready(admin,false);String ticket=a.ticket(path(j),a.grant("DOWNLOAD"));
         jdbc.update("UPDATE app_user SET password_hash=? WHERE id=?",passwords.encode("replacement-test-password"),admin);
-        error(a.download(path(j),ticket),403,"RECENT_AUTH_REQUIRED");
+        error(a.download(path(j),ticket),401,"UNAUTHENTICATED");
     }
     @Test void passwordChallengesAreThrottledAndBodiesAreBounded()throws Exception {
         var a=new Browser(admin);

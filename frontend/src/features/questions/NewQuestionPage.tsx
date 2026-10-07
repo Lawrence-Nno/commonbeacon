@@ -1,3 +1,4 @@
+import { canContribute } from "../auth/api";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
 import { useAuth } from "../auth/AuthProvider";
@@ -56,6 +57,7 @@ export function NewQuestionPage() {
         </Link>
       </section>
     );
+  if (!canContribute(user)) return <p role="status">Email verification is required to post questions.</p>;
   if (query.data.archived)
     return (
       <section className="board-page">

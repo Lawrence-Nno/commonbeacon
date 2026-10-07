@@ -30,11 +30,12 @@ public class CompanySnapshot {
     }
     private record Projection(String from,String fields,String key,String predicate) {}
     private final JdbcTemplate jdbc;
+    private final com.lawrencenno.commonbeacon.identity.AccountPolicy policy;
     private final TransactionTemplate snapshot;
     private final ArchiveCodec codec=new ArchiveCodec();
     private final JsonMapper json=JsonMapper.builder().build();
-    public CompanySnapshot(JdbcTemplate jdbc,PlatformTransactionManager manager) {
-        this.jdbc=jdbc; snapshot=new TransactionTemplate(manager);
+    public CompanySnapshot(JdbcTemplate jdbc,PlatformTransactionManager manager,com.lawrencenno.commonbeacon.identity.AccountPolicy policy) {
+        this.jdbc=jdbc;this.policy=policy; snapshot=new TransactionTemplate(manager);
         snapshot.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         snapshot.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         snapshot.setReadOnly(true);snapshot.setTimeout(120);
@@ -83,6 +84,8 @@ public class CompanySnapshot {
         long deadline=System.nanoTime()+120_000_000_000L;
         try {
             return snapshot.execute(status -> {
+                var account=policy.find(job.requester(),false);
+                if(!policy.exportAllowed(account,job.id(),false))throw new IllegalStateException("AUTHORIZATION_REVOKED");
                 try {return read(job,output,rows->{
                     if(System.nanoTime()>deadline)throw new ExportFailure(TransferJob.Failure.SNAPSHOT_TIMEOUT);
                     progress.check(rows);

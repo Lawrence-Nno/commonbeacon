@@ -1,3 +1,4 @@
+import { canModerate } from "../auth/api";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
@@ -12,7 +13,7 @@ export function ModerationContentPage({ reply }: { reply: boolean }) {
   const { contentId = "" } = useParams();
   if (user === undefined) return <p role="status">{sessionError ? "Account connection unavailable. Reload to try again." : "Checking your account..."}</p>;
   if (!user) return <section className="board-page"><h1>Sign in to review content.</h1><Link to="/login">Sign in</Link></section>;
-  if (!["MODERATOR", "ADMINISTRATOR"].includes(user.role)) return <section className="board-page"><h1>Content review is restricted.</h1></section>;
+  if (!canModerate(user)) return <section className="board-page"><h1>Content review is restricted.</h1></section>;
   return <Content key={`${user.id}:${reply}:${contentId}`} id={contentId} reply={reply} actorId={user.id} />;
 }
 function Content({ id, reply, actorId }: { id: string; reply: boolean; actorId: string }) {

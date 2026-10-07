@@ -1,3 +1,4 @@
+import { canAdminister } from "../auth/api";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router";
@@ -33,7 +34,7 @@ export function Imports({ history = false }: { history?: boolean }) {
   const { user, sessionError } = useAuth(); const { jobId } = useParams();
   if (user === undefined) return <p role="status">{sessionError ? "Account connection unavailable. Reload to continue." : "Checking your account..."}</p>;
   if (!user) return <section className="board-page"><h1>Sign in to import data.</h1><Link to="/login">Sign in</Link></section>;
-  if (user.role !== "ADMINISTRATOR") return <section className="board-page"><h1>Import is restricted to administrators.</h1></section>;
+  if (!canAdminister(user)) return <section className="board-page"><h1>Import is restricted to administrators.</h1></section>;
   return <PrivateImports key={`${user.id}:${history}:${jobId ?? "new"}`} actorId={user.id} id={jobId} history={history} />;
 }
 function PrivateImports(props: { actorId: string; id?: string; history: boolean }) {

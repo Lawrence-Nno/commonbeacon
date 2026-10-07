@@ -29,6 +29,7 @@ import tools.jackson.databind.*;
 @Import({PostgresTestConfiguration.class,ErasureIT.Storage.class})
 @org.springframework.test.context.ActiveProfiles("local")
 class ErasureIT {
+    @Autowired com.lawrencenno.commonbeacon.identity.AccountPolicy policy;
     static final String PASSWORD="disposable-erasure-password",TOKEN="e".repeat(43);
     static final Set<String> ACKS=Set.of("IRREVERSIBLE","RETAINED_DATA","ALL_TRANSFER_FILES","BACKUP_RETENTION");
     static final Path ROOT=root();
@@ -213,7 +214,7 @@ class ErasureIT {
         assertThat(count("erasure_job")).isEqualTo(2);drain();assertThat(count("app_user")).isEqualTo(1);assertThat(count("question")).isZero();assertThat(count("erasure_tombstone")).isEqualTo(2);
     }
     @Test void companyRequiresDeploymentOptInAndCurrentAdministrator() {
-        var disabled=new ErasureService(jdbc,transactions,stores,false,30,admission);
+        var disabled=new ErasureService(jdbc,transactions,stores,false,30,admission,policy);
         assertThatThrownBy(()->disabled.preview(admin,Scope.COMPANY)).isInstanceOf(com.lawrencenno.commonbeacon.shared.ApiFailure.class);
         assertThatThrownBy(()->service.preview(member,Scope.COMPANY)).isInstanceOf(com.lawrencenno.commonbeacon.shared.ApiFailure.class);
         assertThat(count("erasure_job")).isZero();

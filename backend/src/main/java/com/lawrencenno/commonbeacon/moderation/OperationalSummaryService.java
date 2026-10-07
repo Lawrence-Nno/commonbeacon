@@ -7,7 +7,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @PreAuthorize("hasAnyRole('MODERATOR', 'ADMINISTRATOR')")
-@Transactional(readOnly = true)
+@Transactional(readOnly = false)
 public class OperationalSummaryService {
     private final JdbcTemplate jdbc;
     public OperationalSummaryService(JdbcTemplate jdbc) { this.jdbc = jdbc; }

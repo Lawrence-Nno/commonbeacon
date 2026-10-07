@@ -90,7 +90,7 @@ class IdentityIT {
             assertThat(response.statusCode()).isEqualTo(201);
             assertThat(response.body()).contains("MEMBER", "Test Member").doesNotContain("password", email, "authEpoch", "generation", "tokenDigest", "pendingEmail");
             var account=json.readTree(response.body());
-            assertThat(account.size()).isEqualTo(5);
+            assertThat(account.size()).isEqualTo(6);
             assertThat(account.path("accountState").asText()).isEqualTo("ACTIVE");
             assertThat(account.path("emailVerified").asBoolean()).isFalse();
             assertThat(browser.get("/api/v1/auth/me").statusCode()).isEqualTo(401);

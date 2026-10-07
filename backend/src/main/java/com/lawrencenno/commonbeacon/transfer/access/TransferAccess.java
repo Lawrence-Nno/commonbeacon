@@ -11,20 +11,19 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class TransferAccess {
-    public record Actor(UUID id,String role,long revision) {}
+    public record Actor(UUID id,String role,long revision,long epoch) {}
     private final JdbcTemplate jdbc;
     private final PasswordEncoder passwords;
-    public TransferAccess(JdbcTemplate jdbc,PasswordEncoder passwords) {this.jdbc=jdbc;this.passwords=passwords;}
+    private final com.lawrencenno.commonbeacon.identity.AccountPolicy policy;
+    public TransferAccess(JdbcTemplate jdbc,PasswordEncoder passwords,com.lawrencenno.commonbeacon.identity.AccountPolicy policy) {this.jdbc=jdbc;this.passwords=passwords;this.policy=policy;}
     @Transactional(timeout=5)
     public Actor current(Authentication authentication,boolean administrator) {
         if(authentication==null || !authentication.isAuthenticated() || authentication instanceof AnonymousAuthenticationToken)
             throw new ApiFailure(401,"UNAUTHENTICATED","Please sign in to continue.");
-        var actors=jdbc.query("SELECT id,role,auth_revision FROM app_user WHERE email=? AND account_state='ACTIVE' FOR SHARE",
-            (r,n)->new Actor(r.getObject(1,UUID.class),r.getString(2),r.getLong(3)),authentication.getName());
-        if(actors.isEmpty())throw new ApiFailure(401,"UNAUTHENTICATED","Please sign in to continue.");
-        var actor=actors.getFirst();
-        if(administrator && !actor.role().equals("ADMINISTRATOR"))throw new ApiFailure(403,"FORBIDDEN","You do not have permission for this action.");
-        return actor;
+        com.lawrencenno.commonbeacon.identity.AccountPolicy.shared(jdbc);
+        var account=policy.current(authentication,true);
+        if(administrator)policy.requireFull(account,true,false);
+        return new Actor(account.id(),account.role().name(),account.revision(),account.epoch());
     }
     @Transactional(timeout=5)
     public Actor confirmPassword(Authentication authentication,String password,boolean administrator) {

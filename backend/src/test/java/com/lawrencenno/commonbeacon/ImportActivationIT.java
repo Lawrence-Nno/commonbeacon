@@ -281,8 +281,12 @@ class ImportActivationIT {
                 try{release.await(3,java.util.concurrent.TimeUnit.SECONDS);}catch(InterruptedException e){throw new RuntimeException(e);}
             }));
             assertThat(entered.await(5,java.util.concurrent.TimeUnit.SECONDS)).isTrue();var worker=pool.submit(()->activation.runOnce());
-            try{Thread.sleep(200);assertThat(worker.isDone()).isFalse();}finally{release.countDown();}
-            writer.get(5,java.util.concurrent.TimeUnit.SECONDS);assertThat(worker.get(10,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+            // The identity writer owns the exclusive identity gate: claim fails closed
+            // before obtaining a job lease, then retries after the writer commits.
+            try{assertThatThrownBy(()->worker.get(5,java.util.concurrent.TimeUnit.SECONDS))
+                .hasCauseInstanceOf(com.lawrencenno.commonbeacon.shared.ApiFailure.class)
+                .satisfies(error->assertThat(((com.lawrencenno.commonbeacon.shared.ApiFailure)error.getCause()).code()).isEqualTo("IDENTITY_CHANGE_IN_PROGRESS"));}finally{release.countDown();}
+            writer.get(5,java.util.concurrent.TimeUnit.SECONDS);assertThat(activation.runOnce()).isTrue();
         }
         assertThat(jobs.status(admin,id).state()).isEqualTo(TransferJob.State.FAILED);assertThat(count("board")).isZero();assertThat(count("app_user")).isEqualTo(3);
     }

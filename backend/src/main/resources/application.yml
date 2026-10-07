@@ -62,8 +62,9 @@ management:
 
 commonbeacon:
   identity:
-    # Stage 2 storage only. Unsupported enforcement modes fail startup.
-    verification-mode: TRANSITION
+    # Keep legacy ACTIVE access until the verified-account rollout is qualified.
+    # ENFORCED requires current-address proof for community and company authority.
+    verification-mode: ${EMAIL_VERIFICATION_MODE:TRANSITION}
   erasure:
     company-enabled: ${COMPANY_ERASURE_ENABLED:false}
     backup-retention-days: ${ERASURE_BACKUP_RETENTION_DAYS:30}

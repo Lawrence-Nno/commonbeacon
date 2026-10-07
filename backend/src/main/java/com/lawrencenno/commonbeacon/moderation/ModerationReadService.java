@@ -13,7 +13,7 @@ import com.lawrencenno.commonbeacon.shared.PageResponse;
 
 @Service
 @PreAuthorize("hasAnyRole('MODERATOR', 'ADMINISTRATOR')")
-@Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+@Transactional(readOnly = false, isolation = Isolation.REPEATABLE_READ)
 public class ModerationReadService {
     private final ModerationReadRepository reports;
     public ModerationReadService(ModerationReadRepository reports) { this.reports = reports; }

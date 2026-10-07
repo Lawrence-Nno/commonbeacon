@@ -21,6 +21,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={"commonbeacon.demo.enabled=false","commonbeacon.transfer.storage.enabled=false"})
 @Import(PostgresTestConfiguration.class)
 class TransferFoundationIT {
+    @Autowired com.lawrencenno.commonbeacon.identity.AccountPolicy policy;
     @Autowired JdbcTemplate jdbc;
     @Autowired TransferJobs jobs;
     @Autowired PlatformTransactionManager transactions;
@@ -81,7 +82,7 @@ class TransferFoundationIT {
     }
     @Test void creationIsDurableIdempotentAndOwnerScoped() {
         UUID key=UUID.randomUUID();var first=jobs.create(admin,Kind.COMPANY_EXPORT,key,"a".repeat(64));
-        var restarted=new TransferJobs(jdbc,transactions);
+        var restarted=new TransferJobs(jdbc,transactions,policy);
         assertThat(restarted.create(admin,Kind.COMPANY_EXPORT,key,"a".repeat(64)).id()).isEqualTo(first.id());
         assertThat(events(first.id(),"CREATED")).isEqualTo(1);
         assertThatThrownBy(()->jobs.create(admin,Kind.COMPANY_EXPORT,key,"b".repeat(64))).hasMessage("IDEMPOTENCY_CONFLICT");
@@ -94,7 +95,7 @@ class TransferFoundationIT {
         try(var pool=Executors.newFixedThreadPool(2)) {
             var start=new CountDownLatch(1);
             var a=pool.submit(()->{start.await();return jobs.claim(UUID.randomUUID());});
-            var b=pool.submit(()->{start.await();return new TransferJobs(jdbc,transactions).claim(UUID.randomUUID());});
+            var b=pool.submit(()->{start.await();return new TransferJobs(jdbc,transactions,policy).claim(UUID.randomUUID());});
             start.countDown();
             assertThat((a.get(15,TimeUnit.SECONDS).isPresent()?1:0)+(b.get(15,TimeUnit.SECONDS).isPresent()?1:0)).isEqualTo(1);
         }
@@ -103,7 +104,7 @@ class TransferFoundationIT {
     @Test void leaseRecoveryFencesOldProgressAndRestartsExportSnapshot() {
         var intent=create(admin);var first=jobs.claim(UUID.randomUUID()).orElseThrow();
         assertThat(jobs.checkpoint(first.lease(),42)).isTrue();expire(intent.id());
-        var second=new TransferJobs(jdbc,transactions).claim(UUID.randomUUID()).orElseThrow();
+        var second=new TransferJobs(jdbc,transactions,policy).claim(UUID.randomUUID()).orElseThrow();
         assertThat(second.fence()).isGreaterThan(first.fence());assertThat(second.checkpoint()).isZero();
         assertThatThrownBy(()->jobs.heartbeat(first.lease())).hasMessage("STALE_LEASE");
         assertThatThrownBy(()->jobs.checkpoint(first.lease(),43)).hasMessage("STALE_LEASE");
@@ -134,7 +135,7 @@ class TransferFoundationIT {
         jdbc.update("UPDATE transfer_artifact SET expires_at=clock_timestamp()+interval '1 minute' WHERE id=?",key);
         assertThat(jobs.publish(lease,key,file.bytes(),file.sha256())).isTrue();
         assertThat(jdbc.queryForObject("SELECT expires_at>clock_timestamp()+interval '23 hours' FROM transfer_artifact WHERE id=?",Boolean.class,key)).isTrue();
-        assertThat(new TransferJobs(jdbc,transactions).publish(lease,key,file.bytes(),file.sha256())).isTrue();
+        assertThat(new TransferJobs(jdbc,transactions,policy).publish(lease,key,file.bytes(),file.sha256())).isTrue();
         assertThat(jobs.status(admin,j.id()).state()).isEqualTo(State.READY);
         assertThat(events(j.id(),"COMPLETED")).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT count(*) FROM transfer_completion",Integer.class)).isEqualTo(1);
@@ -254,7 +255,7 @@ class TransferFoundationIT {
         assertThat(registry.get("commonbeacon.transfer.cleanup_backlog").gauge().value()).isEqualTo(1);
         assertThat(registry.get("commonbeacon.transfer.cleanup_failures").gauge().value()).isEqualTo(1);
         assertThat(registry.get("commonbeacon.transfer.cleanup_last_success_seconds").gauge().value()).isZero();
-        var restarted=new ArtifactReconciler(new TransferJobs(jdbc,transactions),store,new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+        var restarted=new ArtifactReconciler(new TransferJobs(jdbc,transactions,policy),store,new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
         restarted.reconcile();assertThat(store.inspect(broken)).isEmpty();assertThat(reserved(first)).isZero();
         assertThat(jobs.status(admin,first).state()).isEqualTo(State.READY);
     }
@@ -279,7 +280,7 @@ class TransferFoundationIT {
     @Test void writingSnapshotCannotMisdiagnoseConcurrentPublication()throws Exception {
         var id=create(admin).id();var lease=jobs.claim(UUID.randomUUID()).orElseThrow().lease();
         var key=jobs.beginArtifact(lease,"DOWNLOAD",100);var file=store.write(key,100,out->out.write(1));
-        var racingJobs=new TransferJobs(jdbc,transactions){
+        var racingJobs=new TransferJobs(jdbc,transactions,policy){
             @Override public List<Artifact> artifacts(){var snapshot=super.artifacts();jobs.publish(lease,key,file.bytes(),file.sha256());return snapshot;}
         };
         new ArtifactReconciler(racingJobs,new DelegatingStore(){

@@ -7921,10 +7921,19 @@
           },
           "accountState": {
             "type": "string",
-            "enum": ["ACTIVE", "PENDING_VERIFICATION", "SUSPENDED", "IMPORTED_INACTIVE", "ERASED"]
+            "enum": [
+              "ACTIVE",
+              "PENDING_VERIFICATION",
+              "SUSPENDED",
+              "IMPORTED_INACTIVE",
+              "ERASED"
+            ]
           },
           "emailVerified": {
             "type": "boolean"
+          },
+          "capabilities": {
+            "$ref": "#/components/schemas/AccountCapabilities"
           }
         },
         "required": [
@@ -7932,7 +7941,8 @@
           "displayName",
           "role",
           "accountState",
-          "emailVerified"
+          "emailVerified",
+          "capabilities"
         ],
         "additionalProperties": false
       },
@@ -10808,6 +10818,34 @@
           "phase",
           "processed",
           "retrying"
+        ],
+        "additionalProperties": false
+      },
+      "AccountCapabilities": {
+        "type": "object",
+        "properties": {
+          "contribute": {
+            "type": "boolean"
+          },
+          "moderate": {
+            "type": "boolean"
+          },
+          "administer": {
+            "type": "boolean"
+          },
+          "personalData": {
+            "type": "boolean"
+          },
+          "eraseAccount": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "contribute",
+          "moderate",
+          "administer",
+          "personalData",
+          "eraseAccount"
         ],
         "additionalProperties": false
       }

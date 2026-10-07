@@ -23,11 +23,12 @@ import static com.lawrencenno.commonbeacon.transfer.archive.ArchiveFormat.*;
 public class PersonalSnapshot {
     private record Projection(String from,String fields,String key,String predicate) {}
     private final JdbcTemplate jdbc;
+    private final com.lawrencenno.commonbeacon.identity.AccountPolicy policy;
     private final TransactionTemplate snapshot;
     private final ArchiveCodec codec=new ArchiveCodec();
     private final JsonMapper json=JsonMapper.builder().build();
-    public PersonalSnapshot(JdbcTemplate jdbc,PlatformTransactionManager manager) {
-        this.jdbc=jdbc; snapshot=new TransactionTemplate(manager);
+    public PersonalSnapshot(JdbcTemplate jdbc,PlatformTransactionManager manager,com.lawrencenno.commonbeacon.identity.AccountPolicy policy) {
+        this.jdbc=jdbc;this.policy=policy; snapshot=new TransactionTemplate(manager);
         snapshot.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         snapshot.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
         snapshot.setReadOnly(true);snapshot.setTimeout(120);
@@ -35,7 +36,7 @@ public class PersonalSnapshot {
     // Every projection binds only the job's authenticated requester. No company DTOs or moderation joins.
     private Projection projection(Entity entity) {
         return switch(entity) {
-            case users -> new Projection("app_user", "id,display_name,created_at,email,role", "id", "id=? AND account_state='ACTIVE'");
+            case users -> new Projection("app_user", "id,display_name,created_at,email,role", "id", "id=? AND account_state IN ('ACTIVE','PENDING_VERIFICATION')");
             case boards -> new Projection("board b", "b.id,b.slug,b.name", "b.id",
                 "EXISTS (SELECT 1 FROM question q WHERE q.board_id=b.id AND q.author_id=?)");
             case questions -> new Projection("question", "id,board_id,author_id,title,body,visibility,created_at,updated_at", "id", "author_id=?");
@@ -71,6 +72,8 @@ public class PersonalSnapshot {
         long deadline=System.nanoTime()+120_000_000_000L;
         try {
             return snapshot.execute(status -> {
+                var account=policy.find(job.requester(),false);
+                if(!policy.exportAllowed(account,job.id(),true))throw new IllegalStateException("AUTHORIZATION_REVOKED");
                 try {return read(job,output,rows->{
                     if(System.nanoTime()>deadline)throw new ExportFailure(TransferJob.Failure.SNAPSHOT_TIMEOUT);
                     progress.check(rows);

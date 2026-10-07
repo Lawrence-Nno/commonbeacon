@@ -27,7 +27,7 @@ public class AdminArticleService {
     public AdminArticleService(ArticleRepository articles, ArticleReadRepository reads, IdentityService identity, UserRepository users) {
         this.articles = articles; this.reads = reads; this.identity = identity; this.users = users;
     }
-    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    @Transactional(readOnly = false, isolation = Isolation.REPEATABLE_READ)
     public PageResponse<ArticleViews.AdminSummary> list(String status, int page, int size) {
         if (status != null && !Set.of("DRAFT", "PUBLISHED", "ARCHIVED").contains(status))
             throw new ApiFailure(400, "INVALID_STATUS", "Use DRAFT, PUBLISHED, or ARCHIVED; omit status to list all articles.");
@@ -35,7 +35,7 @@ public class AdminArticleService {
         long total = reads.count(status);
         return new PageResponse<>(reads.admin(status, size, (long) page * size), page, size, total, ArticlePaging.totalPages(total, size));
     }
-    @Transactional(readOnly = true)
+    @Transactional(readOnly = false)
     public ArticleViews.AdminDetail get(UUID id) {
         return ArticleViews.AdminDetail.from(articles.findById(id).orElseThrow(PublicArticleService::missing));
     }

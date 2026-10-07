@@ -1,3 +1,4 @@
+import { canContribute } from "../auth/api";
 import { useEffect, useId, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { FormEvent } from "react";
@@ -8,7 +9,7 @@ import type { ReportTarget } from "./api";
 
 export function ReportControl({ target }: { target: ReportTarget }) {
   const { user } = useAuth();
-  if (!user) return null;
+  if (!user || !canContribute(user)) return null;
   // Unmount private draft/result state when the account or content changes.
   return <ReportForm key={user.id + (target.questionId ?? target.replyId)} target={target} />;
 }

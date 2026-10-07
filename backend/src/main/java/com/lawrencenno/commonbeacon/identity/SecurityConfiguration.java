@@ -24,15 +24,22 @@ import tools.jackson.databind.ObjectMapper;
 @Configuration
 @EnableMethodSecurity
 public class SecurityConfiguration {
+    private static boolean limitedAllowed(HttpServletRequest request){
+        String path=request.getServletPath();
+        if(path.startsWith("/api/v1/account/data/") || path.startsWith("/api/v1/erasure/"))return true;
+        if(java.util.Set.of("/api/v1/auth/csrf","/api/v1/auth/me","/api/v1/auth/login","/api/v1/auth/logout","/api/v1/auth/register").contains(path))return true;
+        return "GET".equals(request.getMethod()) && (path.matches("/api/v1/boards(?:/[^/]+(?:/questions)?)?")
+            || path.matches("/api/v1/questions/[^/]+(?:/replies)?") || path.matches("/api/v1/replies/[^/]+")
+            || path.matches("/api/v1/articles(?:/[^/]+)?") || path.equals("/api/v1/search") || path.startsWith("/actuator/health"));
+    }
     @Bean PasswordEncoder passwordEncoder() {
         return new DelegatingPasswordEncoder("pbkdf2", Map.of(
                 "pbkdf2", Pbkdf2PasswordEncoder.defaultsForSpringSecurity_v5_8()));
     }
-    @Bean UserDetailsService userDetailsService(UserRepository users) {
+    @Bean UserDetailsService userDetailsService(UserRepository users,AccountPolicy policy) {
         return email -> users.findByEmail(email.trim().toLowerCase(Locale.ROOT))
-                .filter(AppUser::isActive)
-                .map(user -> User.withUsername(user.getEmail()).password(user.passwordHash())
-                        .roles(user.getRole().name()).build())
+                .filter(user->user.getAccountState()==AccountState.ACTIVE || user.getAccountState()==AccountState.PENDING_VERIFICATION)
+                .map(user -> new AccountPrincipal(user.getId(),user.authEpoch(),user.passwordHash(),user.getRole(),policy.full(policy.find(user.getId(),false))))
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
     }
     @Bean LoginRateLimiter loginRateLimiter() {
@@ -71,9 +78,15 @@ public class SecurityConfiguration {
                 .successHandler((request, response, authentication) -> {
                     response.setContentType("application/json");
                     response.setHeader("Cache-Control", "no-store");
-                    var current=identity.current(authentication);
-                    request.getSession().setAttribute("authenticatedUserId",current.id());
-                    mapper.writeValue(response.getWriter(), current);
+                    try {
+                        var current=identity.current(authentication);
+                        request.getSession().setAttribute("authenticatedUserId",current.id());
+                        request.getSession().setAttribute("authenticatedEpoch",((AccountPrincipal)authentication.getPrincipal()).epoch());
+                        mapper.writeValue(response.getWriter(), current);
+                    }catch(com.lawrencenno.commonbeacon.shared.ApiFailure | org.springframework.security.access.AccessDeniedException stale){
+                        request.getSession().invalidate();org.springframework.security.core.context.SecurityContextHolder.clearContext();
+                        problems.write(response,401,"UNAUTHENTICATED","Please sign in again.");
+                    }
                 })
                 .failureHandler((request, response, error) ->
                         problems.write(response, 401, "INVALID_CREDENTIALS", "Email or password is incorrect.")));
@@ -111,14 +124,22 @@ public class SecurityConfiguration {
                 if (!receipt && authentication != null && authentication.isAuthenticated()
                         && !(authentication instanceof org.springframework.security.authentication.AnonymousAuthenticationToken)) {
                     try {
+                        response.setHeader("Cache-Control","no-store");
                         var current=identity.current(authentication);var session=request.getSession(false);
-                        if(session==null || !current.id().equals(session.getAttribute("authenticatedUserId")))
+                        if(session==null || !current.id().equals(session.getAttribute("authenticatedUserId"))
+                            || !java.util.Objects.equals(((AccountPrincipal)authentication.getPrincipal()).epoch(),session.getAttribute("authenticatedEpoch")))
                             throw new org.springframework.security.access.AccessDeniedException("Account unavailable");
+                        if(!current.capabilities().contribute() && !limitedAllowed(request)){
+                            problems.write(response,403,"EMAIL_VERIFICATION_REQUIRED","Verify your email before using this action.");return;
+                        }
                     }
-                    catch (org.springframework.security.access.AccessDeniedException unavailable) {
+                    catch (org.springframework.security.access.AccessDeniedException | com.lawrencenno.commonbeacon.shared.ApiFailure unavailable) {
                         var session = request.getSession(false);
                         if (session != null) session.invalidate();
                         org.springframework.security.core.context.SecurityContextHolder.clearContext();
+                        if(path.equals("/api/v1/auth/csrf") || path.equals("/api/v1/auth/login")){
+                            chain.doFilter(request,response);return;
+                        }
                         problems.write(response, 401, "UNAUTHENTICATED", "Please sign in to continue.");
                         return;
                     }

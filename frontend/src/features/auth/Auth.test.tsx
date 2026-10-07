@@ -52,6 +52,17 @@ function setup(form = false) {
   );
   return client;
 }
+it("clears private caches when capabilities change for the same account on refresh", async () => {
+  let limited = false;
+  vi.stubGlobal("fetch", vi.fn(async () => Response.json({ ...member, accountState: "ACTIVE", emailVerified: !limited,
+    capabilities: { contribute: !limited, moderate: false, administer: false, personalData: true, eraseAccount: true } })));
+  const client = setup();
+  await screen.findByText("Member A");
+  client.setQueryData(["private-data", member.id], { secret: "discard-me" });
+  limited = true;
+  await act(async () => window.dispatchEvent(new Event("focus")));
+  await waitFor(() => expect(client.getQueryData(["private-data", member.id])).toBeUndefined());
+});
 it("preserves registration input, clears passwords, and associates server validation errors", async () => {
   vi.stubGlobal(
     "fetch",

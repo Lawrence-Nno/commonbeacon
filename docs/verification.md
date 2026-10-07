@@ -11,6 +11,15 @@ challenge/credential constraints, and failed-migration rollback/retry. Export an
 erasure tests also check the new private storage boundaries. See
 [implemented scope and transition mode](identity-verification.md).
 
+The identity browser journey runs in a fresh disposable `identity` group, separate
+from community tests, so its logins do not consume another suite's production quota.
+`AuthoritativeIdentityIT` qualifies ENFORCED-mode limited/privacy access, UUID/epoch
+invalidation, fresh-login activation/promotion, forged cached roles, background work,
+and transaction/account-change serialization. Transfer tests cover in-flight upload
+and download revocation with cleanup; the authoritative-identity browser journey
+checks the pending-account UI and fresh login after simulated activation in a disposable
+stack. Frontend authentication tests check same-UUID capability cache invalidation.
+
 CommonBeacon uses unit tests, real PostgreSQL integration tests, browser workflows,
 and disposable deployment checks. Each covers a different boundary; a passing
 build does not establish production readiness or a performance service level.

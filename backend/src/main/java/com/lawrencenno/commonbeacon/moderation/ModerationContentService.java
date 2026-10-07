@@ -30,11 +30,11 @@ public class ModerationContentService {
         this.boards = boards; this.questions = questions; this.replies = replies;
         this.identity = identity; this.actions = actions; this.reads = reads;
     }
-    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    @Transactional(readOnly = false, isolation = Isolation.REPEATABLE_READ)
     public ModerationContext get(UUID id, boolean reply) {
         return context(id, reply);
     }
-    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    @Transactional(readOnly = false, isolation = Isolation.REPEATABLE_READ)
     public PageResponse<ModerationAction> history(UUID id, boolean reply, int page, int size) {
         if (page < 0 || size < 1 || size > 100 || (long) page * size > Integer.MAX_VALUE)
             throw new ApiFailure(400, "INVALID_PAGE", "Use a nonnegative page and a size from 1 to 100; the offset must fit a 32-bit integer.");

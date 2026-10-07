@@ -160,7 +160,7 @@ class ImportedIdentityIT {
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> identity.current(auth))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> transferAccess.current(auth, false))
-                .isInstanceOf(com.lawrencenno.commonbeacon.shared.ApiFailure.class);
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
             assertThat(jobs.checkpoint(lease.lease(), 1)).isFalse();
             assertThat(jdbc.queryForObject("SELECT error_code FROM transfer_job WHERE id=?", String.class, job.id())).isEqualTo("AUTHORIZATION_REVOKED");
             assertThat(browser.get("/api/v1/auth/me").statusCode()).isEqualTo(401);
