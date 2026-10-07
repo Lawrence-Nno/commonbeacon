@@ -12,12 +12,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.*;
 
-/** Durable outbox primitives. No scheduler/network call; Stage 7 supplies bounded dispatch. */
+/** Durable outbox primitives. All network calls remain outside these transactions. */
 @Service
 public class EmailOutbox {
     public enum Type { VERIFICATION,PASSWORD_RESET,EMAIL_CHANGE,PASSWORD_CHANGED,EMAIL_CHANGED_OLD,EMAIL_CHANGED_NEW }
-    public enum Failure { TRANSIENT,PERMANENT,KEY_UNAVAILABLE,PAYLOAD_INVALID }
+    public enum Failure { TRANSIENT,TIMEOUT,PERMANENT,CONFIGURATION,SUPPRESSED,KEY_UNAVAILABLE,PAYLOAD_INVALID }
     public record Lease(UUID id,UUID owner,long version) {}
+    @com.fasterxml.jackson.annotation.JsonAutoDetect(fieldVisibility=com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.NONE,getterVisibility=com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.NONE,isGetterVisibility=com.fasterxml.jackson.annotation.JsonAutoDetect.Visibility.NONE)
+    public record Delivery(Type type,int version,Instant expires,OutboxCrypto.Payload payload) {
+        @Override public String toString(){return "MailDelivery[REDACTED]";}
+    }
     private record Row(UUID id,UUID subject,Type type,UUID event,UUID challenge,Long generation,String key,byte[] nonce,byte[] ciphertext,
         Instant created,Instant expires,String state,int attempts,UUID owner,long version,Instant leaseUntil) {
         String binding(){return "CommonBeacon/mail/v1/"+id+"/"+subject+"/"+type+"/"+event+"/"+challenge+"/"+generation+"/"+created+"/"+expires;}
@@ -49,33 +53,41 @@ public class EmailOutbox {
             persist(c.subject(),Type.EMAIL_CHANGED_NEW,c.challenge(),null,null,expires,new OutboxCrypto.Payload(c.email(),""));
         }
     }
-    private boolean eligible(Row r){
-        if(!Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM app_user WHERE id=? AND account_state IN ('ACTIVE','PENDING_VERIFICATION'))",Boolean.class,r.subject)))return false;
-        if(r.generation==null)return true; // Deliberate security-notice recipient is encrypted, never retargeted.
-        String column=EmailChallenges.Purpose.valueOf(r.type.name()).column;
-        String address=r.type==Type.EMAIL_CHANGE?"EXISTS(SELECT 1 FROM pending_email_change p WHERE p.subject_id=u.id AND p.intended_email=c.intended_email AND p.generation=c.generation AND p.expires_at>?) AND u.account_state='ACTIVE' AND u.email_verified_at IS NOT NULL":"c.intended_email=u.email"+(r.type==Type.VERIFICATION?" AND u.email_verified_at IS NULL":"");
-        var arguments=new ArrayList<Object>();arguments.add(r.challenge);arguments.add(r.subject);arguments.add(r.type.name());arguments.add(Timestamp.from(now()));if(r.type==Type.EMAIL_CHANGE)arguments.add(Timestamp.from(now()));
-        return Boolean.TRUE.equals(jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM email_challenge c JOIN app_user u ON u.id=c.subject_id WHERE c.id=? AND c.subject_id=? AND c.purpose=? AND c.generation=u."+column+" AND c.consumed_at IS NULL AND c.revoked_at IS NULL AND c.expires_at>? AND "+address+")",Boolean.class,arguments.toArray()));
-    }
+    private boolean eligible(Row r){return Boolean.TRUE.equals(jdbc.queryForObject("SELECT email_outbox_eligible(?,?)",Boolean.class,r.id,Timestamp.from(now())));}
     private void terminal(Row r,String state,String failure){jdbc.update("UPDATE email_outbox SET state=?,failure_code=?,nonce=NULL,ciphertext=NULL,lease_owner=NULL,lease_until=NULL,lease_version=lease_version+1,updated_at=? WHERE id=?",state,failure,Timestamp.from(now().isBefore(r.created)?r.created:now()),r.id);}
     /** A single durable claim; eligibility/decryption happen in a subsequent short transaction. */
-    public Optional<Lease> claim(UUID worker){crypto.requireEnabled();return locked(()->{
+    public Optional<Lease> claim(UUID worker){return claim(worker,600,false);}
+    public Optional<Lease> claim(UUID worker,int hourlyLimit,boolean preferAlert){crypto.requireEnabled();
+        if(worker==null || hourlyLimit<2 || hourlyLimit>600)throw new IllegalArgumentException("INVALID_MAIL_CLAIM");
+        return locked(()->{
         Instant now=now();
-        jdbc.update("UPDATE email_outbox SET state='FAILED',failure_code='LEASE_EXPIRED',nonce=NULL,ciphertext=NULL,lease_owner=NULL,lease_until=NULL,lease_version=lease_version+1,updated_at=greatest(created_at,?) WHERE id IN (SELECT id FROM email_outbox WHERE state='SENDING' AND lease_until<=? ORDER BY id LIMIT 20)",Timestamp.from(now),Timestamp.from(now));
-        var ids=jdbc.queryForList("SELECT id FROM email_outbox WHERE state IN ('QUEUED','RETRY_WAIT') AND next_attempt_at<=? ORDER BY next_attempt_at,id LIMIT 1 FOR UPDATE SKIP LOCKED",UUID.class,Timestamp.from(now));
-        if(ids.isEmpty())return Optional.empty();var r=row(ids.getFirst());
-        if(!now.isBefore(r.expires)){terminal(r,"EXPIRED",null);return Optional.empty();}
-        if(!eligible(r)){terminal(r,"CANCELLED","STALE_CHALLENGE");return Optional.empty();}
+        for(UUID id:jdbc.queryForList("SELECT id FROM email_outbox WHERE state='SENDING' AND lease_until<=? ORDER BY lease_until,id LIMIT 20 FOR UPDATE SKIP LOCKED",UUID.class,Timestamp.from(now)))retry(row(id),"LEASE_EXPIRED");
+        if(jdbc.queryForObject("SELECT count(*) FROM email_outbox WHERE state='SENDING'",Long.class)>=2)return Optional.empty();
+        Instant window=now.truncatedTo(ChronoUnit.HOURS);
+        jdbc.update("INSERT INTO email_transport_budget(window_start) VALUES (?) ON CONFLICT DO NOTHING",Timestamp.from(window));
+        var budget=jdbc.queryForMap("SELECT ordinary,alerts,retries FROM email_transport_budget WHERE window_start=? FOR UPDATE",Timestamp.from(window));
+        int ordinary=((Number)budget.get("ordinary")).intValue(),alerts=((Number)budget.get("alerts")).intValue(),retries=((Number)budget.get("retries")).intValue();
+        int ordinaryLimit=Math.max(1,hourlyLimit*4/5),alertLimit=hourlyLimit-ordinaryLimit,retryLimit=Math.max(1,hourlyLimit*3/10);
+        if(ordinary+alerts>=hourlyLimit)return Optional.empty();
+        var ids=jdbc.queryForList("SELECT id FROM email_outbox WHERE state IN ('QUEUED','RETRY_WAIT') AND created_at<=? AND next_attempt_at<=? AND (attempts=0 OR ?) AND ((generation IS NULL AND ?) OR (generation IS NOT NULL AND ?)) ORDER BY CASE WHEN (generation IS NULL)=? THEN 0 ELSE 1 END,next_attempt_at,id LIMIT 20 FOR UPDATE SKIP LOCKED",UUID.class,Timestamp.from(now),Timestamp.from(now),retries<retryLimit,alerts<alertLimit,ordinary<ordinaryLimit,preferAlert);
+        for(UUID id:ids){var r=row(id);
+        if(!now.isBefore(r.expires)){terminal(r,"EXPIRED",null);continue;}
+        if(!eligible(r)){terminal(r,"CANCELLED","STALE_CHALLENGE");continue;}
+        if(r.attempts>=6){terminal(r,"FAILED","ATTEMPTS_EXHAUSTED");continue;}
+        jdbc.update("UPDATE email_transport_budget SET ordinary=ordinary+?,alerts=alerts+?,retries=retries+? WHERE window_start=?",r.generation==null?0:1,r.generation==null?1:0,r.attempts>0?1:0,Timestamp.from(window));
         jdbc.update("UPDATE email_outbox SET state='SENDING',attempts=attempts+1,lease_owner=?,lease_until=?,lease_version=lease_version+1,updated_at=? WHERE id=?",worker,Timestamp.from(now.plusSeconds(60)),Timestamp.from(now),r.id);
         return Optional.of(new Lease(r.id,worker,r.version+1));
+        }
+        return Optional.empty();
     });}
     private boolean owned(Row r,Lease lease){Instant now=now();return r!=null && r.state.equals("SENDING") && Objects.equals(r.owner,lease.owner) && r.version==lease.version && !now.isBefore(r.created) && now.isBefore(r.leaseUntil);}
     /** Null means cancelled/expired/fenced or crypto failure. No lock survives the return. */
-    public OutboxCrypto.Payload prepare(Lease lease){return locked(()->{
+    public OutboxCrypto.Payload prepare(Lease lease){var delivery=prepareDelivery(lease);return delivery==null?null:delivery.payload();}
+    public Delivery prepareDelivery(Lease lease){return locked(()->{
         var r=row(lease.id);if(!owned(r,lease))return null;
         if(!now().isBefore(r.expires)){terminal(r,"EXPIRED",null);return null;}
         if(!eligible(r)){terminal(r,"CANCELLED","STALE_CHALLENGE");return null;}
-        try{return crypto.decrypt(r.binding(),r.key,r.nonce,r.ciphertext);}catch(IllegalStateException invalid){terminal(r,"FAILED",invalid.getMessage().equals("KEY_UNAVAILABLE")?"KEY_UNAVAILABLE":"PAYLOAD_INVALID");return null;}
+        try{return new Delivery(r.type,1,r.expires,crypto.decrypt(r.binding(),r.key,r.nonce,r.ciphertext));}catch(IllegalStateException invalid){terminal(r,"FAILED",invalid.getMessage().equals("KEY_UNAVAILABLE")?"KEY_UNAVAILABLE":"PAYLOAD_INVALID");return null;}
     });}
     /** Provider acceptance is not proof of inbox delivery. The exact payload is purged here. */
     public boolean accepted(Lease lease,UUID correlation){return locked(()->{var r=row(lease.id);if(!owned(r,lease))return false;terminal(r,"ACCEPTED",null);jdbc.update("UPDATE email_outbox SET provider_correlation=? WHERE id=?",correlation,r.id);return true;});}
@@ -83,16 +95,23 @@ public class EmailOutbox {
         var r=row(lease.id);if(!owned(r,lease))return false;
         if(!now().isBefore(r.expires)){terminal(r,"EXPIRED",null);return true;}
         if(!eligible(r)){terminal(r,"CANCELLED","STALE_CHALLENGE");return true;}
-        if(failure!=Failure.TRANSIENT || r.attempts>=6){terminal(r,"FAILED",failure.name());return true;}
+        if(failure!=Failure.TRANSIENT && failure!=Failure.TIMEOUT){terminal(r,"FAILED",failure.name());return true;}
+        retry(r,failure.name());return true;
+    });}
+    private void retry(Row r,String code){
+        if(!now().isBefore(r.expires)){terminal(r,"EXPIRED",null);return;}
+        if(!eligible(r)){terminal(r,"CANCELLED","STALE_CHALLENGE");return;}
+        if(r.attempts>=6){terminal(r,"FAILED","ATTEMPTS_EXHAUSTED");return;}
         long[] delays={30,120,600,1800,7200};long delay=delays[r.attempts-1];
         // Bounded positive jitter; retries preserve nonce/ciphertext and never extend expiry.
         long jitter=java.util.concurrent.ThreadLocalRandom.current().nextLong(Math.max(1,delay/10));
         Instant next=now().plusSeconds(delay+jitter);
-        if(!next.isBefore(r.expires)){terminal(r,"EXPIRED",null);return true;}
-        jdbc.update("UPDATE email_outbox SET state='RETRY_WAIT',failure_code='TRANSIENT',next_attempt_at=?,lease_owner=NULL,lease_until=NULL,updated_at=? WHERE id=?",Timestamp.from(next),Timestamp.from(now()),r.id);return true;
-    });}
+        if(!next.isBefore(r.expires)){terminal(r,"EXPIRED",null);return;}
+        jdbc.update("UPDATE email_outbox SET state='RETRY_WAIT',failure_code=?,next_attempt_at=?,lease_owner=NULL,lease_until=NULL,lease_version=lease_version+1,updated_at=? WHERE id=?",code,Timestamp.from(next),Timestamp.from(now()),r.id);
+    }
     public int purgeExpired(){return locked(()->{
         Instant now=now();int count=jdbc.update("UPDATE email_outbox SET state='EXPIRED',nonce=NULL,ciphertext=NULL,lease_owner=NULL,lease_until=NULL,lease_version=lease_version+1,updated_at=greatest(created_at,?) WHERE id IN (SELECT id FROM email_outbox WHERE state IN ('QUEUED','SENDING','RETRY_WAIT') AND expires_at<=? ORDER BY id LIMIT 200)",Timestamp.from(now),Timestamp.from(now));
         count+=jdbc.update("DELETE FROM email_outbox WHERE id IN (SELECT id FROM email_outbox WHERE state IN ('ACCEPTED','FAILED','CANCELLED','EXPIRED') AND updated_at<? ORDER BY id LIMIT 200)",Timestamp.from(now.minus(Duration.ofDays(30))));return count;
     });}
+    public int pruneBudgets(){return locked(()->jdbc.update("DELETE FROM email_transport_budget WHERE window_start IN (SELECT window_start FROM email_transport_budget WHERE window_start<? ORDER BY window_start LIMIT 200)",Timestamp.from(now().minus(Duration.ofDays(2)))));}
 }

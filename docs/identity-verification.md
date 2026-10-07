@@ -5,13 +5,14 @@ permissions, with V20 connecting explicit epoch advances to transfer invalidatio
 Stage 4 adds internal transactional challenge issuance and consumption; Stage 5
 adds a private encrypted outbox in V21 and internal `EmailIdentity` orchestration.
 Stage 6 adds SMTP transport, versioned templates, local capture, and token landing pages.
-Public verification/reset endpoints, worker dispatch, and pending registration remain later
+Stage 7 adds bounded durable dispatch and deployment-only retry/cancel controls in V22.
+Public verification/reset endpoints and pending registration remain later
 stages. Registration still creates ACTIVE members.
 Completing these stages does not close the production email launch gate.
 
 ## Upgrade and transition mode
 
-Normal startup applies V19-V21 once after V18 and validates the JPA mapping.
+Normal startup applies V19-V22 once after V18 and validates the JPA mapping.
 All existing addresses have `email_verified_at = NULL`: their verification is
 unknown. Existing credentials, roles, content, and transfer authorization revisions
 are preserved. No timestamps are inferred from prior use or administrator status.
@@ -220,18 +221,18 @@ One claim grants a 60-second fenced lease; a clock before creation grants no dec
 or finalization. Prepare rechecks current subject/challenge/
 generation/address/proposal before decrypting. Its return holds no database lock.
 Already prepared/submitted bytes cannot be recalled after suspension/resend/erasure;
-future work is cancelled and old links remain invalid. Stage 7 must add bounded dispatch,
-transport budgeting, shutdown coordination, and provider uncertainty qualification.
+future work is cancelled and old links remain invalid. Stage 7 supplies bounded dispatch,
+transport budgeting, shutdown coordination, and conservative uncertainty recovery below.
 
 Transient failures preserve the exact ciphertext/nonce/token and original expiry.
 There are at most six attempts, with 30-second, 2-minute, 10-minute, 30-minute, and
 2-hour delays plus less than 10% positive jitter. Retry cannot extend lifetime. A retry
 that would reach expiry expires the message. Provider acceptance, terminal failure,
 cancellation, and expiry erase ciphertext/nonce and clear/fence leases. Expired uncertain
-leases currently fail closed with LEASE_EXPIRED; Stage 7 must qualify recovery/operator
-retry behavior instead of claiming exactly-once remote sending. Retention cleanup uses
+leases now recover through RETRY_WAIT with LEASE_EXPIRED and the same payload/backoff,
+or become terminal on expiry, invalidation or exhaustion. Retention cleanup uses
 bounded 200-row batches and removes terminal metadata after 30 days without deleting
-accounts. It is an explicit primitive, not a scheduled dispatcher at this stage.
+accounts. The enabled Stage 7 worker schedules cleanup independently of delivery.
 
 Challenge consumption/revocation/deletion cancels linked queued/leased messages through
 database triggers. Suspension/import-inactive/erasure cancels subject mail, including
@@ -279,9 +280,9 @@ V21 failure/retry tests verify migration safety. No provider was contacted.
 makes one attempt outside database transactions and returns the UUID on SMTP acceptance.
 It does not verify an inbox, guarantee delivery, retry automatically, or change an account.
 The stable `<outbox-uuid@sender-domain>` Message-ID is correlation, not deduplication:
-repeated attempts can produce duplicate messages. Stage 7 must wire the dispatcher and
-map safe failure categories to outbox disposition with bounded recovery and concurrency.
-There is no dispatcher or provider API/webhook integration in Stage 6.
+repeated attempts can produce duplicate messages. Stage 7 wires the dispatcher and
+maps safe failure categories to outbox disposition with bounded recovery and concurrency.
+Provider API/webhook integration remains outside these stages.
 
 Spring Boot manages Jakarta Mail/Angus versions. Angus is explicitly a compile dependency
 so SMTP rejection codes can be classified without parsing or retaining provider text.
@@ -313,7 +314,7 @@ not a CommonBeacon account settings UI. A provider supporting SMTP requires no c
 - Connection, read and write timeouts use `EMAIL_SMTP_CONNECT_TIMEOUT_MS`,
   `EMAIL_SMTP_READ_TIMEOUT_MS`, and `EMAIL_SMTP_WRITE_TIMEOUT_MS`. Each defaults to
   10,000 ms and must be 100–15,000 ms. These are socket operation limits; Stage 7
-  must qualify the worker's total send/lease/shutdown budget separately.
+  additionally closes live sockets at its total attempt deadline.
 
 Enabled startup fails with a redacted configuration error for missing keys or required
 fields, unsafe addresses, invalid TLS/port/timeout values, or partial credentials.
@@ -378,7 +379,7 @@ The UI is at `http://127.0.0.1:8026`; a host-run local backend can use
 `@example.test` sender/support addresses, and its local frontend origin. Supply an
 independent disposable outbox key. A containerized backend needs a deliberately
 connected local network/SMTP endpoint; its loopback is not the host. The Stage 6
-runtime still has no dispatcher, so creating an outbox row does not yet send it.
+worker is disabled by default; enable it explicitly as described below to send queued intents.
 
 When finished, stop only that project:
 
@@ -400,3 +401,121 @@ container and checks MIME text/HTML and recipients. Frontend unit/browser tests 
 URL scrubbing, repeated copy/paste, missing/malformed tokens, passive loading, explicit
 submit, password confirmation, reload behavior, safe failures, security headers and
 local capture UI. No external mail provider is used by these tests.
+
+## Stage 7: durable delivery and recovery
+
+`EmailWorker` is a Spring lifecycle component with a dedicated poll thread and at
+most two send threads. Enable `EMAIL_WORKER_ENABLED=true` only after enabling SMTP,
+configuring the sender/support/public origin, and supplying the external outbox keys.
+Enabled startup rejects a disabled transport. Changing the provider's SMTP settings
+does not require application code changes. Default deployment configuration keeps
+both SMTP and the worker disabled. Public identity POST flows remain deferred.
+
+The following deployment settings can lower the frozen limits:
+
+- `EMAIL_WORKER_BATCH_SIZE=20`: 1–20 claims per polling cycle. Each transaction
+  examines at most 20 due candidates and recovers at most 20 expired leases.
+- `EMAIL_WORKER_CONCURRENCY=2`: 1–2 local sends. Database claims additionally cap
+  SENDING rows at two across competing workers, not just within one JVM.
+- `EMAIL_WORKER_ATTEMPTS_PER_HOUR=600`: 2–600 charged claims per fixed UTC hour.
+- `EMAIL_WORKER_INTERVAL_MS=1000`: 100–60,000 ms between poll cycles.
+- `EMAIL_WORKER_TIMEOUT_MS=15000`: 100–15,000 ms total attempt deadline, including
+  preparation/rendering. Cancellation closes registered SMTP/TLS sockets; a timed
+  out send keeps its worker slot until it actually returns. This does not abandon
+  an unbounded collection of background futures. Deployment DNS resolver delays
+  still need operational qualification; closing a socket cannot interrupt JVM DNS.
+- `EMAIL_WORKER_SHUTDOWN_MS=20000`: 100–20,000 ms to finish active work on shutdown.
+  Afterwards the worker closes live sockets and interrupts its send pool. Ordinary
+  Compose allows 30 seconds before termination. Interrupted finalization leaves a
+  durable lease for restart recovery; new claims stop immediately.
+
+The maintenance gate, identity gate and outbox/budget row locks are acquired in
+that order. Claim, preparation and finalization use separate short transactions;
+no database transaction survives across SMTP. The 60-second lease is not renewed.
+Sending rechecks current challenge eligibility before decrypting; only the matching
+owner/version can finalize. Erasure, revocation, suspension and operator cancellation
+advance fencing versions. They cannot recall bytes already submitted to a provider.
+
+### Transport volume and fairness
+
+The V22 `email_transport_budget` persists aggregate counters without addresses or
+account identifiers. Every claimed attempt is charged before preparation, including
+retries, subsequent crypto failures and cancellations. At the default limit, ordinary
+verification/reset/change messages can spend 480 attempts, security alerts 120, and
+all retries together at most 180 of those 600. Lower limits use 80% ordinary capacity
+and the remainder for alerts, with a 30% retry ceiling (rounded down, minimum one).
+Reserved capacity is not borrowed: ordinary traffic cannot exhaust the alert budget,
+and alert traffic cannot exhaust ordinary capacity. A retry ceiling leaves room for
+fresh messages. One in four claim scans prefers alerts; other scans prefer ordinary
+mail, with fallback when the preferred class has no eligible due candidate.
+
+All counters are serialized with claims, so competing workers cannot overspend.
+Fixed UTC windows allow a boundary burst; they are not a rolling-hour rate limit.
+Rows older than two days are pruned in batches of at most 200. Stage 8 separately
+implements fresh-intent admission, address/network cooldowns and queue capacity.
+Transport counters are not a replacement for those public endpoint abuse controls.
+
+### Failure, uncertainty and retention
+
+Timeouts and transient outages enter RETRY_WAIT with persisted backoff and the
+unchanged encrypted payload. Expired leases after a crash also back off with the
+safe LEASE_EXPIRED code. Six total attempts, challenge expiry and current eligibility
+remain authoritative; recovery never creates a token or extends its expiry.
+ATTEMPTS_EXHAUSTED makes exhaustion visible in safe metadata. Permanent rejection,
+configuration error, unavailable key, invalid payload or an adapter-reported
+suppression becomes terminal and purges the ciphertext/nonce. SMTP cannot report
+every downstream bounce or complaint: provider feedback adapters remain later work.
+
+SMTP acceptance moves a still-owned row to ACCEPTED and purges its body. Acceptance
+does not prove inbox delivery and never verifies or activates an account. A crash
+after remote acceptance but before database finalization can cause another send
+with the same Message-ID and the same link. This is **at-least-once submission**,
+not exactly-once delivery. One-use, generation-bound challenge consumption prevents
+duplicate account transitions. An operator cannot restore purged terminal content.
+
+Cleanup runs on the first enabled poll and every 60 poll cycles thereafter (about
+a minute at the default interval). Each pass expires at most 200 live rows and
+deletes at most 200 terminal rows older than 30 days, without deleting accounts.
+Cleanup exceptions are reported safely and do not prevent delivery; later polls
+and process restarts retry cleanup. A disabled worker performs no scheduled mail
+cleanup. Accepted bodies are purged immediately, independent of retention passes.
+Logs contain safe job IDs, event names, allowlisted failure codes and sanitized code
+locations; provider text, addresses, tokens, SMTP credentials and payloads stay private.
+
+### Operator list, retry and cancel
+
+The PowerShell helper uses the selected Compose database and its existing in-container
+credentials; it does not read local secret files. Database deployment access is the
+operator boundary. There is no public HTTP route or administrator UI for these actions.
+Always select the intended project explicitly:
+
+```powershell
+./scripts/email-outbox.ps1 -Project your-deployment -Action list
+./scripts/email-outbox.ps1 -Project your-deployment -Action retry -Id OUTBOX-UUID -ExpectedVersion 2
+./scripts/email-outbox.ps1 -Project your-deployment -Action cancel -Id OUTBOX-UUID -ExpectedVersion 3
+```
+
+Replace the UUID and version with values from list; the listed 20 most recently
+updated jobs omit recipients and ciphertext. `applied=f` (false) means no action was
+taken: re-list rather than blindly submitting a different version. Retry only makes
+an eligible RETRY_WAIT job due now, without resetting attempts, changing its message
+or extending its expiry. It still passes the normal transport budget. Cancel applies
+to QUEUED, RETRY_WAIT or SENDING, purges the body and fences late finalization.
+Maintenance/erasure blocks mutation. For deployments outside Compose, run the same
+`operate_email_outbox(uuid, expected_version, 'retry'/'cancel')` function through
+privileged database tooling with bounded statement/lock timeouts.
+
+For an expired, rejected or key-lost link, use a fresh admitted user flow once those
+endpoints exist; do not edit ciphertext, generation, attempts or expiry manually.
+After a provider outage, first repair configuration, inspect safe job states and let
+automatic retries resume. Investigate sustained failures before accelerating retries.
+
+`EmailWorkerIT` qualifies a recreated worker after a simulated acceptance/finalization
+crash, competing claims,
+identity/erasure concurrency, immutable retries, deadline/shutdown, independent cleanup,
+durable budget reservation and operator fencing. Its scheduled worker also sends an
+encrypted intent through actual SMTP into a disposable Mailpit container. SMTP unit
+tests verify a total deadline closes a stalled connection even with a longer read
+timeout. Fresh/populated V21 upgrades and transactional V22 failure/retry checks preserve
+existing outbox bytes. These synthetic local checks do not certify a chosen production
+provider, its DNS/TLS/network behavior, downstream delivery or production capacity.

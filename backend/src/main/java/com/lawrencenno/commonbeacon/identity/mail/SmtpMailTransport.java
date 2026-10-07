@@ -39,13 +39,27 @@ public final class SmtpMailTransport implements MailTransport {
         props.setProperty(prefix + "sendpartial", "false");
     }
     @Override public UUID send(UUID outboxId, Message message) {
+        try (var attempt = new MailAttempt(java.time.Duration.ofSeconds(15))) { return send(outboxId,message,attempt); }
+    }
+    @Override public UUID send(UUID outboxId, Message message, MailAttempt attempt) {
         settings.requireEnabled();
         if (TransactionSynchronizationManager.isActualTransactionActive()) throw new IllegalStateException("MAIL_SEND_TRANSACTION_FORBIDDEN");
         if (outboxId == null || message == null) throw new TransportFailure(Failure.INVALID_MESSAGE);
+        attempt.check();
+        var deliverySender = new JavaMailSenderImpl();
+        deliverySender.setHost(sender.getHost()); deliverySender.setPort(sender.getPort()); deliverySender.setProtocol(sender.getProtocol());
+        deliverySender.setUsername(sender.getUsername()); deliverySender.setPassword(sender.getPassword());
+        var props = new Properties(); props.putAll(sender.getJavaMailProperties());
+        String prefix = "mail." + sender.getProtocol() + ".";
+        props.put(prefix + "socketFactory", DeadlineSockets.plain(attempt,settings.connectTimeout()));
+        props.put(prefix + "ssl.socketFactory", DeadlineSockets.tls(attempt,settings.connectTimeout()));
+        props.setProperty(prefix + "socketFactory.fallback", "false");
+        props.setProperty(prefix + "ssl.socketFactory.fallback", "false");
+        deliverySender.setJavaMailProperties(props);
         try {
             String id = "<" + outboxId + "@" + settings.sender().substring(settings.sender().lastIndexOf('@') + 1) + ">";
             // Jakarta Mail saveChanges regenerates Message-ID; override to preserve durable correlation.
-            MimeMessage mime = new MimeMessage(sender.getSession()) {
+            MimeMessage mime = new MimeMessage(deliverySender.getSession()) {
                 @Override protected void updateMessageID() throws MessagingException { setHeader("Message-ID", id); }
             };
             MimeMessageHelper helper = new MimeMessageHelper(mime, false, "UTF-8");
@@ -56,9 +70,11 @@ public final class SmtpMailTransport implements MailTransport {
             var html = new MimeBodyPart(); html.setText(message.html(), "UTF-8", "html");
             alternative.addBodyPart(plain); alternative.addBodyPart(html); mime.setContent(alternative);
             mime.setHeader("Auto-Submitted", "auto-generated");
-            sender.send(mime);
+            deliverySender.send(mime);
+            attempt.check();
             return outboxId;
         } catch (MailException | MessagingException failed) {
+            attempt.check();
             throw new TransportFailure(classify(failed));
         }
     }

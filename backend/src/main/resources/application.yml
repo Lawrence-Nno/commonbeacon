@@ -67,6 +67,14 @@ management:
 
 commonbeacon:
   email:
+    worker:
+      enabled: ${EMAIL_WORKER_ENABLED:false}
+      batch-size: ${EMAIL_WORKER_BATCH_SIZE:20}
+      concurrency: ${EMAIL_WORKER_CONCURRENCY:2}
+      attempts-per-hour: ${EMAIL_WORKER_ATTEMPTS_PER_HOUR:600}
+      interval-ms: ${EMAIL_WORKER_INTERVAL_MS:1000}
+      timeout-ms: ${EMAIL_WORKER_TIMEOUT_MS:15000}
+      shutdown-ms: ${EMAIL_WORKER_SHUTDOWN_MS:20000}
     smtp:
       enabled: ${EMAIL_SMTP_ENABLED:false}
       host: ${EMAIL_SMTP_HOST:}

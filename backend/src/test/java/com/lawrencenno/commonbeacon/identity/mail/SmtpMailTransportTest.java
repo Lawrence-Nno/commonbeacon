@@ -56,6 +56,16 @@ class SmtpMailTransportTest {
             assertThat(smtp.result()).isEmpty();
         }
     }
+    @Test void totalDeadlineClosesSmtpSocketEvenWhenReadTimeoutIsLonger() throws Exception {
+        for(String tls:List.of("NONE","IMPLICIT"))try(var smtp=new Fixture(250,true,1);var attempt=new MailAttempt(java.time.Duration.ofMillis(300))){
+            var env=MailSettingsTest.local(smtp.port()).withProperty("commonbeacon.email.smtp.read-timeout-ms","5000").withProperty("commonbeacon.email.smtp.tls",tls);
+            var transport=new SmtpMailTransport(new MailSettings(env,MailSettingsTest.keys()));
+            long started=System.nanoTime();
+            assertThatThrownBy(()->transport.send(UUID.randomUUID(),message(),attempt)).hasMessage("MAIL_TIMEOUT").hasNoCause();
+            assertThat(TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started)).isLessThan(2000);
+            assertThat(smtp.result()).isEmpty();
+        }
+    }
     @Test void exceptionGraphClassificationNeverRetainsProviderSecrets() throws Exception {
         var timeout = new MessagingException("private recipient and token", new SocketTimeoutException("private host"));
         assertThat(SmtpMailTransport.classify(new MailSendException("private SMTP body", timeout))).isEqualTo(MailTransport.Failure.TIMEOUT);
@@ -82,7 +92,7 @@ class SmtpMailTransportTest {
                 var bodies = new ArrayList<String>();
                 for (int i = 0; i < connections; i++) try (Socket socket = server.accept()) {
                     active = socket; socket.setSoTimeout(4000);
-                    if (stall) { socket.getInputStream().read(); continue; }
+                    if (stall) { while(socket.getInputStream().read()!=-1){} continue; }
                     var input = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
                     var output = new PrintWriter(new OutputStreamWriter(socket.getOutputStream(), StandardCharsets.UTF_8), true);
                     output.print("220 test fixture\r\n"); output.flush();

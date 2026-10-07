@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import java.util.UUID;
 
 public interface MailTransport {
-    enum Failure { TIMEOUT, TRANSIENT, PERMANENT, CONFIGURATION, INVALID_MESSAGE }
+    enum Failure { TIMEOUT, TRANSIENT, PERMANENT, CONFIGURATION, SUPPRESSED, INVALID_MESSAGE }
     final class TransportFailure extends RuntimeException {
         private final Failure failure;
         public TransportFailure(Failure failure) { super("MAIL_" + failure.name()); this.failure = failure; }
@@ -31,4 +31,7 @@ public interface MailTransport {
     }
     /** Caller supplies the durable outbox ID. Acceptance is not delivery or inbox verification. */
     UUID send(UUID outboxId, Message message);
+    default UUID send(UUID outboxId, Message message, MailAttempt attempt) {
+        attempt.check(); UUID receipt = send(outboxId, message); attempt.check(); return receipt;
+    }
 }

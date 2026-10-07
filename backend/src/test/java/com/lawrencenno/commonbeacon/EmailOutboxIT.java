@@ -26,7 +26,7 @@ class EmailOutboxIT {
     final String key=Base64.getEncoder().encodeToString(new byte[32]);
     EmailChallengesIT.MutableClock clock;EmailChallenges challenges;EmailOutbox outbox;OutboxCrypto crypto;EmailIdentity identity;
     @BeforeEach void setup(){clock=new EmailChallengesIT.MutableClock(Instant.parse("2030-01-01T00:00:00Z"));crypto=new OutboxCrypto(true,"a","a="+key);challenges=new EmailChallenges(jdbc,manager,clock,new SecureRandom(),passwords);outbox=new EmailOutbox(jdbc,manager,crypto,clock);identity=new EmailIdentity(challenges,outbox,crypto);}
-    @AfterEach void cleanup(){jdbc.execute("TRUNCATE erasure_job,erasure_tombstone CASCADE");for(UUID id:users)jdbc.update("DELETE FROM app_user WHERE id=?",id);users.clear();}
+    @AfterEach void cleanup(){jdbc.execute("TRUNCATE erasure_job,erasure_tombstone,email_transport_budget CASCADE");for(UUID id:users)jdbc.update("DELETE FROM app_user WHERE id=?",id);users.clear();}
     UUID user(boolean verified){UUID id=UUID.randomUUID();users.add(id);jdbc.update("INSERT INTO app_user(id,email,display_name,password_hash,email_verified_at) VALUES (?,?,'Outbox member',?,?)",id,id+"@example.test",passwords.encode("outbox-old-password"),verified?java.sql.Timestamp.from(clock.instant().minusSeconds(1)):null);return id;}
     Issued issue(UUID id,Purpose purpose){var c=new AtomicReference<Issued>();assertThat(challenges.issue(id,purpose,(purpose==Purpose.EMAIL_CHANGE?"new-":"")+id+"@example.test",()->true,x->{outbox.challenge(x);c.set(x);})).isTrue();return c.get();}
     Map<String,Object> row(UUID id){return jdbc.queryForMap("SELECT * FROM email_outbox WHERE event_id=? AND message_type IN ('VERIFICATION','PASSWORD_RESET','EMAIL_CHANGE')",id);}
@@ -106,7 +106,7 @@ class EmailOutboxIT {
         UUID id=user(false);var c=issue(id,Purpose.PASSWORD_RESET);clock.value.set(c.expires());assertThat(outbox.purgeExpired()).isEqualTo(1);assertThat(row(c.id())).containsEntry("state","EXPIRED").containsEntry("ciphertext",null);
         clock.value.set(clock.instant().plus(Duration.ofDays(31)));outbox.purgeExpired();assertThat(jdbc.queryForObject("SELECT count(*) FROM email_outbox WHERE subject_id=?",Long.class,id)).isZero();assertThat(jdbc.queryForObject("SELECT count(*) FROM app_user WHERE id=?",Long.class,id)).isEqualTo(1);
     }
-    @Test void retryExhaustionAndExpiredLeasePurgeAndFencePayload(){
+    @Test void retryExhaustionPurgesAndExpiredLeaseBacksOffWithFencedPayload(){
         UUID id=user(false);var c=issue(id,Purpose.VERIFICATION);
         for(int attempt=1;attempt<=6;attempt++){
             var lease=outbox.claim(UUID.randomUUID()).orElseThrow();assertThat(outbox.failed(lease,EmailOutbox.Failure.TRANSIENT)).isTrue();var saved=row(c.id());
@@ -115,7 +115,8 @@ class EmailOutboxIT {
             else assertThat(saved).containsEntry("state","FAILED").containsEntry("ciphertext",null);
         }
         UUID other=user(false);var abandoned=issue(other,Purpose.VERIFICATION);var old=outbox.claim(UUID.randomUUID()).orElseThrow();clock.value.set(clock.instant().plusSeconds(60));
-        assertThat(outbox.accepted(old,UUID.randomUUID())).isFalse();assertThat(outbox.claim(UUID.randomUUID())).isEmpty();assertThat(row(abandoned.id())).containsEntry("failure_code","LEASE_EXPIRED").containsEntry("ciphertext",null);
+        assertThat(outbox.accepted(old,UUID.randomUUID())).isFalse();assertThat(outbox.claim(UUID.randomUUID())).isEmpty();assertThat(row(abandoned.id())).containsEntry("state","RETRY_WAIT").containsEntry("failure_code","LEASE_EXPIRED");
+        assertThat(row(abandoned.id()).get("ciphertext")).isNotNull();
     }
     @Test void intentRequiresTransactionAndDatabaseRejectsBindingMutation(){
         UUID id=user(false);var c=issue(id,Purpose.VERIFICATION);

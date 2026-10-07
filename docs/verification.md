@@ -472,3 +472,43 @@ The backend reported 78 unit and 265 integration tests, with no failures or skip
 Frontend, browser/persistence/cleanup and process-recovery checks also passed.
 The documentation and source-only helper described above were verified locally and
 remain a separate change from that runtime CI revision.
+
+## Durable account-mail dispatch (2026-10-07)
+
+Stage 6 SMTP/templates/landing pages were committed and pushed as `a997d9a` before
+Stage 7. Stage 7 is implemented and qualified locally. V22 adds transport
+budgets and operator controls; V1–V21 retain their original checksums. See
+[worker configuration and recovery](identity-verification.md#stage-7-durable-delivery-and-recovery).
+
+The complete backend regression run executed 98 unit and 345 integration tests.
+It exposed nine errors confined to the new worker fixture after company-erasure
+teardown left its simulated maintenance barrier active. Administrator fixture and
+reset ordering were corrected without relaxing runtime protections. The final
+affected `mvnw verify -Dit.test=EmailWorkerIT,EmailOutboxIT,MailCaptureIT,DatabaseBootstrapIT,MilestoneUpgradeIT`
+passed all 98 unit and 51 integration tests, including one additional expired-head
+fairness test. Final XML report inventory across these runs is **98 unit + 346
+integration = 444 tests**, with zero failures, errors or skips. This is combined
+qualification evidence, not a claim of a second complete-suite run.
+
+Checks include concurrent workers/budget spending, simulated crash after remote
+acceptance, immutable retry payloads/expiry, one-use account consumption, SMTP waits
+without identity locks, company-erasure concurrency, total plaintext/implicit-TLS
+socket deadlines, shutdown, cleanup failure/restart, safe classifications, operator
+version fencing, and fresh/populated/failed-and-retried V22 upgrades. A scheduled
+worker sent an encrypted intent through actual SMTP into its own loopback-bound
+Mailpit. All six templates also passed the existing real-SMTP capture test.
+
+Frontend lint/typecheck, all **183 tests**, build and all **22 browser journeys**
+passed. Ordinary Compose configuration and diff whitespace checks passed. The actual
+PowerShell operator helper passed list/retry/stale-cancel/current-cancel checks against
+a synthetic disposable database; the final row was CANCELLED, attempts remained one,
+version advanced twice and ciphertext was purged. Its resources and all browser
+projects were removed. The original development stack was not changed or migrated.
+
+Ignored evidence logs are `.email-stage7-verification.log`,
+`.email-stage7-final-targeted.log`, `.email-stage7-frontend.log`,
+`.email-stage7-browser.log` and `.email-stage7-operator.log`. Tests used no provider
+credentials or external recipients. SMTP/worker stay disabled by default; public
+verification/recovery APIs and production provider/DNS/feedback qualification remain
+later work. Stable Message-ID does not guarantee deduplication, and a JVM DNS lookup
+can outlast socket cancellation; production network behavior is not certified here.
